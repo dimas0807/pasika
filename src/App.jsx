@@ -23,6 +23,8 @@ import OrdersAdmin from "./admin/OrdersAdmin";
 import OrderDetail from "./admin/OrderDetail";
 import SettingsAdmin from "./admin/SettingsAdmin";
 
+import BeeFlightSystem from "./components/BeeFlightSystem";
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => window.scrollTo(0, 0), [pathname]);
@@ -31,7 +33,8 @@ function ScrollToTop() {
 
 function StoreLayout({ children }) {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      <BeeFlightSystem />
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

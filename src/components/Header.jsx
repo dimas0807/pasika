@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import RealisticBee from "./RealisticBee";
 import { useCart } from "../context/CartContext";
 
 const NAV = [
@@ -14,16 +15,36 @@ const NAV = [
 export default function Header() {
   const { count } = useCart();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+  const isHome = location.pathname === "/";
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 30);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FFFDF8]/95 backdrop-blur-md border-b border-ink/5 transition-all">
+    <header
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        scrolled || !isHome
+          ? "bg-[#FFFDF8]/90 backdrop-blur-md border-b border-ink/5 shadow-2xs"
+          : "bg-white/35 backdrop-blur-md border-b border-white/25 shadow-2xs"
+      }`}
+    >
       <div className="container-p flex items-center justify-between h-16 md:h-20">
-        {/* Brand Logo */}
+        {/* Brand Logo with Realistic 3D Bee */}
         <Link
           to="/"
-          className="flex items-center gap-2.5 font-serif text-2xl md:text-3xl font-bold text-ink tracking-tight hover:opacity-90 transition-opacity shrink-0"
+          className="flex items-center gap-2.5 font-serif text-2xl md:text-3xl font-extrabold text-ink tracking-tight hover:opacity-90 transition-opacity shrink-0"
         >
-          <span className="text-2xl md:text-3xl leading-none">🐝</span>
+          <div className="w-8 h-8 flex items-center justify-center">
+            <RealisticBee size={28} depth="near" />
+          </div>
           <span className="bg-gradient-to-r from-ink via-ink to-[#4A4031] bg-clip-text">Honey</span>
         </Link>
 
@@ -34,10 +55,10 @@ export default function Header() {
               key={n.to}
               to={n.to}
               className={({ isActive }) =>
-                `relative py-1 hover:text-honey transition-colors ${
+                `relative py-1 transition-colors hover:text-honey ${
                   isActive
-                    ? "text-honey font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
-                    : "text-ink/75"
+                    ? "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
+                    : "text-ink/80"
                 }`
               }
             >
@@ -51,16 +72,26 @@ export default function Header() {
           {/* Direct Phone Call */}
           <a
             href="tel:+380678352311"
-            className="hidden md:flex items-center gap-2 text-xs lg:text-sm font-semibold text-ink/80 hover:text-honey transition-colors py-1.5 px-3 rounded-full hover:bg-cream"
+            className="hidden md:flex items-center gap-2 text-xs lg:text-sm font-semibold text-ink/85 hover:text-honey transition-colors py-1.5 px-3 rounded-full hover:bg-white/60"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-honey">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-honey"
+            >
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
             </svg>
             <span>+380 67 835 23 11</span>
           </a>
 
           {/* Social Links (Desktop) */}
-          <div className="hidden xl:flex items-center gap-3 border-l border-ink/10 pl-4 text-xs font-medium text-ink/60">
+          <div className="hidden xl:flex items-center gap-3 border-l border-ink/10 pl-4 text-xs font-medium text-ink/65">
             <a
               href="https://www.tiktok.com/@honey.dsv"
               target="_blank"
@@ -71,7 +102,7 @@ export default function Header() {
             </a>
             <span className="text-ink/20">•</span>
             <a
-              href="https://t.me"
+              href="https://t.me/honey_dsv"
               target="_blank"
               rel="noreferrer"
               className="hover:text-honey transition-colors"
@@ -83,7 +114,7 @@ export default function Header() {
           {/* Cart Trigger */}
           <Link
             to="/cart"
-            className="relative p-2.5 rounded-full hover:bg-cream/80 text-ink hover:text-honey transition-all active:scale-95"
+            className="relative p-2.5 rounded-full hover:bg-white/60 text-ink hover:text-honey transition-all active:scale-95"
             aria-label="Кошик покупок"
           >
             <CartIcon />
@@ -96,7 +127,7 @@ export default function Header() {
 
           {/* Mobile Menu Hamburger */}
           <button
-            className="lg:hidden p-2 rounded-xl text-ink hover:bg-cream transition-colors"
+            className="lg:hidden p-2 rounded-xl text-ink hover:bg-white/60 transition-colors"
             onClick={() => setOpen((o) => !o)}
             aria-label="Меню навігації"
           >
@@ -107,7 +138,7 @@ export default function Header() {
 
       {/* Mobile Drawer Menu */}
       {open && (
-        <div className="lg:hidden border-t border-ink/5 bg-[#FFFDF8] px-4 pt-2 pb-6 shadow-xl animate-fadeIn">
+        <div className="lg:hidden border-t border-ink/5 bg-[#FFFDF8]/95 backdrop-blur-md px-4 pt-2 pb-6 shadow-xl animate-fadeIn">
           <nav className="flex flex-col gap-1 py-2">
             {NAV.map((n) => (
               <NavLink
@@ -117,7 +148,7 @@ export default function Header() {
                 className={({ isActive }) =>
                   `py-3 px-3 rounded-xl text-base font-medium transition-colors ${
                     isActive
-                      ? "bg-cream text-honey font-semibold"
+                      ? "bg-cream text-honey font-bold"
                       : "text-ink/80 hover:bg-cream/50"
                   }`
                 }
@@ -130,15 +161,25 @@ export default function Header() {
           <div className="mt-4 pt-4 border-t border-ink/5 space-y-3">
             <a
               href="tel:+380678352311"
-              className="flex items-center gap-2 text-sm font-semibold text-ink px-3 py-2 rounded-xl bg-cream/60"
+              className="flex items-center gap-2 text-sm font-semibold text-ink px-3 py-2 rounded-xl bg-cream/70"
             >
               <span className="text-honey">📞</span> +380 67 835 23 11
             </a>
             <div className="flex gap-4 px-3 text-sm text-ink/70">
-              <a href="https://www.tiktok.com/@honey.dsv" target="_blank" rel="noreferrer" className="hover:text-honey font-medium">
+              <a
+                href="https://www.tiktok.com/@honey.dsv"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-honey font-medium"
+              >
                 TikTok ↗
               </a>
-              <a href="https://t.me" target="_blank" rel="noreferrer" className="hover:text-honey font-medium">
+              <a
+                href="https://t.me/honey_dsv"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-honey font-medium"
+              >
                 Telegram ↗
               </a>
             </div>

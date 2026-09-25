@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import BeeScene from "../components/BeeScene";
+import RealisticBee from "../components/RealisticBee";
 import TikTokCard from "../components/TikTokCard";
 
 const VALUES = [
   {
-    icon: "🐝",
+    icon: <RealisticBee size={34} depth="near" />,
     title: "Власна сімейна пасіка",
     desc: "Це родинна справа, яка почалася з одного вулика і за 10 років виросла у власне виробництво.",
   },
@@ -36,7 +36,7 @@ const STORY_STEPS = [
     step: "Розвиток",
     title: "Любов до справи",
     desc: "Терпіння, уважність і щоденне вивчення життя бджіл.",
-    icon: "🐝",
+    icon: <RealisticBee size={28} depth="near" />,
   },
   {
     step: "Сьогодні",
@@ -130,8 +130,6 @@ export default function About() {
     <div className="overflow-x-hidden pb-16">
       {/* 1. HERO & EDITORIAL LAYOUT */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#F7F1E5] via-[#FCF9F2] to-[#FFFDF8] border-b border-ink/5 pt-8 pb-14 md:py-20">
-        <BeeScene />
-
         <div className="container-p relative z-20">
           <nav className="text-xs text-ink/50 mb-4 flex items-center gap-1.5">
             <Link to="/" className="hover:text-honey transition-colors">Головна</Link>
@@ -202,7 +200,9 @@ export default function About() {
                 </div>
                 {/* Decorative floating badge */}
                 <div className="absolute -bottom-4 -left-4 sm:bottom-6 sm:-left-6 bg-white/95 backdrop-blur-md border border-gold/30 rounded-2xl p-4 shadow-lg flex items-center gap-3">
-                  <span className="text-3xl">🐝</span>
+                  <div className="w-9 h-9 flex items-center justify-center">
+                    <RealisticBee size={32} depth="near" />
+                  </div>
                   <div>
                     <div className="text-xs font-bold text-ink uppercase tracking-wide">10 років досвіду</div>
                     <div className="text-[11px] text-ink/60">Родинна пасіка на Прикарпатті</div>
@@ -520,11 +520,11 @@ export default function About() {
             {/* Text description */}
             <div className="md:col-span-7">
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/20 shadow-2xs mb-4">
-                <span>🐝</span>
+                <RealisticBee size={18} depth="near" />
                 <span>Офіційний TikTok: @honey.dsv</span>
               </div>
               <h2 className="font-serif text-2xl sm:text-4xl font-extrabold text-ink leading-tight">
-                Більше життя нашої пасіки — у TikTok 🐝
+                Більше життя нашої пасіки — у TikTok
               </h2>
               <p className="mt-3 text-ink/75 text-sm sm:text-base leading-relaxed max-w-xl">
                 Щодня пасіка має своє життя. Більше моментів із нашої роботи, бджіл та меду дивіться у TikTok.
