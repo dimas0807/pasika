@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+body {
+  background: #FFFDF8;
+  color: #292821;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+h1,h2,h3,.font-serif { font-family: 'Playfair Display', Georgia, serif; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #D99A1966; border-radius: 8px; }
+
+.container-p { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 bg-honey hover:bg-accent text-white hover:text-ink font-semibold px-6 py-3 rounded-full transition-colors duration-200 shadow-soft;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 bg-white border border-honey/40 text-ink hover:border-honey font-semibold px-6 py-3 rounded-full transition-colors duration-200;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 text-ink/80 hover:text-honey font-medium transition-colors;
+}
+.card { @apply bg-white rounded-2xl shadow-soft border border-ink/5; }
+.input {
+  @apply w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-honey/50 focus:border-honey transition;
+}
+.label { @apply block text-sm font-medium text-ink/70 mb-1.5; }
+.badge { @apply inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full; }
+
+@keyframes floaty {
+  0% { transform: translate(0,0) rotate(0deg); }
+  50% { transform: translate(6px,-10px) rotate(3deg); }
+  100% { transform: translate(0,0) rotate(0deg); }
+}
+.bee { animation: floaty 6s ease-in-out infinite; }
+.bee-2 { animation: floaty 8s ease-in-out infinite; animation-delay: -2s; }
+.bee-3 { animation: floaty 7s ease-in-out infinite; animation-delay: -4s; }
+
+@keyframes drift {
+  0% { transform: translateX(-10px) translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(120px) translateY(-40px); opacity: 0; }
+}
+.pollen { animation: drift 9s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bee, .bee-2, .bee-3, .pollen { animation: none; }
+}
