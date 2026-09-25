@@ -12,7 +12,7 @@ export default function Contacts() {
 
   const phone = s?.contacts?.phone || "+380 67 835 23 11";
   const email = s?.contacts?.email || "hello@pasika-honey.ua";
-  const tiktok = s?.contacts?.tiktok || "@pasika.honey";
+  const tiktok = s?.contacts?.tiktok || "@honey.dsv";
   const telegram = s?.contacts?.telegram || "@pasika_honey";
 
   return (
@@ -49,7 +49,7 @@ export default function Contacts() {
           icon="📱"
           label="TikTok"
           value={tiktok}
-          link="https://tiktok.com"
+          link="https://www.tiktok.com/@honey.dsv"
           btnText="Перейти ↗"
           external
         />

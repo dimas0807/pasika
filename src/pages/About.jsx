@@ -101,19 +101,24 @@ export default function About() {
 
       {/* TikTok Card Banner */}
       <section className="container-p pb-12">
-        <div className="card p-8 md:p-12 text-center bg-gradient-to-br from-[#1E2022] to-[#2B2E32] text-[#FFFDF8] rounded-3xl shadow-xl">
+        <div className="card p-8 md:p-12 text-center bg-gradient-to-br from-[#FAF6EE] via-[#FDFBF7] to-[#F3ECD9] border border-gold/40 text-ink rounded-3xl shadow-sm">
           <span className="text-2xl mb-2 inline-block">🐝</span>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold">Більше життя нашої пасіки — у TikTok</h2>
-          <p className="mt-2 text-white/70 text-sm max-w-lg mx-auto">
-            Щоденні ролики з пасіки: як працюють бджілки, як качають мед та як ми готуємо ваші замовлення.
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/20 shadow-2xs mb-3">
+            <span>Офіційний TikTok: @honey.dsv</span>
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-ink">
+            Більше життя нашої пасіки — у TikTok
+          </h2>
+          <p className="mt-2 text-ink/75 text-sm max-w-lg mx-auto leading-relaxed">
+            Підписуйтесь на наш офіційний канал <b>@honey.dsv</b>: показуємо щоденне життя пасіки, процес збору меду та залаштунки виробництва.
           </p>
           <a
-            href="https://tiktok.com"
+            href="https://www.tiktok.com/@honey.dsv"
             target="_blank"
             rel="noreferrer"
-            className="btn-primary mt-6 inline-flex text-sm px-6 py-3 font-bold"
+            className="btn-primary mt-6 inline-flex text-sm sm:text-base px-7 py-3.5 font-bold shadow-md hover:shadow-lg"
           >
-            Дивитися у TikTok ↗
+            Дивитися нашу пасіку в TikTok →
           </a>
         </div>
       </section>

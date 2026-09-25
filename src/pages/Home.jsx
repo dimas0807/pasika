@@ -21,26 +21,24 @@ const CATEGORY_IMAGES = {
   "gift-boxes": "/images/prod-gift-box.jpg",
 };
 
-const TIKTOK_VIDEOS = [
+const TIKTOK_PROFILE_URL = "https://www.tiktok.com/@honey.dsv";
+
+const TIKTOK_PREVIEWS = [
   {
-    image: "/images/tiktok-1.jpg",
-    title: "Свіжий мед з наших пасік",
-    views: "16.4K",
+    image: "/tiktok/preview-1.jpg",
+    label: "Життя пасіки",
   },
   {
-    image: "/images/tiktok-2.jpg",
-    title: "Бджілки-трудівниці на роботі",
-    views: "24.1K",
+    image: "/tiktok/preview-2.jpg",
+    label: "Праця бджіл",
   },
   {
-    image: "/images/tiktok-3.jpg",
-    title: "Збір меду в літній день",
-    views: "19.8K",
+    image: "/tiktok/preview-3.jpg",
+    label: "Свіжий мед",
   },
   {
-    image: "/images/tiktok-4.jpg",
-    title: "Пакування крафтових боксів",
-    views: "12.3K",
+    image: "/tiktok/preview-4.jpg",
+    label: "Крафтові бокси",
   },
 ];
 
@@ -325,67 +323,65 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 6. TIKTOK / VIDEO SECTION */}
+            {/* 6. TIKTOK / VIDEO SECTION */}
       <section className="container-p pb-20">
-        <div className="rounded-3xl bg-gradient-to-br from-[#1E2022] via-[#2A2D30] to-[#1C1F22] text-[#FFFDF8] p-6 sm:p-10 md:p-12 shadow-xl">
+        <div className="rounded-3xl bg-gradient-to-br from-[#FAF6EE] via-[#FDFBF7] to-[#F3ECD9] border border-gold/40 text-ink p-6 sm:p-10 md:p-12 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-accent bg-white/10 px-3 py-1 rounded-full">
-                Відео з пасіки
-              </span>
-              <h2 className="font-serif text-2xl sm:text-4xl font-bold mt-3">
-                Більше життя нашої пасіки — у TikTok 🐝
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/20 shadow-2xs">
+                <span>🐝</span>
+                <span>Офіційний TikTok: @honey.dsv</span>
+              </div>
+              <h2 className="font-serif text-2xl sm:text-4xl font-extrabold text-ink mt-3 leading-tight">
+                Більше життя нашої пасіки — у TikTok
               </h2>
-              <p className="mt-2 text-white/70 text-sm sm:text-base max-w-xl">
-                Дивіться, як живе наша пасіка, як працюють бджілки та як народжується натуральний мед.
+              <p className="mt-2 text-ink/75 text-sm sm:text-base max-w-xl leading-relaxed">
+                Підписуйтесь на наш офіційний канал <b>@honey.dsv</b>: показуємо щоденне життя пасіки, процес збору меду та залаштунки створення нашої продукції.
               </p>
             </div>
             <a
-              href="https://tiktok.com"
+              href={TIKTOK_PROFILE_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 bg-accent hover:bg-honey text-ink font-bold px-6 py-3 rounded-xl transition-all shadow-md active:scale-95 shrink-0"
+              className="btn-primary text-sm sm:text-base px-7 py-3.5 font-bold shadow-md hover:shadow-lg shrink-0 flex items-center gap-2"
             >
-              <span>Ми в TikTok</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .58.04.86.11V9.41a6.33 6.33 0 0 0-.86-.06 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.45a8.27 8.27 0 0 0 4.82 1.54V6.69z" />
-              </svg>
+              <span>Дивитися нашу пасіку в TikTok →</span>
             </a>
           </div>
 
-          {/* 4 Vertical Video Cards */}
+          {/* 4 Vertical Video Preview Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {TIKTOK_VIDEOS.map((v, i) => (
+            {TIKTOK_PREVIEWS.map((v, i) => (
               <a
                 key={i}
-                href="https://tiktok.com"
+                href={TIKTOK_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="group relative rounded-2xl overflow-hidden aspect-[9/16] bg-black/40 border border-white/10 hover:border-accent transition-all flex flex-col justify-end p-3 shadow-lg"
+                className="group relative rounded-2xl overflow-hidden aspect-[9/16] bg-[#FAF6EE] border border-ink/10 hover:border-honey shadow-sm hover:shadow-md transition-all flex flex-col justify-end p-3.5"
               >
                 <img
                   src={v.image}
-                  alt={v.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
+                  alt={`Кадр пасіки @honey.dsv ${i + 1}`}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent group-hover:from-black/85 transition-colors" />
 
-                {/* Play Button Icon */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/25 backdrop-blur-md border border-white/40 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                {/* Play Badge Overlay */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/30 backdrop-blur-md border border-white/60 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-honey group-hover:text-ink transition-all shadow-md">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="5 3 19 12 5 21 5 3" />
                   </svg>
                 </div>
 
-                {/* Video Info */}
-                <div className="relative z-10">
-                  <div className="text-[10px] font-semibold text-accent flex items-center gap-1">
-                    <span>👁️</span> {v.views}
+                {/* Card Label */}
+                <div className="relative z-10 text-white">
+                  <span className="text-[11px] font-semibold text-accent/90">@honey.dsv</span>
+                  <div className="text-xs font-bold mt-0.5 line-clamp-1">{v.label}</div>
+                  <div className="text-[10px] text-white/70 mt-1 flex items-center gap-1 group-hover:text-accent transition-colors">
+                    <span>Дивитися в TikTok</span>
+                    <span>↗</span>
                   </div>
-                  <h4 className="text-xs font-semibold text-white mt-1 line-clamp-2 leading-tight">
-                    {v.title}
-                  </h4>
                 </div>
               </a>
             ))}

@@ -62,7 +62,7 @@ export default function Header() {
           {/* Social Links (Desktop) */}
           <div className="hidden xl:flex items-center gap-3 border-l border-ink/10 pl-4 text-xs font-medium text-ink/60">
             <a
-              href="https://tiktok.com"
+              href="https://www.tiktok.com/@honey.dsv"
               target="_blank"
               rel="noreferrer"
               className="hover:text-honey transition-colors"
@@ -135,7 +135,7 @@ export default function Header() {
               <span className="text-honey">📞</span> +380 67 835 23 11
             </a>
             <div className="flex gap-4 px-3 text-sm text-ink/70">
-              <a href="https://tiktok.com" target="_blank" rel="noreferrer" className="hover:text-honey font-medium">
+              <a href="https://www.tiktok.com/@honey.dsv" target="_blank" rel="noreferrer" className="hover:text-honey font-medium">
                 TikTok ↗
               </a>
               <a href="https://t.me" target="_blank" rel="noreferrer" className="hover:text-honey font-medium">

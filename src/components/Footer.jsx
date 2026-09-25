@@ -102,7 +102,7 @@ export default function Footer() {
             </li>
             <li className="flex gap-4 pt-2">
               <a
-                href="https://tiktok.com"
+                href="https://www.tiktok.com/@honey.dsv"
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"

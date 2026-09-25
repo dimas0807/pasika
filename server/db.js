@@ -252,7 +252,7 @@ function seedInitialData() {
       contacts: {
         phone: "+380 67 835 23 11",
         email: "hello@pasika-honey.ua",
-        tiktok: "@pasika.honey",
+        tiktok: "@honey.dsv",
         telegram: "@pasika_honey",
       },
       payment: {
