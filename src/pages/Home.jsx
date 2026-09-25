@@ -4,7 +4,6 @@ import ProductCard from "../components/ProductCard";
 import TikTokCard from "../components/TikTokCard";
 import RealisticBee from "../components/RealisticBee";
 import WaxHoneycomb from "../components/WaxHoneycomb";
-import FlowerToHiveScene from "../components/FlowerToHiveScene";
 import { Categories, Products, subscribe } from "../data/db";
 
 const TRUST_BADGES = [
@@ -370,12 +369,7 @@ export default function Home() {
       </section>
 
       {/* ==================================================
-          04 — THE LIVING APIARY: FLOWER → BEE → HIVE JOURNEY
-          ================================================== */}
-      <FlowerToHiveScene />
-
-      {/* ==================================================
-          05 — GIFT BOXES EDITORIAL SHOWCASE (Artisan Craft)
+          04 — GIFT BOXES EDITORIAL SHOWCASE (Artisan Craft)
           ================================================== */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#F7EFE2] via-[#FAF5EC] to-[#F7EFE2] py-16 md:py-24 border-b border-amber-900/10">
         <WaxHoneycomb position="right" withBee={true} className="hidden xl:block" />
@@ -415,7 +409,7 @@ export default function Home() {
       </section>
 
       {/* ==================================================
-          06 — OUR APIARY / ABOUT STORYTELLING (Novoselytsia)
+          05 — OUR APIARY / ABOUT STORYTELLING (Novoselytsia)
           ================================================== */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#FAF5EB] via-[#F4EDE0] to-[#FAF5EB] py-16 md:py-24 border-b border-amber-900/10">
         <div className="container-p relative z-20">
@@ -519,7 +513,7 @@ export default function Home() {
       </section>
 
       {/* ==================================================
-          07 — TIKTOK / VIDEO HOVER PREVIEW SECTION
+          06 — TIKTOK / VIDEO HOVER PREVIEW SECTION
           ================================================== */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#FAF5EB] via-[#F5EDDE] to-[#FAF5EB] py-16 border-b border-amber-900/10">
         <div className="container-p relative z-20">
@@ -558,7 +552,7 @@ export default function Home() {
       </section>
 
       {/* ==================================================
-          08 — FINAL ATMOSPHERIC PHOTO CTA SCENE
+          07 — FINAL ATMOSPHERIC PHOTO CTA SCENE
           ================================================== */}
       <section className="relative overflow-hidden bg-[#FAF5EB] py-16">
         <div className="container-p">
