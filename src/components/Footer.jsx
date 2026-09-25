@@ -81,11 +81,6 @@ export default function Footer() {
                 Контакти
               </Link>
             </li>
-            <li>
-              <Link to="/admin" className="hover:text-accent text-white/40 transition-colors">
-                Адмін-панель
-              </Link>
-            </li>
           </ul>
         </div>
 

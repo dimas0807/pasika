@@ -37,8 +37,11 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
+const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+
 // Fetch helper with error handling and credentials
-async function request(endpoint, options = {}) {
+export async function request(endpoint, options = {}) {
+  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
   const fetchOptions = {
     ...options,
     headers: {
@@ -48,23 +51,53 @@ async function request(endpoint, options = {}) {
     credentials: "same-origin",
   };
 
-  const res = await fetch(endpoint, fetchOptions);
-  const contentType = res.headers.get("content-type") || "";
-
-  // Guard: API responses must always be JSON. If HTML is returned (e.g. SPA fallback on static host), treat as unavailable API.
-  if (!contentType.includes("application/json")) {
-    const err = new Error(`Некоректний тип відповіді сервера (очікувався JSON, отримано ${contentType || "невідомий формат"})`);
-    err.status = res.status;
+  let res;
+  try {
+    res = await fetch(url, fetchOptions);
+  } catch {
+    const err = new Error("Не вдалося підключитися до сервера. Перевірте інтернет-з'єднання.");
+    err.status = 0;
     throw err;
   }
 
-  const data = await res.json();
+  const contentType = res.headers.get("content-type") || "";
+  let data = null;
+
+  if (contentType.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+  }
 
   if (!res.ok) {
-    const errorMsg = data?.error || res.statusText || "Помилка сервера";
+    let errorMsg = data?.error || data?.message;
+    if (!errorMsg) {
+      if (res.status === 401) {
+        errorMsg = "Невірний логін або пароль";
+      } else if (res.status === 403) {
+        errorMsg = "Недостатньо прав";
+      } else if (res.status === 404) {
+        errorMsg = "Admin API endpoint не знайдено";
+      } else if (res.status === 429) {
+        errorMsg = "Забагато спроб запиту. Спробуйте пізніше.";
+      } else if (res.status >= 500) {
+        errorMsg = "Помилка сервера. Спробуйте пізніше.";
+      } else {
+        errorMsg = res.statusText || "Помилка сервера";
+      }
+    }
     const err = new Error(errorMsg);
     err.status = res.status;
     err.data = data;
+    throw err;
+  }
+
+  // Guard: if status is ok, but not JSON (e.g. static host served index.html with 200)
+  if (!contentType.includes("application/json") || data === null) {
+    const err = new Error("Сервер повернув неочікувану відповідь (API недоступний)");
+    err.status = res.status;
     throw err;
   }
 
@@ -330,10 +363,14 @@ export const TelegramLog = {
 // ---------------- Admin Auth ----------------
 export const Auth = {
   isAuthed: () => state.adminAuthed,
+  getUsername: () => state.adminUsername || "admin",
   checkSession: async () => {
     try {
       const res = await request("/api/auth/me");
       state.adminAuthed = Boolean(res?.authenticated);
+      if (res?.username) {
+        state.adminUsername = res.username;
+      }
       notify();
       return state.adminAuthed;
     } catch {
@@ -349,6 +386,7 @@ export const Auth = {
     });
     if (res.success) {
       state.adminAuthed = true;
+      state.adminUsername = res.username || login.trim();
       notify();
       return true;
     }
@@ -359,8 +397,20 @@ export const Auth = {
       await request("/api/auth/logout", { method: "POST" });
     } finally {
       state.adminAuthed = false;
+      state.adminUsername = null;
       notify();
     }
+  },
+  updateSecurity: async ({ currentPassword, newLogin, newPassword, confirmPassword }) => {
+    const res = await request("/api/admin/security", {
+      method: "PUT",
+      body: JSON.stringify({ currentPassword, newLogin, newPassword, confirmPassword }),
+    });
+    if (res?.success && res?.username) {
+      state.adminUsername = res.username;
+      notify();
+    }
+    return res;
   },
 };
 

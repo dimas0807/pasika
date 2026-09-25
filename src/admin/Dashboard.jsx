@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { request } from "../data/db";
 
 const STATUS_LABEL = {
   NEW: "Нове", PROCESSING: "В обробці", PACKED: "Запаковано",
@@ -16,8 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/dashboard")
-      .then((res) => (res.ok ? res.json() : null))
+    request("/api/admin/dashboard")
       .then((d) => {
         if (d) setData(d);
       })

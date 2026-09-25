@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { loginHandler, logoutHandler, meHandler, requireAdminAuth } from "./auth.js";
+import {
+  changeSecurityHandler,
+  loginHandler,
+  logoutHandler,
+  meHandler,
+  requireAdminAuth,
+} from "./auth.js";
 import {
   getBranchesNovaPoshta,
   getBranchesUkrposhta,
@@ -119,6 +125,7 @@ router.post("/admin/products/:id/duplicate", duplicateProduct);
 
 router.get("/admin/settings", getPublicSettings);
 router.put("/admin/settings", updateSettings);
+router.put("/admin/security", changeSecurityHandler);
 router.get("/admin/telegram-log", getTelegramLogs);
 
 export default router;

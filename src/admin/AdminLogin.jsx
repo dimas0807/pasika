@@ -52,11 +52,10 @@ export default function AdminLogin() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        {error && <p className="text-xs text-red-500 mt-2 text-center">{error}</p>}
         <button className="btn-primary w-full mt-5 disabled:opacity-50" disabled={loading}>
           {loading ? "Перевірка..." : "Увійти"}
         </button>
-        <p className="text-xs text-ink/40 text-center mt-4">За замовчуванням: admin / pasika2026 (налаштовується в .env)</p>
       </form>
     </div>
   );
