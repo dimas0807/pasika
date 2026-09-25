@@ -257,49 +257,49 @@ export default function Home() {
           {/* Text & Bullets */}
           <div className="lg:col-span-6">
             <span className="text-xs font-bold uppercase tracking-widest text-honey bg-cream px-3 py-1 rounded-full">
-              Про нашу пасіку
+              Наша історія
             </span>
             <h2 className="font-serif text-2xl sm:text-4xl font-bold text-ink mt-3 leading-snug">
-              Мед, який починається з бджіл
+              Пасіка, яка почалася з одного вулика
             </h2>
             <p className="mt-4 text-ink/75 leading-relaxed text-sm sm:text-base">
-              Ми працюємо з бджолами та створюємо натуральну продукцію, яку хочеться щодня дарувати рідним та смакувати за сімейним столом. Кожна банка проходить дбайливий контроль без пастеризації та перегріву.
+              Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, а сьогодні на пасіці налічується більше ста вуликів.
             </p>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-ink/5">
                 <span className="text-2xl">🐝</span>
                 <div>
-                  <h4 className="text-sm font-bold text-ink">Власна пасіка</h4>
-                  <p className="text-xs text-ink/60 mt-0.5">Розташована серед квітучих луків</p>
+                  <h4 className="text-sm font-bold text-ink">10 років досвіду</h4>
+                  <p className="text-xs text-ink/60 mt-0.5">Від першого вулика до власного виробництва</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-ink/5">
                 <span className="text-2xl">🍯</span>
                 <div>
-                  <h4 className="text-sm font-bold text-ink">Натуральні продукти</h4>
-                  <p className="text-xs text-ink/60 mt-0.5">Без доданого цукру чи барвників</p>
+                  <h4 className="text-sm font-bold text-ink">Понад 100 вуликів</h4>
+                  <p className="text-xs text-ink/60 mt-0.5">Одна родинна справа та щоденна турбота</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-ink/5">
-                <span className="text-2xl">🌿</span>
+                <span className="text-2xl">📍</span>
                 <div>
-                  <h4 className="text-sm font-bold text-ink">Турбота про бджіл</h4>
-                  <p className="text-xs text-ink/60 mt-0.5">Екологічний підхід до бджільництва</p>
+                  <h4 className="text-sm font-bold text-ink">Прикарпаття</h4>
+                  <p className="text-xs text-ink/60 mt-0.5">Село Новоселиця, Снятинський район</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-xl bg-white border border-ink/5">
                 <span className="text-2xl">💛</span>
                 <div>
-                  <h4 className="text-sm font-bold text-ink">Якість у баночці</h4>
-                  <p className="text-xs text-ink/60 mt-0.5">Ручний збір та фасування</p>
+                  <h4 className="text-sm font-bold text-ink">Натуральні продукти</h4>
+                  <p className="text-xs text-ink/60 mt-0.5">Мед, соти, крем-меди та набори</p>
                 </div>
               </div>
             </div>
 
             <div className="mt-8">
               <Link to="/about" className="btn-secondary text-sm">
-                Більше про наше господарство →
+                Наша історія та цінності →
               </Link>
             </div>
           </div>
