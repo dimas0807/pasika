@@ -2,52 +2,169 @@
 @tailwind components;
 @tailwind utilities;
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: #FFFDF8;
   color: #292821;
   font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
 }
-h1,h2,h3,.font-serif { font-family: 'Playfair Display', Georgia, serif; }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #D99A1966; border-radius: 8px; }
+h1, h2, h3, .font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
 
-.container-p { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F1E5;
+}
+::-webkit-scrollbar-thumb {
+  background: #D99A1988;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D99A19CC;
+}
+
+.container-p {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 bg-honey hover:bg-accent text-white hover:text-ink font-semibold px-6 py-3 rounded-full transition-colors duration-200 shadow-soft;
+  @apply inline-flex items-center justify-center gap-2 bg-gradient-to-r from-honey to-[#E6A620] hover:from-accent hover:to-honey text-[#292821] font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98];
 }
+
 .btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 bg-white border border-honey/40 text-ink hover:border-honey font-semibold px-6 py-3 rounded-full transition-colors duration-200;
+  @apply inline-flex items-center justify-center gap-2 bg-white/90 hover:bg-cream border border-honey/30 hover:border-honey text-ink font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-sm active:scale-[0.98];
 }
+
 .btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 text-ink/80 hover:text-honey font-medium transition-colors;
+  @apply inline-flex items-center justify-center gap-1.5 text-ink/80 hover:text-honey font-medium transition-colors;
 }
-.card { @apply bg-white rounded-2xl shadow-soft border border-ink/5; }
+
+.card {
+  @apply bg-white rounded-2xl shadow-soft border border-ink/5 transition-all duration-200;
+}
+
+.card-hover {
+  @apply hover:-translate-y-1 hover:shadow-lg transition-all duration-300;
+}
+
 .input {
-  @apply w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-honey/50 focus:border-honey transition;
+  @apply w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-honey/50 focus:border-honey transition placeholder:text-ink/35;
 }
-.label { @apply block text-sm font-medium text-ink/70 mb-1.5; }
-.badge { @apply inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full; }
 
-@keyframes floaty {
-  0% { transform: translate(0,0) rotate(0deg); }
-  50% { transform: translate(6px,-10px) rotate(3deg); }
-  100% { transform: translate(0,0) rotate(0deg); }
+.label {
+  @apply block text-xs font-semibold uppercase tracking-wider text-ink/65 mb-1.5;
 }
-.bee { animation: floaty 6s ease-in-out infinite; }
-.bee-2 { animation: floaty 8s ease-in-out infinite; animation-delay: -2s; }
-.bee-3 { animation: floaty 7s ease-in-out infinite; animation-delay: -4s; }
 
-@keyframes drift {
-  0% { transform: translateX(-10px) translateY(0); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateX(120px) translateY(-40px); opacity: 0; }
+.badge {
+  @apply inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full;
 }
-.pollen { animation: drift 9s linear infinite; }
+
+/* Realistic Flying Bee Keyframes */
+@keyframes wing-flutter {
+  0%, 100% {
+    transform: scaleY(1) rotate(0deg);
+  }
+  50% {
+    transform: scaleY(0.2) rotate(-15deg);
+  }
+}
+
+@keyframes bee-hover-bob {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+}
+
+@keyframes bee-flight-path {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -20px) scale(1.05);
+  }
+  50% {
+    transform: translate(15px, 15px) scale(0.95);
+  }
+  75% {
+    transform: translate(-20px, -10px) scale(1.02);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes bee-flight-path-2 {
+  0% {
+    transform: translate(0, 0) scale(0.9);
+  }
+  30% {
+    transform: translate(-35px, 20px) scale(0.95);
+  }
+  70% {
+    transform: translate(25px, -15px) scale(0.85);
+  }
+  100% {
+    transform: translate(0, 0) scale(0.9);
+  }
+}
+
+.wing-animated {
+  transform-origin: 20px 14px;
+  animation: wing-flutter 0.08s ease-in-out infinite;
+}
+
+.bee-body-hover {
+  animation: bee-hover-bob 3.5s ease-in-out infinite;
+}
+
+.bee-path-1 {
+  animation: bee-flight-path 9s ease-in-out infinite;
+}
+
+.bee-path-2 {
+  animation: bee-flight-path-2 12s ease-in-out infinite;
+}
+
+/* Subtle Golden Pollen Drift */
+@keyframes pollen-float {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-60px) translateX(40px);
+    opacity: 0;
+  }
+}
+
+.pollen-particle {
+  animation: pollen-float 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .bee, .bee-2, .bee-3, .pollen { animation: none; }
+  .wing-animated,
+  .bee-body-hover,
+  .bee-path-1,
+  .bee-path-2,
+  .pollen-particle {
+    animation: none !important;
+  }
 }
