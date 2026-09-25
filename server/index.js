@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initDatabase } from "./db.js";
 import apiRouter from "./routes.js";
-import { serveReceiptFile, STORAGE_DIR } from "./storage.js";
+import { serveReceiptFile, STORAGE_DIR, PRODUCTS_STORAGE_DIR } from "./storage.js";
 
 // Load environment variables
 dotenv.config();
@@ -22,6 +22,9 @@ export const app = express();
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Serve uploaded product photos publicly
+app.use("/uploads/products", express.static(PRODUCTS_STORAGE_DIR));
 
 // Securely serve uploaded receipts (requires admin auth or customer/checkout token)
 app.get("/uploads/receipts/:filename", serveReceiptFile);

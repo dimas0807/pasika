@@ -28,14 +28,19 @@ import {
   getProductById,
   getProductBySlug,
   saveProduct,
+  saveCategory,
+  deleteCategory,
 } from "./products.js";
-import { getPublicSettings, getTelegramLogs, updateSettings } from "./settings.js";
+import { getAdminSettings, getPublicSettings, getTelegramLogs, updateSettings } from "./settings.js";
 import {
+  handleProductImageUpload,
   handleReceiptUpload,
   serveReceiptFile,
+  uploadProductImageMulter,
   uploadReceiptMulter,
   uploadReceiptValidationMiddleware,
 } from "./storage.js";
+import { testTelegramConnection } from "./telegram.js";
 
 const router = Router();
 
@@ -129,9 +134,32 @@ router.put("/admin/products/:id", saveProduct);
 router.delete("/admin/products/:id", deleteProduct);
 router.post("/admin/products/:id/duplicate", duplicateProduct);
 
-router.get("/admin/settings", getPublicSettings);
+// Product Image Upload
+router.post("/upload-product-image", (req, res) => {
+  uploadProductImageMulter.fields([
+    { name: "file", maxCount: 1 },
+    { name: "image", maxCount: 1 },
+  ])(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    handleProductImageUpload(req, res);
+  });
+});
+
+// Categories Management
+router.post("/admin/categories", saveCategory);
+router.delete("/admin/categories/:slug", deleteCategory);
+
+// Settings & Telegram
+router.get("/admin/settings", getAdminSettings);
 router.put("/admin/settings", updateSettings);
 router.put("/admin/security", changeSecurityHandler);
 router.get("/admin/telegram-log", getTelegramLogs);
+router.post("/admin/telegram/test", async (req, res) => {
+  const { botToken, chatId } = req.body || {};
+  const result = await testTelegramConnection(botToken, chatId);
+  return res.json(result);
+});
 
 export default router;

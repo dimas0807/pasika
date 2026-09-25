@@ -5,9 +5,12 @@ import { PRODUCTS as SEED_PRODUCTS, CATEGORIES as SEED_CATEGORIES, DEFAULT_SETTI
 
 // Clean seed settings without admin credentials
 const SAFE_SEED_SETTINGS = {
+  store: SEED_SETTINGS.store,
+  about: SEED_SETTINGS.about,
   contacts: SEED_SETTINGS.contacts,
   payment: SEED_SETTINGS.payment,
   delivery: SEED_SETTINGS.delivery,
+  telegram: SEED_SETTINGS.telegram,
 };
 
 // In-memory runtime cache for fast rendering and seamless offline/initial hydration
@@ -153,6 +156,23 @@ export const Categories = {
     } catch {
       return Categories.all();
     }
+  },
+  save: async (cat) => {
+    const saved = await request("/api/admin/categories", {
+      method: "POST",
+      body: JSON.stringify(cat),
+    });
+    const idx = state.categories.findIndex((c) => c.slug === saved.slug);
+    if (idx >= 0) state.categories[idx] = saved;
+    else state.categories.push(saved);
+    notify();
+    return saved;
+  },
+  delete: async (slug) => {
+    await request(`/api/admin/categories/${slug}`, { method: "DELETE" });
+    state.categories = state.categories.filter((c) => c.slug !== slug);
+    notify();
+    return true;
   },
 };
 
@@ -332,6 +352,18 @@ export const Settings = {
       return Settings.get();
     }
   },
+  fetchAdmin: async () => {
+    try {
+      const settings = await request("/api/admin/settings");
+      if (settings && typeof settings === "object" && !Array.isArray(settings)) {
+        state.settings = settings;
+        notify();
+      }
+      return Settings.get();
+    } catch {
+      return Settings.get();
+    }
+  },
   save: async (settings) => {
     const updated = await request("/api/admin/settings", {
       method: "PUT",
@@ -459,5 +491,57 @@ export const Storage = {
       name: data.originalName || file.name,
       filename: data.filename,
     };
+  },
+  uploadProductImage: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("image", file);
+
+    const url = `${API_BASE}/api/upload-product-image`;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      });
+    } catch {
+      throw new Error("Не вдалося підключитися до сервера для завантаження фото товару.");
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    let data = null;
+    if (contentType.includes("application/json")) {
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!res.ok) {
+      const errorMsg = data?.error || "Не вдалося завантажити фото товару. Спробуйте ще раз.";
+      throw new Error(errorMsg);
+    }
+
+    if (!data || !data.fileUrl) {
+      throw new Error("Не вдалося завантажити фото товару. Спробуйте ще раз.");
+    }
+
+    return {
+      fileUrl: data.fileUrl,
+      name: data.originalName || file.name,
+      filename: data.filename,
+    };
+  },
+};
+
+// ---------------- Telegram Bot API ----------------
+export const Telegram = {
+  testConnection: async ({ botToken, chatId } = {}) => {
+    return await request("/api/admin/telegram/test", {
+      method: "POST",
+      body: JSON.stringify({ botToken, chatId }),
+    });
   },
 };

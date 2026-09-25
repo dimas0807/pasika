@@ -65,6 +65,26 @@ const SEED_PRODUCTS = [
 ];
 
 const DEFAULT_SETTINGS = {
+  store: {
+    name: "Honey Pasika",
+    phone: "+380 67 835 23 11",
+    email: "hello@pasika-honey.ua",
+    address: "Прикарпаття, с. Новоселиця, Снятинський район",
+    workingHours: "Пн-Нд 09:00 - 20:00",
+    instagram: "@honey_pasika",
+    tiktok: "@honey.dsv",
+    telegram: "@pasika_honey",
+    description: "Натуральний мед та продукти бджільництва з родинної пасіки на Прикарпатті.",
+  },
+  about: {
+    title: "Родинна пасіка в серці Прикарпаття",
+    shortText: "Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району.",
+    fullDescription: "Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів. З того часу любов до бджільництва виросла у власне сімейне виробництво натурального меду найвищої якості.",
+    foundationYear: "2014",
+    hivesCount: "100+",
+    location: "с. Новоселиця, Івано-Франківська обл.",
+    image: "/images/about-apiary.jpg",
+  },
   contacts: {
     phone: "+380 67 835 23 11",
     email: "hello@pasika-honey.ua",
@@ -73,8 +93,8 @@ const DEFAULT_SETTINGS = {
   },
   payment: {
     bank: "monobank",
-    card: "4441 1111 2222 3333",
-    holder: "Олена Петріна",
+    card: "",
+    holder: "",
     purpose: "Оплата замовлення",
     instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення.",
   },
@@ -82,12 +102,49 @@ const DEFAULT_SETTINGS = {
     novaPoshtaEnabled: true,
     ukrposhtaEnabled: true,
   },
+  telegram: {
+    botToken: "",
+    chatId: "",
+  },
 };
 
 // In-memory cache for edge runtime worker lifetime
 let memoryOrders = [];
 let memorySettings = { ...DEFAULT_SETTINGS };
 let memoryProducts = [...SEED_PRODUCTS];
+let memoryCategories = [...SEED_CATEGORIES];
+const memoryProductImages = new Map();
+
+const UKR_TO_LAT = {
+  а: "a", б: "b", в: "v", г: "h", ґ: "g", д: "d", е: "e", є: "ye", ж: "zh",
+  з: "z", и: "y", і: "i", ї: "yi", й: "y", к: "k", л: "l", м: "m", н: "n",
+  о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts",
+  ч: "ch", ш: "sh", щ: "shch", ь: "", ю: "yu", я: "ya",
+  "’": "", "'": "", "`": "", "ʼ": "",
+};
+
+function transliterateUa(text = "") {
+  return String(text)
+    .toLowerCase()
+    .split("")
+    .map((char) => (UKR_TO_LAT[char] !== undefined ? UKR_TO_LAT[char] : char))
+    .join("")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function resolveEdgeUniqueSlug(baseSlug, productId = null) {
+  let slug = baseSlug || "product";
+  let count = 2;
+  while (true) {
+    const existing = memoryProducts.find((p) => p.slug === slug && p.id !== productId);
+    if (!existing) {
+      return slug;
+    }
+    slug = `${baseSlug}-${count}`;
+    count++;
+  }
+}
 
 // ---------------- Crypto & Security Helpers ----------------
 
@@ -333,12 +390,18 @@ export async function onRequest(context) {
 
   // Categories
   if (path === "/categories" && method === "GET") {
-    return jsonResponse(SEED_CATEGORIES);
+    return jsonResponse(memoryCategories);
   }
 
   // Settings (Public)
   if (path === "/settings" && method === "GET") {
-    return jsonResponse(memorySettings);
+    const publicSettings = { ...memorySettings };
+    if (publicSettings.telegram) {
+      publicSettings.telegram = {
+        configured: Boolean(publicSettings.telegram.chatId),
+      };
+    }
+    return jsonResponse(publicSettings);
   }
 
   // Delivery search
@@ -569,6 +632,72 @@ export async function onRequest(context) {
     });
   }
 
+  // Product Image Upload
+  if (path === "/upload-product-image" && method === "POST") {
+    try {
+      const contentType = request.headers.get("content-type") || "";
+      if (!contentType.includes("multipart/form-data")) {
+        return jsonResponse({ error: "Очікується multipart/form-data запит" }, 400);
+      }
+      const formData = await request.formData();
+      const file = formData.get("file") || formData.get("image");
+      if (!file || typeof file === "string") {
+        return jsonResponse({ error: "Файл зображення не надано" }, 400);
+      }
+
+      const lowerName = file.name.toLowerCase();
+      const validExts = [".jpg", ".jpeg", ".png", ".webp"];
+      const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
+      const isMimeValid =
+        file.type === "image/jpeg" ||
+        file.type === "image/png" ||
+        file.type === "image/webp";
+
+      if (!isExtValid && !isMimeValid) {
+        return jsonResponse({ error: "Дозволено лише файли форматів JPG, PNG або WEBP" }, 400);
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        return jsonResponse({ error: "Розмір файлу не повинен перевищувати 10 МБ" }, 400);
+      }
+
+      const ext = lowerName.match(/\.[a-z0-9]+$/)?.[0] || ".jpg";
+      const filename = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+      const fileUrl = `/uploads/products/${filename}`;
+
+      const bytes = await file.arrayBuffer();
+      memoryProductImages.set(filename, { bytes, type: file.type || "image/jpeg" });
+
+      return jsonResponse({
+        success: true,
+        fileUrl,
+        originalName: file.name,
+        filename,
+      }, 200);
+    } catch (err) {
+      return jsonResponse({ error: err.message || "Не вдалося завантажити фото" }, 500);
+    }
+  }
+
+  // Serve product images
+  if (path.startsWith("/uploads/products/") && method === "GET") {
+    const filename = path.replace("/uploads/products/", "");
+    const item = memoryProductImages.get(filename);
+    if (item) {
+      return new Response(item.bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": item.type,
+          "Cache-Control": "public, max-age=31536000",
+        },
+      });
+    }
+    return new Response(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="100%" height="100%" fill="#FAF6EE"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#D99A19">🐝 Honey Pasika</text></svg>`,
+      { status: 200, headers: { "Content-Type": "image/svg+xml; charset=utf-8" } }
+    );
+  }
+
   // ---------------- Protected Admin Endpoints ----------------
 
   if (path.startsWith("/admin")) {
@@ -705,9 +834,23 @@ export async function onRequest(context) {
     }
     if (path === "/admin/products" && method === "POST") {
       const body = await request.json().catch(() => ({}));
+      const name = (body.name || "").trim();
+      if (!name) {
+        return jsonResponse({ error: "Назва товару обов'язкова" }, 400);
+      }
+      const image = (body.image || "").trim();
+      if (!image) {
+        return jsonResponse({ error: "Фото товару обов'язкове для створення нового товару" }, 400);
+      }
+      const rawSlug = (body.slug || "").trim() || transliterateUa(name);
+      const cleanSlug = transliterateUa(rawSlug);
+      const slug = resolveEdgeUniqueSlug(cleanSlug);
       const newProd = {
         ...body,
         id: "p_" + Date.now(),
+        name,
+        slug,
+        image,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -721,8 +864,10 @@ export async function onRequest(context) {
       const dup = {
         ...orig,
         id: "p_" + Date.now(),
-        name: orig.name + " (Копія)",
-        slug: orig.slug + "-copy-" + Date.now().toString(36),
+        name: orig.name + " (копія)",
+        slug: resolveEdgeUniqueSlug(orig.slug + "-2"),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
       memoryProducts.unshift(dup);
       return jsonResponse(dup, 201);
@@ -743,14 +888,111 @@ export async function onRequest(context) {
       return jsonResponse({ success: true });
     }
 
+    // Admin Categories
+    if (path === "/admin/categories" && method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const name = (body.name || "").trim();
+      if (!name) return jsonResponse({ error: "Назва категорії обов'язкова" }, 400);
+      let slug = (body.slug || "").trim() || transliterateUa(name);
+      slug = transliterateUa(slug);
+      const icon = (body.icon || "🍯").trim();
+      const sortOrder = Number(body.sortOrder) || 0;
+
+      const idx = memoryCategories.findIndex((c) => c.slug === slug);
+      const catObj = { slug, name, icon, sortOrder };
+      if (idx >= 0) {
+        memoryCategories[idx] = catObj;
+      } else {
+        memoryCategories.push(catObj);
+      }
+      return jsonResponse(catObj);
+    }
+    if (path.startsWith("/admin/categories/") && method === "DELETE") {
+      const slug = path.replace("/admin/categories/", "");
+      const count = memoryProducts.filter((p) => p.category === slug).length;
+      if (count > 0) {
+        return jsonResponse({
+          error: `У цій категорії є ${count} товарів. Спочатку перенесіть товари в іншу категорію.`,
+        }, 400);
+      }
+      memoryCategories = memoryCategories.filter((c) => c.slug !== slug);
+      return jsonResponse({ success: true });
+    }
+
     // Admin Settings
     if (path === "/admin/settings" && method === "GET") {
-      return jsonResponse(memorySettings);
+      const masked = {
+        ...memorySettings,
+        telegram: {
+          hasToken: Boolean(memorySettings.telegram?.botToken),
+          botToken: memorySettings.telegram?.botToken ? "••••••••••••••••" : "",
+          chatId: memorySettings.telegram?.chatId || "",
+        },
+      };
+      return jsonResponse(masked);
     }
     if (path === "/admin/settings" && method === "PUT") {
       const body = await request.json().catch(() => ({}));
-      memorySettings = { ...memorySettings, ...body };
-      return jsonResponse(memorySettings);
+      let finalTelegram = { ...(memorySettings.telegram || {}) };
+      if (body.telegram) {
+        const rawToken = (body.telegram.botToken || "").trim();
+        if (rawToken && rawToken !== "••••••••••••••••") {
+          finalTelegram.botToken = rawToken;
+        }
+        if (body.telegram.chatId !== undefined) {
+          finalTelegram.chatId = String(body.telegram.chatId).trim();
+        }
+      }
+      memorySettings = {
+        ...memorySettings,
+        ...body,
+        telegram: finalTelegram,
+      };
+      return jsonResponse({
+        ...memorySettings,
+        telegram: {
+          hasToken: Boolean(finalTelegram.botToken),
+          botToken: finalTelegram.botToken ? "••••••••••••••••" : "",
+          chatId: finalTelegram.chatId || "",
+        },
+      });
+    }
+
+    // Admin Telegram Test
+    if (path === "/admin/telegram/test" && method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const customToken = (body.botToken && body.botToken !== "••••••••••••••••" ? body.botToken : memorySettings.telegram?.botToken)?.trim();
+      const customChatId = (body.chatId || memorySettings.telegram?.chatId)?.trim();
+      if (!customToken) {
+        return jsonResponse({ ok: false, error: "Telegram Bot Token не налаштовано" });
+      }
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${customToken}/getMe`);
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          return jsonResponse({ ok: false, error: data.description || "Невірний токен бота" });
+        }
+        const botName = data.result?.username ? `@${data.result.username}` : data.result?.first_name || "Bot";
+        if (customChatId) {
+          try {
+            await fetch(`https://api.telegram.org/bot${customToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: customChatId,
+                text: "🐝 Honey Pasika: тестове сповіщення успішно надіслано!",
+              }),
+            });
+          } catch {}
+        }
+        return jsonResponse({
+          ok: true,
+          botName,
+          message: `З'єднання успішне! Бот: ${botName}${customChatId ? " (тестове повідомлення надіслано в чат)" : ""}`,
+        });
+      } catch (err) {
+        return jsonResponse({ ok: false, error: err.message || "Помилка зв'язку з Telegram" });
+      }
     }
 
     // Admin Telegram Log

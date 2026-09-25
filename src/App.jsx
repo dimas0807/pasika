@@ -22,6 +22,8 @@ import ProductForm from "./admin/ProductForm";
 import OrdersAdmin from "./admin/OrdersAdmin";
 import OrderDetail from "./admin/OrderDetail";
 import SettingsAdmin from "./admin/SettingsAdmin";
+import CategoriesAdmin from "./admin/CategoriesAdmin";
+import HelpAdmin from "./admin/HelpAdmin";
 
 import BeeFlightSystem from "./components/BeeFlightSystem";
 
@@ -68,7 +70,9 @@ export default function App() {
           <Route path="products/:id" element={<ProductForm />} />
           <Route path="orders" element={<OrdersAdmin />} />
           <Route path="orders/:id" element={<OrderDetail />} />
+          <Route path="categories" element={<CategoriesAdmin />} />
           <Route path="settings" element={<SettingsAdmin />} />
+          <Route path="help" element={<HelpAdmin />} />
         </Route>
 
         <Route path="*" element={<StoreLayout><NotFound /></StoreLayout>} />

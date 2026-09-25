@@ -20,6 +20,8 @@ storage/receipts/*
 !storage/receipts/.gitkeep
 server/storage/receipts/*
 !server/storage/receipts/.gitkeep
+storage/products/*
+!storage/products/.gitkeep
 
 # Editor directories and files
 .vscode/*

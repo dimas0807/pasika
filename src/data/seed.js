@@ -73,7 +73,45 @@ export const PRODUCTS = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  contacts: { phone: "+380 67 835 23 11", email: "hello@pasika-honey.ua", tiktok: "@honey.dsv", telegram: "@pasika_honey" },
-  payment: { bank: "monobank", card: "4441 1111 2222 3333", holder: "Олена Петріна", purpose: "Оплата замовлення", instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення." },
-  delivery: { novaPoshtaEnabled: true, ukrposhtaEnabled: true },
+  store: {
+    name: "Honey Pasika",
+    phone: "+380 67 835 23 11",
+    email: "hello@pasika-honey.ua",
+    address: "Прикарпаття, с. Новоселиця, Снятинський район",
+    workingHours: "Пн-Нд 09:00 - 20:00",
+    instagram: "@honey_pasika",
+    tiktok: "@honey.dsv",
+    telegram: "@pasika_honey",
+    description: "Натуральний мед та продукти бджільництва з родинної пасіки на Прикарпатті.",
+  },
+  about: {
+    title: "Родинна пасіка в серці Прикарпаття",
+    shortText: "Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району.",
+    fullDescription: "Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів. З того часу любов до бджільництва виросла у власне сімейне виробництво натурального меду найвищої якості.",
+    foundationYear: "2014",
+    hivesCount: "100+",
+    location: "с. Новоселиця, Івано-Франківська обл.",
+    image: "/images/about-apiary.jpg",
+  },
+  contacts: {
+    phone: "+380 67 835 23 11",
+    email: "hello@pasika-honey.ua",
+    tiktok: "@honey.dsv",
+    telegram: "@pasika_honey",
+  },
+  payment: {
+    bank: "monobank",
+    card: "",
+    holder: "",
+    purpose: "Оплата замовлення",
+    instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення.",
+  },
+  delivery: {
+    novaPoshtaEnabled: true,
+    ukrposhtaEnabled: true,
+  },
+  telegram: {
+    botToken: "",
+    chatId: "",
+  },
 };

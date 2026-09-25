@@ -73,6 +73,37 @@ export function getCategories(req, res) {
 
 // ---------------- Admin Endpoints ----------------
 
+const UKR_TO_LAT = {
+  а: "a", б: "b", в: "v", г: "h", ґ: "g", д: "d", е: "e", є: "ye", ж: "zh",
+  з: "z", и: "y", і: "i", ї: "yi", й: "y", к: "k", л: "l", м: "m", н: "n",
+  о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts",
+  ч: "ch", ш: "sh", щ: "shch", ь: "", ю: "yu", я: "ya",
+  "’": "", "'": "", "`": "", "ʼ": "",
+};
+
+function transliterateUa(text = "") {
+  return String(text)
+    .toLowerCase()
+    .split("")
+    .map((char) => (UKR_TO_LAT[char] !== undefined ? UKR_TO_LAT[char] : char))
+    .join("")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function resolveUniqueSlug(baseSlug, productId = null) {
+  let slug = baseSlug || "product";
+  let count = 2;
+  while (true) {
+    const existing = db.prepare("SELECT id FROM products WHERE slug = ?").get(slug);
+    if (!existing || (productId && existing.id === productId)) {
+      return slug;
+    }
+    slug = `${baseSlug}-${count}`;
+    count++;
+  }
+}
+
 export function saveProduct(req, res) {
   const body = req.body || {};
   const id = body.id || "p" + Date.now();
@@ -81,7 +112,24 @@ export function saveProduct(req, res) {
     return res.status(400).json({ error: "Назва товару обов'язкова" });
   }
 
-  const slug = (body.slug || "").trim() || name.toLowerCase().replace(/[^a-zа-яіїєґ0-9]+/gi, "-");
+  const existing = db.prepare("SELECT id, image FROM products WHERE id = ?").get(id);
+
+  // Mandatory photo validation for NEW products:
+  let image = (body.image || "").trim();
+  if (!existing) {
+    if (!image) {
+      return res.status(400).json({ error: "Фото товару обов'язкове для створення нового товару" });
+    }
+  } else {
+    if (!image) {
+      image = existing.image || "";
+    }
+  }
+
+  const rawSlug = (body.slug || "").trim() || transliterateUa(name);
+  const cleanSlug = transliterateUa(rawSlug);
+  const slug = resolveUniqueSlug(cleanSlug, existing ? id : null);
+
   const category = body.category || "honey";
   const weight = body.weight || "";
   const price = Number(body.price) || 0;
@@ -90,10 +138,7 @@ export function saveProduct(req, res) {
   const featured = body.featured ? 1 : 0;
   const giftBox = category === "gift-boxes" || body.giftBox ? 1 : 0;
   const description = body.description || "";
-  const image = body.image || "honey-jar";
   const now = Date.now();
-
-  const existing = db.prepare("SELECT id FROM products WHERE id = ?").get(id);
 
   if (existing) {
     db.prepare(`
@@ -139,8 +184,9 @@ export function duplicateProduct(req, res) {
   }
 
   const newId = "p" + Date.now() + "_" + crypto.randomBytes(2).toString("hex");
-  const newSlug = `${existing.slug}-copy-${Date.now()}`;
   const newName = `${existing.name} (копія)`;
+  const baseSlug = `${existing.slug}-2`;
+  const newSlug = resolveUniqueSlug(baseSlug);
   const now = Date.now();
 
   db.prepare(`
@@ -156,6 +202,54 @@ export function duplicateProduct(req, res) {
 
   const copied = db.prepare("SELECT * FROM products WHERE id = ?").get(newId);
   return res.json(mapProductRow(copied));
+}
+
+export function saveCategory(req, res) {
+  const body = req.body || {};
+  const name = (body.name || "").trim();
+  if (!name) {
+    return res.status(400).json({ error: "Назва категорії обов'язкова" });
+  }
+
+  let slug = (body.slug || "").trim();
+  if (!slug) {
+    slug = transliterateUa(name);
+  } else {
+    slug = transliterateUa(slug);
+  }
+
+  const icon = (body.icon || "🍯").trim();
+  const sortOrder = Number.isInteger(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
+
+  const existing = db.prepare("SELECT slug FROM categories WHERE slug = ?").get(slug);
+  if (existing) {
+    db.prepare("UPDATE categories SET name = ?, icon = ?, sort_order = ? WHERE slug = ?").run(
+      name, icon, sortOrder, slug
+    );
+  } else {
+    db.prepare("INSERT INTO categories (slug, name, icon, sort_order) VALUES (?, ?, ?, ?)").run(
+      slug, name, icon, sortOrder
+    );
+  }
+
+  const updated = db.prepare("SELECT slug, name, icon, sort_order as sortOrder FROM categories WHERE slug = ?").get(slug);
+  return res.json(updated);
+}
+
+export function deleteCategory(req, res) {
+  const { slug } = req.params;
+  const count = db.prepare("SELECT COUNT(*) as count FROM products WHERE category = ?").get(slug)?.count || 0;
+  if (count > 0) {
+    return res.status(400).json({
+      error: `У цій категорії є ${count} товарів. Спочатку перенесіть товари в іншу категорію.`,
+    });
+  }
+
+  const delRes = db.prepare("DELETE FROM categories WHERE slug = ?").run(slug);
+  if (delRes.changes === 0) {
+    return res.status(404).json({ error: "Категорію не знайдено" });
+  }
+  return res.json({ success: true });
 }
 
 export function getDashboardStats(req, res) {

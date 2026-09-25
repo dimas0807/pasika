@@ -93,6 +93,61 @@ export const uploadReceiptMulter = multer({
   },
 });
 
+// Product Images Storage
+export const PRODUCTS_STORAGE_DIR = path.resolve(__dirname, "../storage/products");
+if (!fs.existsSync(PRODUCTS_STORAGE_DIR)) {
+  fs.mkdirSync(PRODUCTS_STORAGE_DIR, { recursive: true });
+}
+
+const ALLOWED_PRODUCT_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const productStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, PRODUCTS_STORAGE_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    const uniqueSuffix = `${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
+    cb(null, `prod_${uniqueSuffix}${ext}`);
+  },
+});
+
+export const uploadProductImageMulter = multer({
+  storage: productStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_PRODUCT_MIME_TYPES.has(file.mimetype.toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error("Непідтримуваний тип файлу. Дозволено лише JPG, PNG, WEBP"));
+    }
+  },
+});
+
+export function handleProductImageUpload(req, res) {
+  const file = req.file || req.files?.file?.[0] || req.files?.image?.[0];
+  if (!file) {
+    return res.status(400).json({ error: "Файл зображення не надано" });
+  }
+
+  const fileUrl = `/uploads/products/${file.filename}`;
+  return res.json({
+    success: true,
+    fileUrl,
+    filename: file.filename,
+    originalName: file.originalname,
+    size: file.size,
+    mimetype: file.mimetype,
+  });
+}
+
 // Middleware for rate limiting and checkout token validation
 export function uploadReceiptValidationMiddleware(req, res, next) {
   // 1. Rate Limit

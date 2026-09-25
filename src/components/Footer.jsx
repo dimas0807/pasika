@@ -102,7 +102,13 @@ export default function Footer() {
             </li>
             <li className="flex gap-4 pt-2">
               <a
-                href="https://www.tiktok.com/@honey.dsv"
+                href={
+                  s?.contacts?.tiktok
+                    ? s.contacts.tiktok.startsWith("http")
+                      ? s.contacts.tiktok
+                      : `https://www.tiktok.com/${s.contacts.tiktok.startsWith("@") ? "" : "@"}${s.contacts.tiktok}`
+                    : "https://www.tiktok.com/@honey.dsv"
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"
@@ -110,7 +116,13 @@ export default function Footer() {
                 TikTok ↗
               </a>
               <a
-                href="https://t.me/honey_dsv"
+                href={
+                  s?.contacts?.telegram
+                    ? s.contacts.telegram.startsWith("http")
+                      ? s.contacts.telegram
+                      : `https://t.me/${s.contacts.telegram.replace(/^@/, "")}`
+                    : "https://t.me/honey_dsv"
+                }
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"

@@ -2,16 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Orders } from "../data/db";
 
-const STATUSES = ["NEW", "PROCESSING", "PACKED", "SHIPPED", "COMPLETED", "CANCELLED"];
-const STATUS_LABEL = {
-  NEW: "Нове", PROCESSING: "В обробці", PACKED: "Запаковано",
-  SHIPPED: "Відправлено", COMPLETED: "Виконано", CANCELLED: "Скасовано",
-};
+const STATUSES = [
+  { key: "NEW", label: "Нове" },
+  { key: "PROCESSING", label: "В обробці" },
+  { key: "PACKED", label: "Запаковано" },
+  { key: "SHIPPED", label: "Відправлено" },
+  { key: "COMPLETED", label: "Виконано" },
+  { key: "CANCELLED", label: "Скасовано" },
+];
 
 export default function OrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(() => Orders.byId(id));
   const [loading, setLoading] = useState(!order);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
   const loadOrder = useCallback(() => {
     Orders.fetchById(id)
@@ -25,121 +30,321 @@ export default function OrderDetail() {
     loadOrder();
   }, [loadOrder]);
 
+  const showNotification = (msg, isError = false) => {
+    setFeedback({ text: msg, isError });
+    setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    setSaving(true);
+    try {
+      const updated = await Orders.updateStatus(order.id, newStatus);
+      setOrder(updated);
+      showNotification(`Статус змінено на "${STATUSES.find((s) => s.key === newStatus)?.label || newStatus}"`);
+    } catch (err) {
+      showNotification("Помилка зміни статусу: " + err.message, true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading && !order) {
     return (
-      <div>
-        <p className="text-ink/50">Завантаження замовлення...</p>
+      <div className="py-12 text-center text-ink/50">
+        <div className="inline-block animate-spin mr-2">⏳</div> Завантаження деталей замовлення...
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div>
-        <p className="text-ink/50">Замовлення не знайдено.</p>
-        <Link to="/admin/orders" className="text-honey">← До замовлень</Link>
+      <div className="py-12 text-center">
+        <p className="text-ink/60 mb-4">Замовлення не знайдено в базі даних.</p>
+        <Link to="/admin/orders" className="btn-primary text-sm">
+          ← Повернутися до замовлень
+        </Link>
       </div>
     );
   }
 
-  const setStatus = async (status) => {
-    try {
-      const updated = await Orders.updateStatus(order.id, status);
-      setOrder(updated);
-    } catch (err) {
-      alert("Помилка зміни статусу: " + err.message);
-    }
-  };
-
+  const isCard = order.payment?.method === "card";
   const receiptUrl = order.receipt?.fileUrl || order.receipt?.dataUrl;
-  const receiptName = order.receipt?.name || "Чек";
+  const receiptName = order.receipt?.name || "Квитанція / чек";
+  const isImageReceipt = receiptUrl && (
+    receiptUrl.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
+    receiptUrl.startsWith("data:image/") ||
+    receiptUrl.includes("/uploads/receipts/")
+  );
 
   return (
-    <div className="max-w-3xl">
-      <Link to="/admin/orders" className="text-sm text-ink/50 hover:text-honey">← До замовлень</Link>
-      <div className="flex items-center justify-between mt-3 mb-6">
-        <div>
-          <h1 className="font-serif text-2xl font-bold text-ink">Замовлення #{order.number}</h1>
-          <span className="text-xs text-ink/40">ID: {order.id} • Створено: {new Date(order.createdAt).toLocaleString("uk-UA")}</span>
+    <div className="max-w-4xl space-y-6">
+      {/* Toast */}
+      {feedback && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
+            feedback.isError ? "bg-red-600 text-white" : "bg-leaf text-white"
+          }`}
+        >
+          {feedback.isError ? "⚠️ " : "✓ "}
+          {feedback.text}
         </div>
-        <select value={order.status} onChange={(e) => setStatus(e.target.value)} className="input w-auto cursor-pointer">
-          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-        </select>
+      )}
+
+      {/* Breadcrumb & Navigation */}
+      <div>
+        <Link
+          to="/admin/orders"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink/60 hover:text-honey transition-colors"
+        >
+          <span>←</span> До списку замовлень
+        </Link>
       </div>
 
+      {/* Main Header */}
+      <div className="card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif text-2xl md:text-3xl font-bold text-ink">
+              Замовлення #{order.number}
+            </h1>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                order.status === "COMPLETED"
+                  ? "bg-leaf/20 text-leaf"
+                  : order.status === "CANCELLED"
+                  ? "bg-red-100 text-red-600"
+                  : "bg-honey/15 text-honey"
+              }`}
+            >
+              {STATUSES.find((s) => s.key === order.status)?.label || order.status}
+            </span>
+          </div>
+          <p className="text-xs text-ink/50 mt-1">
+            Дата оформлення: {new Date(order.createdAt).toLocaleString("uk-UA")} • ID:{" "}
+            <span className="font-mono text-ink/40">{order.id}</span>
+          </p>
+        </div>
+
+        {/* Change status control */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-ink/60 font-medium whitespace-nowrap">
+            Змінити статус:
+          </label>
+          <select
+            value={order.status}
+            disabled={saving}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className="input w-auto text-sm cursor-pointer font-medium"
+          >
+            {STATUSES.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Grid of info cards */}
       <div className="grid md:grid-cols-2 gap-5">
-        <div className="card p-5">
-          <h3 className="font-semibold text-ink mb-3">Клієнт</h3>
-          <p className="text-sm text-ink/70">{order.customer?.firstName} {order.customer?.lastName}</p>
-          <p className="text-sm text-ink/70">📞 {order.customer?.phone}</p>
-          <p className="text-sm text-ink/70">📧 {order.customer?.email || "—"}</p>
-        </div>
-        <div className="card p-5">
-          <h3 className="font-semibold text-ink mb-3">Доставка</h3>
-          <p className="text-sm text-ink/70 font-medium">🚚 {order.delivery?.provider}</p>
-          <p className="text-sm text-ink/70">📍 {order.delivery?.city} {order.delivery?.cityId && <span className="text-xs text-ink/40">({order.delivery.cityId})</span>}</p>
-          <p className="text-sm text-ink/70">🏤 {order.delivery?.branch} {order.delivery?.branchId && <span className="text-xs text-ink/40">({order.delivery.branchId})</span>}</p>
-        </div>
-        <div className="card p-5">
-          <h3 className="font-semibold text-ink mb-3">Оплата</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between items-baseline border-b border-ink/5 pb-1.5">
-              <span className="text-ink/60">Спосіб:</span>
-              <span className="font-semibold text-ink">
-                {order.payment?.method === "card" ? "Оплачено наперед" : "Оплата при отриманні"}
+        {/* Customer card */}
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
+            <span className="text-lg">👤</span>
+            <h3 className="font-serif font-bold text-ink">Дані покупця</h3>
+          </div>
+          <div className="text-sm space-y-1.5 text-ink/80">
+            <div>
+              <span className="text-ink/40 text-xs block">ПІБ:</span>
+              <span className="font-semibold text-ink text-base">
+                {order.customer?.firstName} {order.customer?.lastName}
               </span>
             </div>
-            <div className="flex justify-between items-baseline border-b border-ink/5 pb-1.5">
-              <span className="text-ink/60">Статус:</span>
-              {order.payment?.method === "card" ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+            <div>
+              <span className="text-ink/40 text-xs block">Номер телефону:</span>
+              <a
+                href={`tel:${order.customer?.phone}`}
+                className="font-medium text-honey hover:underline"
+              >
+                📞 {order.customer?.phone}
+              </a>
+            </div>
+            {order.customer?.email && (
+              <div>
+                <span className="text-ink/40 text-xs block">Електронна пошта:</span>
+                <a
+                  href={`mailto:${order.customer?.email}`}
+                  className="font-medium hover:underline text-ink/70"
+                >
+                  ✉️ {order.customer?.email}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Delivery card */}
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
+            <span className="text-lg">🚚</span>
+            <h3 className="font-serif font-bold text-ink">Доставка</h3>
+          </div>
+          <div className="text-sm space-y-1.5 text-ink/80">
+            <div>
+              <span className="text-ink/40 text-xs block">Служба доставки:</span>
+              <span className="font-semibold text-ink">
+                {order.delivery?.provider || "Нова пошта"}
+              </span>
+            </div>
+            <div>
+              <span className="text-ink/40 text-xs block">Населений пункт:</span>
+              <span className="font-medium text-ink">
+                📍 {order.delivery?.city || "Не вказано"}
+              </span>
+            </div>
+            <div>
+              <span className="text-ink/40 text-xs block">Відділення / Адреса:</span>
+              <span className="font-medium text-ink">
+                🏤 {order.delivery?.branch || "Не вказано"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment card */}
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
+            <span className="text-lg">💳</span>
+            <h3 className="font-serif font-bold text-ink">Оплата</h3>
+          </div>
+          <div className="text-sm space-y-3">
+            <div className="flex justify-between items-baseline border-b border-ink/5 pb-2">
+              <span className="text-ink/60">Спосіб розрахунку:</span>
+              <span className="font-semibold text-ink">
+                {isCard ? "Оплачено наперед (на реквізити)" : "Оплата при отриманні (післяплата)"}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-baseline border-b border-ink/5 pb-2">
+              <span className="text-ink/60">Статус оплати:</span>
+              {isCard ? (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
                   Чек на перевірці
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                  Очікує оплати
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  Очікує оплати при отриманні
                 </span>
               )}
             </div>
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-ink/60">Чек:</span>
-              {order.payment?.method === "card" ? (
+
+            {/* Receipt section */}
+            <div>
+              <span className="text-ink/60 text-xs block mb-1.5">Прикріплена квитанція / чек:</span>
+              {isCard ? (
                 receiptUrl ? (
-                  <a
-                    href={receiptUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-primary text-xs inline-flex items-center gap-1.5 py-1.5 px-3"
-                  >
-                    📎 Переглянути / відкрити ({receiptName})
-                  </a>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={receiptUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <span>📎</span> Відкрити оригінал чека
+                      </a>
+                      <span className="text-xs text-ink/50 truncate max-w-[200px]">{receiptName}</span>
+                    </div>
+
+                    {isImageReceipt && (
+                      <div className="mt-3 p-2 bg-cream/40 rounded-xl border border-ink/10 max-w-xs">
+                        <a href={receiptUrl} target="_blank" rel="noreferrer" title="Натисніть для збільшення">
+                          <img
+                            src={receiptUrl}
+                            alt="Чек замовлення"
+                            className="w-full h-auto max-h-48 object-contain rounded-lg border border-ink/5 hover:opacity-95"
+                          />
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <span className="text-red-500 font-medium text-xs">Не завантажено</span>
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600">
+                    ⚠️ Клієнт обрав оплату зараз, але не надав файл квитанції.
+                  </div>
                 )
               ) : (
-                <span className="text-ink/50 text-sm">Не потрібен</span>
+                <span className="text-xs text-ink/40">Для оплати при отриманні чек не вимагається.</span>
               )}
             </div>
           </div>
         </div>
-        <div className="card p-5">
-          <h3 className="font-semibold text-ink mb-3">Коментар</h3>
-          <p className="text-sm text-ink/70">{order.comment || "—"}</p>
+
+        {/* Order comments & notes */}
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
+            <span className="text-lg">💬</span>
+            <h3 className="font-serif font-bold text-ink">Коментар до замовлення</h3>
+          </div>
+          <div className="p-3 bg-cream/30 rounded-xl border border-ink/5 text-sm text-ink/80 min-h-[90px] whitespace-pre-wrap">
+            {order.comment?.trim() ? order.comment : "Клієнт не залишив додаткових коментарів."}
+          </div>
         </div>
       </div>
 
-      <div className="card p-5 mt-5">
-        <h3 className="font-semibold text-ink mb-3">Товари</h3>
-        <div className="space-y-2 text-sm">
-          {order.items?.map((i) => (
-            <div key={i.id || i.product_id} className="flex justify-between border-b border-ink/5 pb-2 last:border-0">
-              <span>{i.name} {i.weight ? `(${i.weight})` : ""} × {i.qty}</span>
-              <span className="font-medium">{i.price * i.qty} грн</span>
-            </div>
-          ))}
+      {/* Ordered Products Table */}
+      <div className="card p-6 space-y-4">
+        <h3 className="font-serif text-lg font-bold text-ink">Склад замовлення</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-ink/50 border-b border-ink/5 text-xs">
+                <th className="pb-2">Товар</th>
+                <th className="pb-2 text-center">Кількість</th>
+                <th className="pb-2 text-right">Ціна за од.</th>
+                <th className="pb-2 text-right">Сума</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items?.map((item, idx) => (
+                <tr key={item.id || item.product_id || idx} className="border-b border-ink/5 last:border-0">
+                  <td className="py-3">
+                    <span className="font-medium text-ink">{item.name}</span>
+                    {item.weight && (
+                      <span className="text-xs text-ink/50 ml-1.5">({item.weight})</span>
+                    )}
+                  </td>
+                  <td className="py-3 text-center font-mono">
+                    {item.qty} шт
+                  </td>
+                  <td className="py-3 text-right text-ink/70">
+                    {item.price} грн
+                  </td>
+                  <td className="py-3 text-right font-semibold text-ink">
+                    {item.price * item.qty} грн
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div className="flex justify-between font-serif text-lg font-bold text-ink pt-3 mt-2 border-t border-ink/10">
-          <span>Разом</span><span>{order.total} грн</span>
+
+        {/* Total Summary */}
+        <div className="pt-4 border-t border-ink/10 flex justify-end">
+          <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className="flex justify-between text-ink/70">
+              <span>Сума товарів:</span>
+              <span className="font-semibold text-ink">{order.total} грн</span>
+            </div>
+            <div className="flex justify-between text-ink/70">
+              <span>Доставка:</span>
+              <span className="text-xs text-ink/50">за тарифами перевізника</span>
+            </div>
+            <div className="flex justify-between items-baseline pt-2 border-t border-ink/10 font-serif text-xl font-bold text-ink">
+              <span>До сплати:</span>
+              <span className="text-honey">{order.total} грн</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

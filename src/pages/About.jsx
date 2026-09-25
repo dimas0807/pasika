@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import RealisticBee from "../components/RealisticBee";
 import TikTokCard from "../components/TikTokCard";
+import { Settings, subscribe } from "../data/db";
 
 const VALUES = [
   {
@@ -126,6 +128,19 @@ const FIRST_TIKTOK_VIDEO = {
 };
 
 export default function About() {
+  const [s, setS] = useState(() => Settings.get());
+
+  useEffect(() => {
+    Settings.fetch().then((data) => data && setS(data));
+    return subscribe(() => setS(Settings.get()));
+  }, []);
+
+  const title = s?.about?.title || "«Ми пасічники і дуже любимо родинну справу»";
+  const lead = s?.about?.lead || "Ми знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, і з того часу любов до бджільництва виросла у власне виробництво.";
+  const location = s?.store?.location || "Прикарпаття • село Новоселиця";
+  const telegram = s?.contacts?.telegram || "@honey_dsv";
+  const telegramUrl = telegram.startsWith("http") ? telegram : `https://t.me/${telegram.replace(/^@/, "")}`;
+
   return (
     <div className="overflow-x-hidden pb-16">
       {/* 1. HERO & EDITORIAL LAYOUT */}
@@ -142,19 +157,17 @@ export default function About() {
             <div className="lg:col-span-7 flex flex-col items-start">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 border border-honey/30 text-ink text-xs font-bold uppercase tracking-wider mb-4 shadow-xs">
                 <span>📍</span>
-                <span>Прикарпаття • село Новоселиця</span>
+                <span>{location}</span>
               </div>
 
               <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-extrabold text-ink leading-[1.15] tracking-tight">
-                «Ми пасічники і дуже любимо родинну справу»
+                {title}
               </h1>
 
               <div className="mt-6 space-y-4 text-ink/80 text-base sm:text-lg leading-relaxed max-w-2xl">
-                <p>
-                  Ми знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, і з того часу любов до бджільництва виросла у власне виробництво.
-                </p>
+                <p>{lead}</p>
                 <p className="text-ink/75 text-sm sm:text-base">
-                  На нашій пасіці налічується більше ста вуликів. Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени.
+                  {s?.about?.story ? s.about.story.split("\n\n")[0] : "На нашій пасіці налічується більше ста вуликів. Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени."}
                 </p>
               </div>
 
@@ -166,9 +179,9 @@ export default function About() {
                 <div>
                   <div className="text-xs uppercase tracking-wider font-bold text-honey">Географія нашої пасіки</div>
                   <div className="font-serif text-base sm:text-lg font-bold text-ink mt-0.5">
-                    Прикарпаття, село Новоселиця
+                    {location}
                   </div>
-                  <div className="text-xs text-ink/60">Снятинський район</div>
+                  <div className="text-xs text-ink/60">Екологічно чистий регіон</div>
                 </div>
               </div>
 
@@ -177,7 +190,7 @@ export default function About() {
                   Переглянути продукцію
                 </Link>
                 <a
-                  href="https://t.me/honey_dsv"
+                  href={telegramUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="btn-secondary text-sm sm:text-base px-6 py-3.5"

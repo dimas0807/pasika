@@ -49,7 +49,11 @@ export default function Contacts() {
           icon="📱"
           label="TikTok"
           value={tiktok}
-          link="https://www.tiktok.com/@honey.dsv"
+          link={
+            tiktok.startsWith("http")
+              ? tiktok
+              : `https://www.tiktok.com/${tiktok.startsWith("@") ? "" : "@"}${tiktok}`
+          }
           btnText="Перейти ↗"
           external
         />
@@ -57,7 +61,11 @@ export default function Contacts() {
           icon="💬"
           label="Telegram"
           value={telegram}
-          link="https://t.me"
+          link={
+            telegram.startsWith("http")
+              ? telegram
+              : `https://t.me/${telegram.replace(/^@/, "")}`
+          }
           btnText="Відкрити чат ↗"
           external
         />
