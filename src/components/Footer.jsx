@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import RealisticBee from "./RealisticBee";
 import { Settings, subscribe } from "../data/db";
 
 export default function Footer() {
@@ -14,18 +15,22 @@ export default function Footer() {
   const email = s?.contacts?.email || "hello@pasika-honey.ua";
 
   return (
-    <footer className="bg-[#1E2022] text-[#FFFDF8] border-t border-ink/10 mt-16 sm:mt-24">
-      <div className="container-p py-12 md:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12">
+    <footer className="bg-[#171512] text-[#FFFDF8] border-t border-gold/20 mt-16 sm:mt-24 relative overflow-hidden">
+      {/* Ambient warm glow in top-right */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="container-p py-12 md:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12 relative z-10">
         {/* Brand Column */}
         <div className="lg:col-span-4">
           <Link to="/" className="font-serif text-2xl font-bold flex items-center gap-2.5 text-white">
-            <span className="text-2xl">🐝</span> Honey Pasika
+            <RealisticBee size={28} depth="near" />
+            <span>Honey Pasika</span>
           </Link>
-          <p className="text-white/65 text-xs sm:text-sm leading-relaxed mt-3.5 max-w-sm">
-            Власна сімейна пасіка з натуральним медом, продуктами бджільництва та святковими крафтовими боксами. Зігріваємо теплом рідної землі.
+          <p className="text-white/70 text-xs sm:text-sm leading-relaxed mt-3.5 max-w-sm">
+            Власна сімейна пасіка на Прикарпатті (с. Новоселиця). Натуральний мед, соти, авторські крем-меди та крафтові подарункові бокси.
           </p>
           <div className="mt-5 flex items-center gap-3 text-xs text-white/50">
-            <span>🌿 100% Натурально</span>
+            <span>🌿 Натуральні продукти</span>
             <span>•</span>
             <span>🚚 Доставка по Україні</span>
           </div>
@@ -110,7 +115,7 @@ export default function Footer() {
                 TikTok ↗
               </a>
               <a
-                href="https://t.me"
+                href="https://t.me/honey_dsv"
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"
@@ -126,7 +131,7 @@ export default function Footer() {
       <div className="border-t border-white/10 py-5">
         <div className="container-p flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40 text-center sm:text-left">
           <div>© {new Date().getFullYear()} Honey Pasika. Всі права захищено.</div>
-          <div>Зроблено з любов'ю до української природи та бджіл 🐝</div>
+          <div>Зроблено з любов'ю до української природи та бджіл</div>
         </div>
       </div>
     </footer>
