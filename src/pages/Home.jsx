@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import BeeScene from "../components/BeeScene";
 import ProductCard from "../components/ProductCard";
+import TikTokCard from "../components/TikTokCard";
 import { Categories, Products, subscribe } from "../data/db";
 
 const TRUST_BADGES = [
@@ -23,21 +24,33 @@ const CATEGORY_IMAGES = {
 
 const TIKTOK_PROFILE_URL = "https://www.tiktok.com/@honey.dsv";
 
-const TIKTOK_PREVIEWS = [
+const TIKTOK_VIDEOS = [
   {
-    image: "/tiktok/preview-1.jpg",
+    id: 1,
+    url: "https://vt.tiktok.com/ZSbLujdn8/",
+    videoSrc: "/tiktok/video-1.mp4",
+    poster: "/tiktok/preview-1.jpg",
     label: "Життя пасіки",
   },
   {
-    image: "/tiktok/preview-2.jpg",
+    id: 2,
+    url: "https://vt.tiktok.com/ZSbLujG9o/",
+    videoSrc: "/tiktok/video-2.mp4",
+    poster: "/tiktok/preview-2.jpg",
     label: "Праця бджіл",
   },
   {
-    image: "/tiktok/preview-3.jpg",
+    id: 3,
+    url: "https://vt.tiktok.com/ZSbLuJ8S1/",
+    videoSrc: "/tiktok/video-3.mp4",
+    poster: "/tiktok/preview-3.jpg",
     label: "Свіжий мед",
   },
   {
-    image: "/tiktok/preview-4.jpg",
+    id: 4,
+    url: "https://vt.tiktok.com/ZSbLuM7kb/",
+    videoSrc: "/tiktok/video-4.mp4",
+    poster: "/tiktok/preview-4.jpg",
     label: "Крафтові бокси",
   },
 ];
@@ -351,39 +364,8 @@ export default function Home() {
 
           {/* 4 Vertical Video Preview Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {TIKTOK_PREVIEWS.map((v, i) => (
-              <a
-                key={i}
-                href={TIKTOK_PROFILE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group relative rounded-2xl overflow-hidden aspect-[9/16] bg-[#FAF6EE] border border-ink/10 hover:border-honey shadow-sm hover:shadow-md transition-all flex flex-col justify-end p-3.5"
-              >
-                <img
-                  src={v.image}
-                  alt={`Кадр пасіки @honey.dsv ${i + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent group-hover:from-black/85 transition-colors" />
-
-                {/* Play Badge Overlay */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/30 backdrop-blur-md border border-white/60 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-honey group-hover:text-ink transition-all shadow-md">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                </div>
-
-                {/* Card Label */}
-                <div className="relative z-10 text-white">
-                  <span className="text-[11px] font-semibold text-accent/90">@honey.dsv</span>
-                  <div className="text-xs font-bold mt-0.5 line-clamp-1">{v.label}</div>
-                  <div className="text-[10px] text-white/70 mt-1 flex items-center gap-1 group-hover:text-accent transition-colors">
-                    <span>Дивитися в TikTok</span>
-                    <span>↗</span>
-                  </div>
-                </div>
-              </a>
+            {TIKTOK_VIDEOS.map((item) => (
+              <TikTokCard key={item.id} item={item} />
             ))}
           </div>
         </div>
