@@ -49,13 +49,16 @@ async function request(endpoint, options = {}) {
   };
 
   const res = await fetch(endpoint, fetchOptions);
-  let data = null;
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    data = await res.text();
+
+  // Guard: API responses must always be JSON. If HTML is returned (e.g. SPA fallback on static host), treat as unavailable API.
+  if (!contentType.includes("application/json")) {
+    const err = new Error(`Некоректний тип відповіді сервера (очікувався JSON, отримано ${contentType || "невідомий формат"})`);
+    err.status = res.status;
+    throw err;
   }
+
+  const data = await res.json();
 
   if (!res.ok) {
     const errorMsg = data?.error || res.statusText || "Помилка сервера";
@@ -77,13 +80,19 @@ export async function initDb() {
       request("/api/settings"),
     ]);
 
-    if (products.status === "fulfilled" && Array.isArray(products.value)) {
+    if (products.status === "fulfilled" && Array.isArray(products.value) && products.value.length > 0) {
       state.products = products.value;
     }
-    if (categories.status === "fulfilled" && Array.isArray(categories.value)) {
+    if (categories.status === "fulfilled" && Array.isArray(categories.value) && categories.value.length > 0) {
       state.categories = categories.value;
     }
-    if (settings.status === "fulfilled" && settings.value) {
+    if (
+      settings.status === "fulfilled" &&
+      settings.value &&
+      typeof settings.value === "object" &&
+      !Array.isArray(settings.value) &&
+      settings.value.contacts
+    ) {
       state.settings = settings.value;
     }
 
@@ -99,60 +108,82 @@ export async function initDb() {
 
 // ---------------- Categories ----------------
 export const Categories = {
-  all: () => state.categories,
+  all: () => (Array.isArray(state.categories) && state.categories.length > 0 ? state.categories : SEED_CATEGORIES),
   fetchAll: async () => {
     try {
       const data = await request("/api/categories");
-      state.categories = data;
-      notify();
-      return data;
+      if (Array.isArray(data) && data.length > 0) {
+        state.categories = data;
+        notify();
+      }
+      return Categories.all();
     } catch {
-      return state.categories;
+      return Categories.all();
     }
   },
 };
 
 // ---------------- Products ----------------
 export const Products = {
-  all: () => state.products,
+  all: () => (Array.isArray(state.products) && state.products.length > 0 ? state.products : SEED_PRODUCTS),
   fetchAll: async () => {
     try {
       const data = await request("/api/products");
-      state.products = data;
-      notify();
-      return data;
+      if (Array.isArray(data) && data.length > 0) {
+        state.products = data;
+        notify();
+      }
+      return Products.all();
     } catch {
-      return state.products;
+      return Products.all();
     }
   },
-  bySlug: (slug) => state.products.find((p) => p.slug === slug),
+  bySlug: (slug) => {
+    const list = Array.isArray(state.products) && state.products.length > 0 ? state.products : SEED_PRODUCTS;
+    return list.find((p) => p.slug === slug);
+  },
   fetchBySlug: async (slug) => {
     try {
       const data = await request(`/api/products/${slug}`);
-      const idx = state.products.findIndex((p) => p.slug === slug || p.id === data.id);
-      if (idx >= 0) state.products[idx] = data;
-      else state.products.push(data);
-      notify();
-      return data;
+      if (data && typeof data === "object" && data.id) {
+        const idx = state.products.findIndex((p) => p.slug === slug || p.id === data.id);
+        if (idx >= 0) state.products[idx] = data;
+        else state.products.push(data);
+        notify();
+        return data;
+      }
+      return Products.bySlug(slug);
     } catch {
       return Products.bySlug(slug);
     }
   },
-  byId: (id) => state.products.find((p) => p.id === id),
+  byId: (id) => {
+    const list = Array.isArray(state.products) && state.products.length > 0 ? state.products : SEED_PRODUCTS;
+    return list.find((p) => p.id === id);
+  },
   fetchById: async (id) => {
     try {
       const data = await request(`/api/products/id/${id}`);
-      const idx = state.products.findIndex((p) => p.id === id);
-      if (idx >= 0) state.products[idx] = data;
-      else state.products.push(data);
-      notify();
-      return data;
+      if (data && typeof data === "object" && data.id) {
+        const idx = state.products.findIndex((p) => p.id === id);
+        if (idx >= 0) state.products[idx] = data;
+        else state.products.push(data);
+        notify();
+        return data;
+      }
+      return Products.byId(id);
     } catch {
       return Products.byId(id);
     }
   },
-  byCategory: (cat) => state.products.filter((p) => p.category === cat),
-  featured: () => state.products.filter((p) => p.featured),
+  byCategory: (cat) => {
+    const list = Array.isArray(state.products) && state.products.length > 0 ? state.products : SEED_PRODUCTS;
+    return list.filter((p) => p.category === cat);
+  },
+  featured: () => {
+    const list = Array.isArray(state.products) && state.products.length > 0 ? state.products : SEED_PRODUCTS;
+    return list.filter((p) => p.featured);
+  },
   save: async (product) => {
     const isNew = !product.id || product.id.startsWith("new_") || !state.products.some((p) => p.id === product.id);
     const endpoint = isNew ? "/api/admin/products" : `/api/admin/products/${product.id}`;
@@ -252,15 +283,20 @@ export const Orders = {
 
 // ---------------- Settings ----------------
 export const Settings = {
-  get: () => state.settings,
+  get: () =>
+    state.settings && typeof state.settings === "object" && !Array.isArray(state.settings) && state.settings.contacts
+      ? state.settings
+      : SAFE_SEED_SETTINGS,
   fetch: async () => {
     try {
       const settings = await request("/api/settings");
-      state.settings = settings;
-      notify();
-      return settings;
+      if (settings && typeof settings === "object" && !Array.isArray(settings) && settings.contacts) {
+        state.settings = settings;
+        notify();
+      }
+      return Settings.get();
     } catch {
-      return state.settings;
+      return Settings.get();
     }
   },
   save: async (settings) => {
@@ -268,8 +304,10 @@ export const Settings = {
       method: "PUT",
       body: JSON.stringify(settings),
     });
-    state.settings = updated;
-    notify();
+    if (updated && typeof updated === "object") {
+      state.settings = updated;
+      notify();
+    }
     return updated;
   },
 };
