@@ -414,28 +414,49 @@ export const Auth = {
   },
 };
 
-// ---------------- File Storage ----------------
 export const Storage = {
   uploadReceipt: async (file, checkoutToken) => {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("receipt", file);
     if (checkoutToken) {
       formData.append("checkoutToken", checkoutToken);
     }
 
-    const res = await fetch("/api/upload-receipt", {
-      method: "POST",
-      body: formData,
-    });
+    const url = `${API_BASE}/api/upload-receipt`;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      });
+    } catch {
+      throw new Error("Не вдалося підключитися до сервера для завантаження чека.");
+    }
 
-    const data = await res.json();
+    const contentType = res.headers.get("content-type") || "";
+    let data = null;
+    if (contentType.includes("application/json")) {
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+    }
+
     if (!res.ok) {
-      throw new Error(data.error || "Не вдалося завантажити чек");
+      const errorMsg = data?.error || "Не вдалося завантажити чек. Спробуйте ще раз.";
+      throw new Error(errorMsg);
+    }
+
+    if (!data || !data.fileUrl) {
+      throw new Error("Не вдалося завантажити чек. Спробуйте ще раз.");
     }
 
     return {
       fileUrl: data.fileUrl,
-      name: data.originalName,
+      name: data.originalName || file.name,
       filename: data.filename,
     };
   },

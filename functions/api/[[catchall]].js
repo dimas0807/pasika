@@ -353,26 +353,150 @@ export async function onRequest(context) {
   if (path === "/orders" && method === "POST") {
     try {
       const body = await request.json().catch(() => ({}));
-      if (!body.customer?.phone || !body.items?.length) {
-        return jsonResponse({ error: "Некоректні дані замовлення" }, 400);
+
+      // Flexible extraction: flat or nested
+      const rawCustomer = body.customer || {};
+      const rawDelivery = body.delivery || {};
+      const rawPayment = body.payment || {};
+
+      const firstName = (body.firstName || rawCustomer.firstName || "").trim();
+      const lastName = (body.lastName || rawCustomer.lastName || "").trim();
+      const rawPhone = body.phone || rawCustomer.phone || "";
+      const email = (body.email || rawCustomer.email || "").trim();
+
+      const providerKey = body.providerKey || rawDelivery.providerKey || "np";
+      const city = body.city || body.deliveryCity || rawDelivery.city || "";
+      const branch = body.branch || body.deliveryBranch || rawDelivery.branch || "";
+
+      const paymentMethod = body.paymentMethod || rawPayment.method || "cod";
+      const isCard = paymentMethod === "card" || paymentMethod === "card_prepay";
+      const cleanPayment = isCard ? "card" : "cod";
+
+      const receiptUrl = body.receiptUrl || body.receipt?.fileUrl || null;
+      const receiptName = body.receiptName || body.receipt?.name || "Чек";
+
+      // 1. Idempotency Check
+      if (body.idempotencyKey) {
+        const existing = memoryOrders.find((o) => o.idempotencyKey === body.idempotencyKey);
+        if (existing) {
+          return jsonResponse({
+            success: true,
+            order: existing,
+            customerToken: existing.customerToken,
+            duplicate: true,
+          }, 200);
+        }
+      }
+
+      // 2. Validate Customer Details
+      if (!firstName || !lastName) {
+        return jsonResponse({ error: "Вкажіть ім'я та прізвище" }, 400);
+      }
+
+      const digits = String(rawPhone).replace(/\D/g, "");
+      let normalizedPhone = null;
+      if (digits.length === 10 && digits.startsWith("0")) normalizedPhone = "+38" + digits;
+      else if (digits.length === 11 && digits.startsWith("80")) normalizedPhone = "+3" + digits;
+      else if (digits.length === 12 && digits.startsWith("380")) normalizedPhone = "+" + digits;
+
+      if (!normalizedPhone) {
+        return jsonResponse({
+          error: "Введіть коректний номер телефону України (наприклад, +380 67 123 45 67)",
+        }, 400);
+      }
+
+      // 3. Validate Delivery
+      const cityName = typeof city === "object" ? city.name : String(city).trim();
+      const branchName = typeof branch === "object" ? branch.name : String(branch).trim();
+      if (!cityName || !branchName) {
+        return jsonResponse({ error: "Оберіть місто та відділення доставки" }, 400);
+      }
+
+      // 4. Validate Payment
+      if (isCard && !receiptUrl) {
+        return jsonResponse({
+          error: "Для способу «Оплатити зараз» обов'язково завантажте чек про оплату",
+        }, 400);
+      }
+
+      // 5. Validate Items & Stock Check
+      const items = body.items;
+      if (!Array.isArray(items) || items.length === 0) {
+        return jsonResponse({ error: "Кошик порожній" }, 400);
+      }
+
+      let calculatedTotal = 0;
+      const orderItems = [];
+
+      for (const item of items) {
+        const qty = Number(item.qty);
+        if (!item.id || !Number.isInteger(qty) || qty <= 0) {
+          return jsonResponse({ error: "Некоректні товари у кошику" }, 400);
+        }
+        const prod = memoryProducts.find((p) => p.id === item.id);
+        if (!prod) {
+          return jsonResponse({ error: `Товар не знайдено` }, 400);
+        }
+        if (prod.stock < qty) {
+          return jsonResponse({
+            error: `Недостатньо товару «${prod.name}» на складі. Доступно: ${prod.stock} шт.`,
+          }, 400);
+        }
+
+        // Deduct stock
+        prod.stock -= qty;
+        calculatedTotal += prod.price * qty;
+        orderItems.push({
+          id: prod.id,
+          name: prod.name,
+          weight: prod.weight,
+          price: prod.price,
+          qty,
+        });
       }
 
       const orderNumber = 1000 + memoryOrders.length + 1;
-      const orderId = "ord_" + Math.random().toString(36).substring(2, 10);
+      const orderId = "ord_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 7);
       const customerToken = "ctk_" + Math.random().toString(36).substring(2, 14);
 
       const newOrder = {
         id: orderId,
         number: orderNumber,
         status: "NEW",
-        total: body.total || 0,
-        customer: body.customer,
-        delivery: body.delivery,
-        payment: body.payment,
-        comment: body.comment || "",
-        items: body.items,
-        receipt: body.receipt || null,
+        total: calculatedTotal,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
+        idempotencyKey: body.idempotencyKey || null,
+        customer: {
+          firstName,
+          lastName,
+          phone: normalizedPhone,
+          email: email || "",
+        },
+        delivery: {
+          provider: providerKey === "up" ? "Укрпошта" : "Нова пошта",
+          providerKey,
+          city: cityName,
+          branch: branchName,
+        },
+        payment: {
+          method: cleanPayment,
+          paymentMethod: isCard ? "card" : "cash_on_delivery",
+          methodLabel: isCard ? "Оплачено наперед" : "Оплата при отриманні",
+          paymentStatus: isCard ? "Чек на перевірці" : "Очікує оплати",
+          status: isCard ? "receipt_review" : "pending",
+          receiptStatus: isCard ? "Прикріплено" : "Не потрібен",
+          receipt: isCard ? "attached" : "not_required",
+          receiptRequired: isCard,
+        },
+        comment: body.comment ? String(body.comment).trim() : "",
+        receipt: isCard && receiptUrl
+          ? {
+              fileUrl: receiptUrl,
+              name: receiptName || "Чек",
+            }
+          : null,
+        items: orderItems,
         customerToken,
       };
 
@@ -394,22 +518,55 @@ export async function onRequest(context) {
   // File Upload
   if (path === "/upload-receipt" && method === "POST") {
     try {
-      const formData = await request.formData();
-      const file = formData.get("file");
-      if (!file || typeof file === "string") {
-        return jsonResponse({ error: "Файл не передано" }, 400);
+      const contentType = request.headers.get("content-type") || "";
+      if (!contentType.includes("multipart/form-data")) {
+        return jsonResponse({ error: "Очікується multipart/form-data запит" }, 400);
       }
-      const filename = `receipt_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "")}`;
-      // In edge without S3/R2, create a lightweight object URL or placeholder
+      const formData = await request.formData();
+      const file = formData.get("file") || formData.get("receipt");
+      if (!file || typeof file === "string") {
+        return jsonResponse({ error: "Файл чека не надано" }, 400);
+      }
+
+      const lowerName = file.name.toLowerCase();
+      const validExts = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
+      const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
+      const isMimeValid =
+        file.type === "image/jpeg" ||
+        file.type === "image/png" ||
+        file.type === "image/webp" ||
+        file.type === "application/pdf" ||
+        file.type.startsWith("image/");
+
+      if (!isExtValid && !isMimeValid) {
+        return jsonResponse({ error: "Дозволено лише файли форматів JPG, PNG, WEBP або PDF" }, 400);
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        return jsonResponse({ error: "Розмір файлу не повинен перевищувати 10 МБ" }, 400);
+      }
+
+      const ext = lowerName.match(/\.[a-z0-9]+$/)?.[0] || ".jpg";
+      const filename = `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
       const fileUrl = `/uploads/receipts/${filename}`;
+
       return jsonResponse({
         fileUrl,
         originalName: file.name,
         filename,
-      });
+      }, 200);
     } catch (err) {
-      return jsonResponse({ error: err.message || "Не вдалося завантажити файл" }, 500);
+      return jsonResponse({ error: err.message || "Не вдалося завантажити чек" }, 500);
     }
+  }
+
+  // Serve or inspect uploaded receipts
+  if (path.startsWith("/uploads/receipts/") && method === "GET") {
+    const filename = path.replace("/uploads/receipts/", "");
+    return new Response(`Receipt: ${filename}`, {
+      status: 200,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 
   // ---------------- Protected Admin Endpoints ----------------

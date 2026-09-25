@@ -58,16 +58,17 @@ export default function Checkout() {
     setErrorMsg("");
 
     const lowerName = file.name.toLowerCase();
-    const validExts = [".jpg", ".jpeg", ".png", ".pdf"];
+    const validExts = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
     const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
     const isMimeValid =
       file.type === "image/jpeg" ||
       file.type === "image/png" ||
+      file.type === "image/webp" ||
       file.type === "application/pdf" ||
       file.type.startsWith("image/");
 
     if (!isExtValid && !isMimeValid) {
-      setErrorMsg("Дозволено завантажувати чек лише у форматах JPG, JPEG, PNG або PDF");
+      setErrorMsg("Дозволено завантажувати чек лише у форматах JPG, JPEG, PNG, WEBP або PDF");
       return;
     }
 
@@ -78,7 +79,13 @@ export default function Checkout() {
 
     setUploadingReceipt(true);
     try {
-      if (file.type.startsWith("image/") || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".png")) {
+      if (
+        file.type.startsWith("image/") ||
+        lowerName.endsWith(".jpg") ||
+        lowerName.endsWith(".jpeg") ||
+        lowerName.endsWith(".png") ||
+        lowerName.endsWith(".webp")
+      ) {
         setReceiptPreview(URL.createObjectURL(file));
       } else {
         setReceiptPreview("pdf");
@@ -101,6 +108,13 @@ export default function Checkout() {
   };
 
   const removeReceipt = () => {
+    if (receiptPreview && typeof receiptPreview === "string" && receiptPreview.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(receiptPreview);
+      } catch {
+        // ignore
+      }
+    }
     setForm((f) => ({
       ...f,
       receiptFile: null,
@@ -147,6 +161,9 @@ export default function Checkout() {
         ? form.deliveryBranch.trim()
         : `Відділення №${form.deliveryBranch.trim()}`;
 
+      const isCard = form.paymentMethod === "card";
+      const cleanPaymentMethod = isCard ? "card" : "cash_on_delivery";
+
       const orderPayload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
@@ -158,10 +175,29 @@ export default function Checkout() {
         deliveryBranch: form.deliveryBranch.trim(),
         city: cityDisplay,
         branch: branchDisplay,
-        paymentMethod: form.paymentMethod,
+        paymentMethod: cleanPaymentMethod,
         comment: form.comment.trim() || undefined,
-        receiptUrl: form.paymentMethod === "card" ? form.receiptUrl : undefined,
-        receiptName: form.paymentMethod === "card" ? form.receiptName : undefined,
+        receiptUrl: isCard ? form.receiptUrl : undefined,
+        receiptName: isCard ? form.receiptName : undefined,
+        customer: {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim() || undefined,
+        },
+        delivery: {
+          provider: form.providerKey === "up" ? "Укрпошта" : "Нова пошта",
+          providerKey: form.providerKey,
+          city: cityDisplay,
+          branch: branchDisplay,
+        },
+        payment: {
+          method: cleanPaymentMethod,
+          paymentMethod: cleanPaymentMethod,
+          methodLabel: isCard ? "Оплачено наперед" : "Оплата при отриманні",
+          receiptUrl: isCard ? form.receiptUrl : undefined,
+          receiptName: isCard ? form.receiptName : undefined,
+        },
         items: items.map((i) => ({ id: i.id, qty: i.qty })),
         idempotencyKey,
         checkoutToken,
@@ -553,7 +589,7 @@ export default function Checkout() {
                       <label className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
                         <span>🧾</span> Завантажте чек про оплату *
                       </label>
-                      <span className="text-[11px] text-ink/50">JPG, JPEG, PNG, PDF</span>
+                      <span className="text-[11px] text-ink/50">JPG, JPEG, PNG, WEBP, PDF</span>
                     </div>
 
                     {form.receiptUrl ? (
@@ -591,7 +627,7 @@ export default function Checkout() {
                           </label>
                           <input
                             type="file"
-                            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                            accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                             onChange={onReceipt}
                             id="receipt-input-change"
                             className="hidden"
@@ -611,7 +647,7 @@ export default function Checkout() {
                       <div className="border-2 border-dashed border-gold/60 rounded-2xl p-5 text-center bg-white hover:bg-cream/40 transition-colors">
                         <input
                           type="file"
-                          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                          accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                           onChange={onReceipt}
                           id="receipt-input"
                           className="hidden"

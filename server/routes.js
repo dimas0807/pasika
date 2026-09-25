@@ -88,9 +88,15 @@ router.get("/delivery/branches", async (req, res) => {
 
 // Receipt File Upload with rate limiting and checkout session validation
 router.post("/upload-receipt", uploadReceiptValidationMiddleware, (req, res) => {
-  uploadReceiptMulter.single("file")(req, res, (err) => {
+  uploadReceiptMulter.fields([
+    { name: "file", maxCount: 1 },
+    { name: "receipt", maxCount: 1 },
+  ])(req, res, (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
+    }
+    if (!req.file && req.files) {
+      req.file = req.files.file?.[0] || req.files.receipt?.[0] || null;
     }
     handleReceiptUpload(req, res);
   });
