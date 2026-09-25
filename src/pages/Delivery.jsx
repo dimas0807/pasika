@@ -77,9 +77,9 @@ export default function Delivery() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="card p-6 border border-ink/10 bg-white">
             <span className="text-3xl mb-3 block">💵</span>
-            <h3 className="font-serif font-bold text-lg text-ink">При отриманні</h3>
+            <h3 className="font-serif font-bold text-lg text-ink">Оплата при отриманні</h3>
             <p className="text-xs text-ink/70 mt-2 leading-relaxed">
-              Накладений платіж у відділенні або поштоматі. Ви можете оглянути посилку перед оплатою.
+              Оплата замовлення під час отримання посилки у відділенні перевізника або кур'єру.
             </p>
             <div className="text-[11px] text-ink/50 mt-4">
               Комісія перевізника: 20 грн + 2% від суми (для Нової пошти)
@@ -88,9 +88,9 @@ export default function Delivery() {
 
           <div className="card p-6 border border-ink/10 bg-white">
             <span className="text-3xl mb-3 block">💳</span>
-            <h3 className="font-serif font-bold text-lg text-ink">Оплата на картку</h3>
+            <h3 className="font-serif font-bold text-lg text-ink">Оплатити зараз</h3>
             <p className="text-xs text-ink/70 mt-2 leading-relaxed">
-              {s?.payment?.instruction || "Без комісії! Реквізити картки відображаються під час оформлення замовлення."}
+              {s?.payment?.instruction || "Без комісії! Оплата за реквізитами картки або IBAN із завантаженням чека під час оформлення замовлення."}
             </p>
             <div className="text-[11px] text-leaf font-semibold mt-4">
               ✓ Без додаткових комісій за накладений платіж

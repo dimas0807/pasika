@@ -9,6 +9,9 @@ export function getPublicSettings(req, res) {
   const settings = JSON.parse(row.value);
   // Ensure no sensitive or admin auth data is ever in public settings
   delete settings.admin;
+  if (settings.payment && !settings.payment.purpose) {
+    settings.payment.purpose = "Оплата замовлення";
+  }
 
   return res.json(settings);
 }

@@ -77,7 +77,8 @@ export default function OrdersAdmin() {
               <th className="p-3">Клієнт</th>
               <th className="p-3">Сума</th>
               <th className="p-3">Доставка</th>
-              <th className="p-3">Оплата</th>
+              <th className="p-3">Спосіб оплати</th>
+              <th className="p-3">Статус оплати</th>
               <th className="p-3">Чек</th>
               <th className="p-3">Статус</th>
               <th className="p-3">Дії</th>
@@ -86,13 +87,13 @@ export default function OrdersAdmin() {
           <tbody>
             {loading && orders.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-ink/40">
+                <td colSpan={10} className="p-6 text-center text-ink/40">
                   Завантаження замовлень...
                 </td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-ink/40">
+                <td colSpan={10} className="p-6 text-center text-ink/40">
                   Замовлень немає.
                 </td>
               </tr>
@@ -104,26 +105,45 @@ export default function OrdersAdmin() {
                     {new Date(o.createdAt).toLocaleDateString("uk-UA")}
                   </td>
                   <td className="p-3">
-                    {o.customer?.firstName} {o.customer?.lastName}
+                    <div className="font-medium text-ink">{o.customer?.firstName} {o.customer?.lastName}</div>
+                    <div className="text-xs text-ink/50">{o.customer?.phone}</div>
                   </td>
                   <td className="p-3 font-semibold">{o.total} грн</td>
-                  <td className="p-3 text-ink/60">{o.delivery?.provider}</td>
                   <td className="p-3 text-ink/60">
-                    {o.payment?.method === "card" ? "Картка" : "Накладено"}
+                    <div>{o.delivery?.provider}</div>
+                    {o.delivery?.city && <div className="text-[11px] text-ink/45 truncate max-w-[120px]">{o.delivery.city}</div>}
+                  </td>
+                  <td className="p-3 text-ink/75 font-medium text-xs">
+                    {o.payment?.method === "card" ? "Оплачено наперед" : "Оплата при отриманні"}
                   </td>
                   <td className="p-3">
-                    {o.receipt?.fileUrl ? (
-                      <a
-                        href={o.receipt.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-honey hover:underline font-medium"
-                        title={o.receipt.name}
-                      >
-                        ✅ Переглянути
-                      </a>
+                    {o.payment?.method === "card" ? (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 whitespace-nowrap">
+                        Чек на перевірці
+                      </span>
                     ) : (
-                      "—"
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 whitespace-nowrap">
+                        Очікує оплати
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-xs">
+                    {o.payment?.method === "card" ? (
+                      o.receipt?.fileUrl ? (
+                        <a
+                          href={o.receipt.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-honey hover:underline font-semibold inline-flex items-center gap-1"
+                          title={o.receipt.name}
+                        >
+                          📎 Відкрити чек
+                        </a>
+                      ) : (
+                        <span className="text-red-500 font-medium">Немає</span>
+                      )
+                    ) : (
+                      <span className="text-ink/40">Не потрібен</span>
                     )}
                   </td>
                   <td className="p-3">

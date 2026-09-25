@@ -6,9 +6,11 @@ export function formatOrderMessage(order) {
     .map((i) => `— ${i.name}${i.weight ? ` (${i.weight})` : ""} x${i.qty} — ${i.price * i.qty} грн`)
     .join("\n");
 
-  const receiptStatus = order.receipt_url || order.receipt?.fileUrl || order.receipt?.dataUrl
-    ? "Додано ✅"
-    : "Не додано";
+  const isCard = (order.payment_method || order.payment?.method) === "card";
+  const paymentLabel = isCard ? "Оплачено наперед" : "Оплата при отриманні";
+  const receiptStatus = isCard
+    ? (order.receipt_url || order.receipt?.fileUrl || order.receipt?.dataUrl ? "Додано ✅" : "Не додано ⚠️")
+    : "Не потрібен";
 
   return [
     `🔔 НОВЕ ЗАМОВЛЕННЯ #${order.number}`,
@@ -25,7 +27,7 @@ export function formatOrderMessage(order) {
     `📍 Місто: ${order.delivery_city_name || order.delivery?.city}`,
     `🏤 Відділення: ${order.delivery_branch_name || order.delivery?.branch}`,
     ``,
-    `💳 Оплата: ${(order.payment_method || order.payment?.method) === "card" ? "На картку" : "При отриманні (накладений)"}`,
+    `💳 Оплата: ${paymentLabel}`,
     `🧾 Чек: ${receiptStatus}`,
     ``,
     `💬 Коментар: ${order.comment || "—"}`,

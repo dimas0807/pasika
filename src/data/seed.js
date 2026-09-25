@@ -74,6 +74,6 @@ export const PRODUCTS = [
 
 export const DEFAULT_SETTINGS = {
   contacts: { phone: "+380 67 835 23 11", email: "hello@pasika-honey.ua", tiktok: "@honey.dsv", telegram: "@pasika_honey" },
-  payment: { bank: "monobank", card: "4441 1111 2222 3333", holder: "Олена Петріна", instruction: "Після оплати завантажте фото/скрін чека — ми підтвердимо замовлення протягом години." },
+  payment: { bank: "monobank", card: "4441 1111 2222 3333", holder: "Олена Петріна", purpose: "Оплата замовлення", instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення." },
   delivery: { novaPoshtaEnabled: true, ukrposhtaEnabled: true },
 };

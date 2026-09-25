@@ -53,19 +53,24 @@ export default function SettingsAdmin() {
         </section>
 
         <section className="card p-6">
-          <h3 className="font-semibold text-ink mb-4">Оплата</h3>
+          <h3 className="font-semibold text-ink mb-1">Реквізити для оплати</h3>
+          <p className="text-xs text-ink/55 mb-4">
+            Ці реквізити відображаються покупцю під час оформлення замовлення («Оплатити зараз»)
+          </p>
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Банк" value={settings?.payment?.bank || ""} onChange={setPath("payment.bank")} />
-            <Field label="Картка / реквізити" value={settings?.payment?.card || ""} onChange={setPath("payment.card")} />
-            <Field label="Отримувач" value={settings?.payment?.holder || ""} onChange={setPath("payment.holder")} />
+            <Field label="Отримувач" value={settings?.payment?.holder || ""} onChange={setPath("payment.holder")} placeholder="ПІБ отримувача або ФОП" />
+            <Field label="Номер картки / IBAN" value={settings?.payment?.card || ""} onChange={setPath("payment.card")} placeholder="UA... або 4441..." />
+            <Field label="Банк" value={settings?.payment?.bank || ""} onChange={setPath("payment.bank")} placeholder="monobank, ПриватБанк тощо" />
+            <Field label="Призначення платежу" value={settings?.payment?.purpose || ""} onChange={setPath("payment.purpose")} placeholder="Оплата замовлення" />
           </div>
           <div className="mt-4">
-            <label className="label">Текст інструкції</label>
+            <label className="label">Додаткова інструкція (необов'язково)</label>
             <textarea
               className="input"
               rows={2}
               value={settings?.payment?.instruction || ""}
               onChange={setPath("payment.instruction")}
+              placeholder="Після оплати завантажте фото або скріншот чека..."
             />
           </div>
         </section>

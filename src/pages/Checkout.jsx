@@ -33,6 +33,7 @@ export default function Checkout() {
   const [branchOptions, setBranchOptions] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
@@ -90,27 +91,66 @@ export default function Checkout() {
     const file = e.target.files?.[0];
     if (!file) return;
     setErrorMsg("");
+
+    const lowerName = file.name.toLowerCase();
+    const validExts = [".jpg", ".jpeg", ".png", ".pdf"];
+    const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
+    const isMimeValid =
+      file.type === "image/jpeg" ||
+      file.type === "image/png" ||
+      file.type === "application/pdf" ||
+      file.type.startsWith("image/");
+
+    if (!isExtValid && !isMimeValid) {
+      setErrorMsg("Дозволено завантажувати чек лише у форматах JPG, JPEG, PNG або PDF");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg("Розмір файлу не повинен перевищувати 10 МБ");
+      return;
+    }
+
     setUploadingReceipt(true);
     try {
+      if (file.type.startsWith("image/") || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg") || lowerName.endsWith(".png")) {
+        setReceiptPreview(URL.createObjectURL(file));
+      } else {
+        setReceiptPreview("pdf");
+      }
+
       const uploaded = await Storage.uploadReceipt(file, checkoutToken);
       setForm((f) => ({
         ...f,
         receiptFile: file,
         receiptUrl: uploaded.fileUrl,
-        receiptName: uploaded.name,
+        receiptName: uploaded.name || file.name,
       }));
     } catch (err) {
+      setReceiptPreview(null);
       setErrorMsg(err.message || "Помилка при завантаженні чека");
     } finally {
       setUploadingReceipt(false);
+      e.target.value = "";
     }
+  };
+
+  const removeReceipt = () => {
+    setForm((f) => ({
+      ...f,
+      receiptFile: null,
+      receiptUrl: null,
+      receiptName: null,
+    }));
+    setReceiptPreview(null);
   };
 
   const step1Valid = form.firstName.trim() && form.lastName.trim() && form.phone.trim();
   const step2Valid = form.city && form.branch;
 
   const copyCard = () => {
-    const cardNum = settings?.payment?.card || "4441 1111 2222 3333";
+    const cardNum = settings?.payment?.card || "";
+    if (!cardNum) return;
     navigator.clipboard?.writeText(cardNum.replace(/\s+/g, ""));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -118,6 +158,12 @@ export default function Checkout() {
 
   const submitOrder = async () => {
     setErrorMsg("");
+
+    if (form.paymentMethod === "card" && !form.receiptUrl) {
+      setErrorMsg("Для способу «Оплатити зараз» обов'язково завантажте чек про оплату");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -133,8 +179,8 @@ export default function Checkout() {
         branch: form.branch,
         paymentMethod: form.paymentMethod,
         comment: form.comment.trim() || undefined,
-        receiptUrl: form.receiptUrl,
-        receiptName: form.receiptName,
+        receiptUrl: form.paymentMethod === "card" ? form.receiptUrl : undefined,
+        receiptName: form.paymentMethod === "card" ? form.receiptName : undefined,
         items: items.map((i) => ({ id: i.id, qty: i.qty })),
         idempotencyKey,
         checkoutToken,
@@ -439,9 +485,9 @@ export default function Checkout() {
                   }`}
                 >
                   <div className="text-xl mb-1">💵</div>
-                  <div className="text-sm font-bold text-ink">При отриманні</div>
-                  <div className="text-xs text-ink/55 mt-0.5 font-normal">
-                    Накладений платіж у відділенні перевізника
+                  <div className="text-sm font-bold text-ink">Оплата при отриманні</div>
+                  <div className="text-xs text-ink/55 mt-1 font-normal leading-relaxed">
+                    Оплатіть замовлення під час отримання посилки.
                   </div>
                 </button>
 
@@ -455,82 +501,193 @@ export default function Checkout() {
                   }`}
                 >
                   <div className="text-xl mb-1">💳</div>
-                  <div className="text-sm font-bold text-ink">Оплата на картку</div>
-                  <div className="text-xs text-ink/55 mt-0.5 font-normal">
-                    Без комісії, швидке відправлення
+                  <div className="text-sm font-bold text-ink">Оплатити зараз</div>
+                  <div className="text-xs text-ink/55 mt-1 font-normal leading-relaxed">
+                    Переказ на картку або IBAN за реквізитами
                   </div>
                 </button>
               </div>
 
-              {/* Card Payment Requisites & Receipt Upload */}
+              {/* 1. Оплата при отриманні — пояснення (Чек не потрібен) */}
+              {form.paymentMethod === "cod" && (
+                <div className="p-4 rounded-2xl bg-[#FAF6EE] border border-gold/30 text-ink/80 text-sm flex items-start gap-3 animate-fadeIn">
+                  <span className="text-2xl shrink-0">📦</span>
+                  <div>
+                    <div className="font-bold text-ink">Оплата при отриманні</div>
+                    <p className="text-xs text-ink/65 mt-1 leading-relaxed">
+                      Оплатіть замовлення під час отримання посилки. Чек про оплату не потрібен.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Оплатити зараз — Реквізити та обов'язкове завантаження чека */}
               {form.paymentMethod === "card" && (
                 <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FDFBF7] to-[#F5EEDF] border border-gold/40 space-y-4 animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-honey">
-                      Реквізити для оплати
+                  <div className="flex items-center justify-between border-b border-ink/5 pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-honey flex items-center gap-1.5">
+                      <span>💳</span> Реквізити для оплати
                     </span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-black text-white">
-                      {settings?.payment?.bank || "monobank"}
-                    </span>
+                    {settings?.payment?.bank && (
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-ink text-white">
+                        {settings.payment.bank}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-white border border-ink/10 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-ink/50">Номер картки</div>
-                      <div className="font-mono font-bold text-base sm:text-lg text-ink tracking-wider">
-                        {settings?.payment?.card || "4441 1111 2222 3333"}
+                  {/* Requisites Details */}
+                  <div className="space-y-2.5 bg-white p-4 rounded-xl border border-ink/10 text-xs sm:text-sm">
+                    {settings?.payment?.holder && (
+                      <div className="flex justify-between items-baseline gap-2">
+                        <span className="text-ink/50 shrink-0">Отримувач:</span>
+                        <span className="font-semibold text-ink text-right">{settings.payment.holder}</span>
                       </div>
-                      <div className="text-xs text-ink/60 mt-0.5">
-                        {settings?.payment?.holder || "Олена Петрівна"}
+                    )}
+
+                    {settings?.payment?.card && (
+                      <div className="flex justify-between items-center gap-2 pt-1 border-t border-ink/5">
+                        <span className="text-ink/50 shrink-0">Картка / IBAN:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-ink tracking-wider text-xs sm:text-sm">
+                            {settings.payment.card}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={copyCard}
+                            className="px-2 py-1 rounded-lg border border-honey/60 text-[11px] font-bold hover:bg-cream text-ink transition-colors flex items-center gap-1 shrink-0"
+                            title="Скопіювати реквізити"
+                          >
+                            {copied ? "✓ Скопійовано" : "❐ Скопіювати"}
+                          </button>
+                        </div>
                       </div>
+                    )}
+
+                    {settings?.payment?.bank && (
+                      <div className="flex justify-between items-baseline gap-2 pt-1 border-t border-ink/5">
+                        <span className="text-ink/50 shrink-0">Банк:</span>
+                        <span className="font-medium text-ink text-right">{settings.payment.bank}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-baseline gap-2 pt-1 border-t border-ink/5">
+                      <span className="text-ink/50 shrink-0">Призначення:</span>
+                      <span className="font-medium text-ink text-right">
+                        {settings?.payment?.purpose || "Оплата замовлення"}
+                      </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={copyCard}
-                      className="px-3 py-1.5 rounded-lg border border-honey text-xs font-bold hover:bg-cream text-ink transition-colors flex items-center gap-1.5"
-                    >
-                      {copied ? "Скопійовано ✓" : "Скопіювати ❐"}
-                    </button>
                   </div>
 
                   {settings?.payment?.instruction && (
-                    <p className="text-xs text-ink/65 leading-relaxed">
+                    <p className="text-xs text-ink/65 leading-relaxed bg-white/70 p-3 rounded-xl border border-ink/5">
                       💡 {settings.payment.instruction}
                     </p>
                   )}
 
-                  {/* Receipt Upload Area */}
-                  <div className="pt-2">
-                    <label className="label">Завантажити фото або скріншот чека (необов'язково)</label>
-                    <div className="border-2 border-dashed border-gold/50 rounded-2xl p-4 text-center bg-white/60 hover:bg-white transition-colors">
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf"
-                        onChange={onReceipt}
-                        id="receipt-input"
-                        className="hidden"
-                      />
-                      <label htmlFor="receipt-input" className="cursor-pointer block">
-                        {uploadingReceipt ? (
-                          <div className="text-xs text-honey font-semibold animate-pulse">
-                            ⏳ Завантаження чека на сервер...
-                          </div>
-                        ) : form.receiptName ? (
-                          <div className="text-xs font-bold text-leaf flex items-center justify-center gap-1.5">
-                            <span>✓</span> Чек прикріплено: {form.receiptName}
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <span className="text-2xl">🧾</span>
-                            <div className="text-xs font-semibold text-ink">
-                              Натисніть для вибору файлу чека
-                            </div>
-                            <div className="text-[10px] text-ink/40">JPG, PNG, WEBP або PDF до 10 МБ</div>
-                          </div>
-                        )}
+                  {/* Receipt Upload Block */}
+                  <div className="pt-2 border-t border-ink/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🧾</span> Завантажте чек про оплату *
                       </label>
+                      <span className="text-[11px] text-ink/50">JPG, JPEG, PNG, PDF</span>
                     </div>
+
+                    {form.receiptUrl ? (
+                      /* Preview of uploaded receipt */
+                      <div className="p-3.5 rounded-2xl bg-white border border-leaf/30 shadow-xs flex items-center justify-between gap-3 animate-fadeIn">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {receiptPreview && receiptPreview !== "pdf" ? (
+                            <img
+                              src={receiptPreview}
+                              alt="Прев'ю чека"
+                              className="w-14 h-14 object-cover rounded-xl border border-ink/10 shadow-2xs shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl bg-red-50 border border-red-200 flex flex-col items-center justify-center text-red-600 font-bold text-[10px] shrink-0">
+                              <span className="text-lg">📄</span>
+                              <span>PDF</span>
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-ink truncate">
+                              {form.receiptName || "Чек про оплату"}
+                            </div>
+                            <div className="text-xs text-leaf font-medium flex items-center gap-1 mt-0.5">
+                              <span>✓</span> Чек успішно прикріплено
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <label
+                            htmlFor="receipt-input-change"
+                            className="text-xs text-honey hover:underline cursor-pointer font-semibold px-2 py-1"
+                          >
+                            Замінити
+                          </label>
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                            onChange={onReceipt}
+                            id="receipt-input-change"
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeReceipt}
+                            className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Видалити чек"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Upload Button / Dropzone */
+                      <div className="border-2 border-dashed border-gold/60 rounded-2xl p-5 text-center bg-white hover:bg-cream/40 transition-colors">
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                          onChange={onReceipt}
+                          id="receipt-input"
+                          className="hidden"
+                        />
+                        <label htmlFor="receipt-input" className="cursor-pointer block space-y-2">
+                          {uploadingReceipt ? (
+                            <div className="text-xs text-honey font-semibold animate-pulse py-2 flex items-center justify-center gap-2">
+                              <span className="animate-spin">🔄</span>
+                              <span>Завантаження чека на сервер...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="w-10 h-10 rounded-full bg-honey/15 text-honey text-xl flex items-center justify-center mx-auto">
+                                📎
+                              </div>
+                              <div className="text-xs sm:text-sm font-bold text-ink">
+                                Натисніть, щоб завантажити чек
+                              </div>
+                              <div className="text-[11px] text-ink/50">
+                                Дозволені формати: JPG, JPEG, PNG, PDF (до 10 МБ)
+                              </div>
+                              <div className="pt-1">
+                                <span className="inline-flex btn-primary text-xs py-2 px-5 pointer-events-none">
+                                  Завантажити чек 🧾
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
                   </div>
+                </div>
+              )}
+
+              {/* Notice when card payment selected but receipt missing */}
+              {form.paymentMethod === "card" && !form.receiptUrl && (
+                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 text-center font-medium animate-fadeIn">
+                  ⚠️ Для остаточного підтвердження замовлення завантажте чек про оплату.
                 </div>
               )}
 
@@ -544,9 +701,9 @@ export default function Checkout() {
                 </button>
                 <button
                   type="button"
-                  disabled={submitting}
+                  disabled={submitting || (form.paymentMethod === "card" && !form.receiptUrl)}
                   onClick={submitOrder}
-                  className="btn-primary text-sm px-8 py-3.5 flex items-center gap-2 disabled:opacity-50"
+                  className="btn-primary text-sm px-8 py-3.5 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
                 >
                   {submitting ? (
                     <>
@@ -604,7 +761,7 @@ export default function Checkout() {
             <div className="mt-5 p-3 rounded-xl bg-white/70 border border-ink/5 text-[11px] text-ink/65 space-y-1">
               <div>📍 <b>Отримувач:</b> {form.firstName} {form.lastName || "—"}</div>
               <div>🚚 <b>Доставка:</b> {provider?.name} {form.city?.name ? `(${form.city.name})` : ""}</div>
-              <div>💳 <b>Оплата:</b> {form.paymentMethod === "card" ? "На картку" : "При отриманні"}</div>
+              <div>💳 <b>Оплата:</b> {form.paymentMethod === "card" ? "Оплатити зараз" : "Оплата при отриманні"}</div>
             </div>
           </div>
         </div>

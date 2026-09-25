@@ -91,9 +91,12 @@ export default function OrderSuccess() {
         <Row label="Місто" value={deliveryCity} />
         {deliveryBranch && <Row label="Відділення" value={deliveryBranch} />}
         <Row
-          label="Оплата"
-          value={order.payment?.method === "card" ? "💳 Оплата на картку" : "💵 При отриманні"}
+          label="Спосіб оплати"
+          value={order.payment?.method === "card" ? "💳 Оплачено наперед" : "💵 Оплата при отриманні"}
         />
+        {order.payment?.method === "card" && (
+          <Row label="Чек про оплату" value="✓ Завантажено (на перевірці)" />
+        )}
         <div className="pt-2 border-t border-ink/10">
           <Row label="Сума до сплати" value={`${order.total} грн`} bold />
         </div>

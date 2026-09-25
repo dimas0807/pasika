@@ -62,9 +62,12 @@ export function getFullOrder(orderId, customerToken = null) {
     },
     payment: {
       method: order.payment_method,
+      methodLabel: order.payment_method === "card" ? "Оплачено наперед" : "Оплата при отриманні",
+      paymentStatus: order.payment_method === "card" ? "Чек на перевірці" : "Очікує оплати",
+      receiptStatus: order.payment_method === "card" ? (order.receipt_url ? "Прикріплено" : "Очікується") : "Не потрібен",
     },
     comment: order.comment || "",
-    receipt: order.receipt_url
+    receipt: (order.payment_method === "card" && order.receipt_url)
       ? {
           fileUrl: receiptAccessUrl,
           rawUrl: order.receipt_url,
@@ -194,6 +197,18 @@ export async function createOrder(req, res) {
       rawReceiptPath = rawReceiptPath.split("?")[0];
     }
 
+    if (cleanPayment === "card" && !rawReceiptPath) {
+      return res.status(400).json({
+        error: "Для способу «Оплатити зараз» обов'язково завантажте чек про оплату",
+      });
+    }
+
+    let finalReceiptName = receiptName;
+    if (cleanPayment === "cod") {
+      rawReceiptPath = null;
+      finalReceiptName = null;
+    }
+
     // Execute atomic transaction: stock check, stock deduction, order & items insert, claim receipt
     const orderId = "o_" + Date.now() + "_" + crypto.randomBytes(3).toString("hex");
     const now = Date.now();
@@ -273,7 +288,7 @@ export async function createOrder(req, res) {
         cleanPayment,
         comment?.trim() || null,
         rawReceiptPath || null,
-        receiptName || null,
+        finalReceiptName || null,
         idempotencyKey || null,
         customerToken,
         now,

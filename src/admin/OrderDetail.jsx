@@ -82,21 +82,45 @@ export default function OrderDetail() {
         </div>
         <div className="card p-5">
           <h3 className="font-semibold text-ink mb-3">Оплата</h3>
-          <p className="text-sm text-ink/70 font-medium">{order.payment?.method === "card" ? "💳 На картку" : "💵 При отриманні"}</p>
-          {receiptUrl ? (
-            <div className="mt-3">
-              <a
-                href={receiptUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary text-xs inline-flex items-center gap-1.5 py-1.5 px-3"
-              >
-                📎 Переглянути чек ({receiptName})
-              </a>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between items-baseline border-b border-ink/5 pb-1.5">
+              <span className="text-ink/60">Спосіб:</span>
+              <span className="font-semibold text-ink">
+                {order.payment?.method === "card" ? "Оплачено наперед" : "Оплата при отриманні"}
+              </span>
             </div>
-          ) : (
-            <p className="text-sm text-ink/40 mt-1">Чек не завантажено</p>
-          )}
+            <div className="flex justify-between items-baseline border-b border-ink/5 pb-1.5">
+              <span className="text-ink/60">Статус:</span>
+              {order.payment?.method === "card" ? (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                  Чек на перевірці
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                  Очікує оплати
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-ink/60">Чек:</span>
+              {order.payment?.method === "card" ? (
+                receiptUrl ? (
+                  <a
+                    href={receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-primary text-xs inline-flex items-center gap-1.5 py-1.5 px-3"
+                  >
+                    📎 Переглянути / відкрити ({receiptName})
+                  </a>
+                ) : (
+                  <span className="text-red-500 font-medium text-xs">Не завантажено</span>
+                )
+              ) : (
+                <span className="text-ink/50 text-sm">Не потрібен</span>
+              )}
+            </div>
+          </div>
         </div>
         <div className="card p-5">
           <h3 className="font-semibold text-ink mb-3">Коментар</h3>

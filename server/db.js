@@ -117,7 +117,6 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-    CREATE INDEX IF NOT EXISTS idx_orders_customer_token ON orders(customer_token);
     CREATE INDEX IF NOT EXISTS idx_pending_receipts_token ON pending_receipts(checkout_token);
     CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token);
@@ -126,6 +125,10 @@ export function initDatabase() {
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN customer_token TEXT");
+  } catch {}
+
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer_token ON orders(customer_token)");
   } catch {}
 
   seedInitialData();
@@ -259,7 +262,8 @@ function seedInitialData() {
         bank: "monobank",
         card: "4441 1111 2222 3333",
         holder: "Олена Петріна",
-        instruction: "Після оплати завантажте фото/скрін чека — ми підтвердимо замовлення протягом години.",
+        purpose: "Оплата замовлення",
+        instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення.",
       },
       delivery: {
         novaPoshtaEnabled: true,
@@ -269,6 +273,14 @@ function seedInitialData() {
     db.prepare("INSERT INTO settings (key, value) VALUES ('app_settings', ?)").run(
       JSON.stringify(defaultSettings)
     );
+  } else {
+    try {
+      const parsed = JSON.parse(settingsRow.value);
+      if (parsed.payment && !parsed.payment.purpose) {
+        parsed.payment.purpose = "Оплата замовлення";
+        db.prepare("UPDATE settings SET value = ? WHERE key = 'app_settings'").run(JSON.stringify(parsed));
+      }
+    } catch {}
   }
 
   // 4. Seed admin user
