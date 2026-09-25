@@ -229,7 +229,7 @@ export default function ProductForm() {
                   <input
                     type="file"
                     ref={replaceInputRef}
-                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    accept="image/*,.jpg,.jpeg,.png,.webp"
                     onChange={onFileInputChange}
                     className="hidden"
                   />
@@ -237,7 +237,7 @@ export default function ProductForm() {
                     type="button"
                     onClick={() => replaceInputRef.current?.click()}
                     disabled={uploadingImage}
-                    className="px-3 py-1.5 rounded-xl border border-honey text-xs font-bold text-ink hover:bg-honey/10 transition-colors disabled:opacity-50"
+                    className="px-3.5 py-2.5 rounded-xl border border-honey text-xs font-bold text-ink hover:bg-honey/10 min-h-[44px] inline-flex items-center justify-center transition-colors disabled:opacity-50"
                   >
                     {uploadingImage ? "Завантаження..." : "Замінити фото"}
                   </button>
@@ -246,7 +246,7 @@ export default function ProductForm() {
                     type="button"
                     onClick={removePhoto}
                     disabled={uploadingImage}
-                    className="px-3 py-1.5 rounded-xl border border-red-200 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                    className="px-3.5 py-2.5 rounded-xl border border-red-200 text-xs font-bold text-red-600 hover:bg-red-50 min-h-[44px] inline-flex items-center justify-center transition-colors"
                   >
                     Видалити фото
                   </button>
@@ -272,7 +272,7 @@ export default function ProductForm() {
               <input
                 type="file"
                 ref={fileInputRef}
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                accept="image/*,.jpg,.jpeg,.png,.webp"
                 onChange={onFileInputChange}
                 className="hidden"
               />
@@ -296,7 +296,7 @@ export default function ProductForm() {
                   </p>
                   <button
                     type="button"
-                    className="mt-2 btn-secondary text-xs py-2 px-4 inline-flex"
+                    className="mt-2 btn-secondary text-xs py-2.5 px-4 min-h-[44px] inline-flex"
                   >
                     Завантажити фото
                   </button>
@@ -454,17 +454,17 @@ export default function ProductForm() {
         </div>
 
         {/* BUTTONS */}
-        <div className="flex items-center gap-3 pt-4 border-t border-ink/10">
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-ink/10">
           <button
             type="button"
             onClick={() => navigate("/admin/products")}
-            className="btn-secondary text-sm py-2.5 px-5"
+            className="btn-secondary w-full sm:w-auto text-sm py-3 px-5 min-h-[44px] order-2 sm:order-1"
           >
             Скасувати
           </button>
           <button
             type="submit"
-            className="btn-primary flex-1 text-sm py-2.5 font-bold disabled:opacity-50"
+            className="btn-primary w-full sm:flex-1 text-sm py-3 font-bold disabled:opacity-50 min-h-[44px] order-1 sm:order-2"
             disabled={saving || uploadingImage}
           >
             {saving ? "Збереження товару..." : "Зберегти товар"}

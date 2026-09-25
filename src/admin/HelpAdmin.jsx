@@ -267,7 +267,7 @@ export default function HelpAdmin() {
             <button
               key={c}
               onClick={() => setActiveCategory(c)}
-              className={`px-3 py-1 rounded-xl transition-all ${
+              className={`px-3.5 py-2 rounded-xl transition-all min-h-[44px] flex items-center ${
                 activeCategory === c
                   ? "bg-honey text-white font-semibold shadow-2xs"
                   : "bg-cream/60 hover:bg-cream text-ink/70"
@@ -326,7 +326,7 @@ export default function HelpAdmin() {
                       <div className="mt-4 pt-3 border-t border-ink/5 flex justify-end">
                         <Link
                           to={item.link}
-                          className="btn-primary text-xs py-1.5 px-3.5 inline-flex items-center gap-1.5 shadow-2xs"
+                          className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 shadow-2xs min-h-[44px]"
                         >
                           <span>→</span> {item.linkText}
                         </Link>

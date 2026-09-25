@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Orders } from "../data/db";
+import { Orders, resolveReceiptUrl } from "../data/db";
 
 const ORDER_STATUSES = [
   { key: "all", label: "Всі замовлення" },
@@ -66,6 +66,34 @@ export default function OrdersAdmin() {
       showNotification("Не вдалося оновити статус: " + err.message, true);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleOpenReceipt = async (e, rawUrl) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!rawUrl) return;
+    if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
+      window.open(rawUrl, "_blank");
+      return;
+    }
+    const fetchUrl = resolveReceiptUrl(rawUrl);
+    try {
+      const res = await fetch(fetchUrl, { credentials: "include" });
+      if (!res.ok) {
+        showNotification("Файл чека недоступний", true);
+        return;
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        showNotification("Файл чека недоступний", true);
+        return;
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+    } catch {
+      showNotification("Файл чека недоступний", true);
     }
   };
 
@@ -191,8 +219,144 @@ export default function OrdersAdmin() {
         </div>
       </div>
 
-      {/* Orders Table */}
-      <div className="card overflow-x-auto shadow-sm">
+      {/* Mobile Orders List (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {loading && orders.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            <div className="inline-block animate-spin mr-2">⏳</div> Завантаження замовлень...
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            Замовлень за обраними фільтрами немає.
+          </div>
+        ) : (
+          filteredOrders.map((o) => {
+            const isCard = o.payment?.method === "card";
+            const receiptUrl = o.receipt?.fileUrl || o.receipt?.dataUrl;
+
+            return (
+              <div key={o.id} className="card p-4 space-y-3 border border-ink/10 shadow-xs">
+                {/* Header: #Number, Date, Status */}
+                <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-ink/5">
+                  <div>
+                    <Link
+                      to={`/admin/orders/${o.id}`}
+                      className="font-serif font-bold text-lg text-ink hover:text-honey transition-colors"
+                    >
+                      #{o.number}
+                    </Link>
+                    <div className="text-[11px] text-ink/50">
+                      {new Date(o.createdAt).toLocaleDateString("uk-UA", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  </div>
+
+                  <select
+                    value={o.status}
+                    disabled={actionLoading === o.id}
+                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                    className={`badge border-0 cursor-pointer text-xs py-2 px-3 rounded-xl shadow-2xs font-semibold min-h-[44px] transition-all ${
+                      STATUS_COLOR[o.status] || "bg-cream text-ink"
+                    }`}
+                  >
+                    {ORDER_STATUSES.filter((s) => s.key !== "all").map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Client info */}
+                <div className="text-xs space-y-1">
+                  <div className="font-semibold text-ink text-sm">
+                    👤 {o.customer?.firstName} {o.customer?.lastName}
+                  </div>
+                  {o.customer?.phone && (
+                    <div>
+                      <a
+                        href={`tel:${o.customer.phone}`}
+                        className="text-honey font-medium hover:underline inline-flex items-center gap-1"
+                      >
+                        📞 {o.customer.phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delivery */}
+                <div className="text-xs text-ink/70 bg-cream/40 p-2.5 rounded-xl border border-ink/5">
+                  <div className="font-medium text-ink flex items-center gap-1.5">
+                    <span>{o.delivery?.provider === "Укрпошта" ? "📮" : "📦"}</span>
+                    <span>{o.delivery?.provider || "Нова пошта"}</span>
+                    <span className="text-ink/40">•</span>
+                    <span className="text-ink">{o.delivery?.city || "—"}</span>
+                  </div>
+                  {o.delivery?.branch && (
+                    <div className="text-[11px] text-ink/60 mt-0.5 truncate">
+                      {o.delivery.branch}
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment & Receipt */}
+                <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                  <div className="text-xs">
+                    {isCard ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium bg-amber-50 text-amber-800 border border-amber-200/60">
+                        <span>💳</span> Оплачено наперед
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium bg-blue-50 text-blue-700 border border-blue-200/60">
+                        <span>💵</span> При отриманні
+                      </span>
+                    )}
+                  </div>
+
+                  {isCard && (
+                    <div>
+                      {receiptUrl ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenReceipt(e, receiptUrl)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-honey bg-honey/10 active:bg-honey/20 border border-honey/30 px-3 py-2 rounded-xl min-h-[44px]"
+                          title="Переглянути квитанцію"
+                        >
+                          📎 Чек
+                        </button>
+                      ) : (
+                        <span className="text-xs text-red-500 font-medium">Немає чека</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom: Total & View Details button */}
+                <div className="flex items-center justify-between pt-2 border-t border-ink/5">
+                  <div>
+                    <span className="text-[11px] text-ink/40 block">До сплати:</span>
+                    <span className="font-bold text-ink text-base">{o.total} грн</span>
+                  </div>
+                  <Link
+                    to={`/admin/orders/${o.id}`}
+                    className="btn-secondary text-xs py-2 px-4 rounded-xl min-h-[44px] inline-flex items-center gap-1 font-semibold"
+                  >
+                    Деталі →
+                  </Link>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Orders Table View (hidden md:block) */}
+      <div className="hidden md:block card overflow-x-auto shadow-sm">
         <table className="w-full text-sm min-w-[880px]">
           <thead>
             <tr className="text-left text-ink/50 border-b border-ink/5 bg-cream/30 text-xs">
@@ -281,15 +445,14 @@ export default function OrdersAdmin() {
                     <td className="p-3 text-xs whitespace-nowrap">
                       {isCard ? (
                         receiptUrl ? (
-                          <a
-                            href={receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 font-semibold text-honey hover:underline bg-cream/70 px-2 py-1 rounded-lg"
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenReceipt(e, receiptUrl)}
+                            className="inline-flex items-center gap-1 font-semibold text-honey hover:underline bg-cream/70 px-2 py-1 rounded-lg cursor-pointer"
                             title={o.receipt?.name || "Переглянути квитанцію"}
                           >
                             📎 Чек
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-red-500 font-medium text-xs">Не надано</span>
                         )

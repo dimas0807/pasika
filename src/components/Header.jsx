@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import RealisticBee from "./RealisticBee";
 import { useCart } from "../context/CartContext";
+import { Settings, subscribe } from "../data/db";
+import { getSocialUrl } from "../utils/contacts";
 
 const NAV = [
   { to: "/", label: "Головна" },
@@ -15,41 +17,38 @@ const NAV = [
 export default function Header() {
   const { count } = useCart();
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const location = useLocation();
-  const isHome = location.pathname === "/";
+  const [s, setS] = useState(() => Settings.get());
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 40);
-    };
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    Settings.fetch().then((data) => data && setS(data));
+    return subscribe(() => setS(Settings.get()));
   }, []);
 
-  const isDarkOverHero = isHome && !scrolled;
+  const storeName = s?.store?.name || "Honey";
+  const phone = (s?.contacts?.phone || s?.store?.phone || "").trim();
+
+  const activeSocials = [
+    { key: "telegram", label: "Telegram" },
+    { key: "viber", label: "Viber" },
+    { key: "instagram", label: "Instagram" },
+    { key: "facebook", label: "Facebook" },
+    { key: "tiktok", label: "TikTok" },
+  ]
+    .map((item) => ({ ...item, url: getSocialUrl(item.key, s?.contacts?.[item.key]) }))
+    .filter((item) => Boolean(item.url));
 
   return (
-    <header
-      className={`sticky top-0 z-40 transition-all duration-300 ${
-        isDarkOverHero
-          ? "bg-black/30 backdrop-blur-md border-b border-white/15 text-white"
-          : "bg-[#FFFDF8]/95 backdrop-blur-md border-b border-ink/5 text-ink shadow-2xs"
-      }`}
-    >
+    <header className="sticky top-0 z-40 bg-[#FFFDF8] border-b border-ink/10 text-ink shadow-2xs">
       <div className="container-p flex items-center justify-between h-16 md:h-20">
         {/* Brand Logo with Realistic 3D Bee */}
         <Link
           to="/"
-          className={`flex items-center gap-2.5 font-serif text-2xl md:text-3xl font-extrabold tracking-tight hover:opacity-90 transition-opacity shrink-0 ${
-            isDarkOverHero ? "text-white" : "text-ink"
-          }`}
+          className="flex items-center gap-2.5 font-serif text-2xl md:text-3xl font-extrabold tracking-tight hover:opacity-90 transition-opacity shrink-0 text-ink"
         >
           <div className="w-8 h-8 flex items-center justify-center">
             <RealisticBee size={28} depth="near" />
           </div>
-          <span>Honey</span>
+          <span>{storeName}</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -60,11 +59,7 @@ export default function Header() {
               to={n.to}
               className={({ isActive }) =>
                 `relative py-1 transition-colors ${
-                  isDarkOverHero
-                    ? isActive
-                      ? "text-accent font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-accent after:rounded-full"
-                      : "text-white/85 hover:text-accent"
-                    : isActive
+                  isActive
                     ? "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
                     : "text-ink/80 hover:text-honey"
                 }`
@@ -77,66 +72,52 @@ export default function Header() {
 
         {/* Action Controls & Contact Info */}
         <div className="flex items-center gap-3 sm:gap-4 md:gap-5">
-          {/* Direct Phone Call */}
-          <a
-            href="tel:+380678352311"
-            className={`hidden md:flex items-center gap-2 text-xs lg:text-sm font-semibold transition-colors py-1.5 px-3 rounded-full ${
-              isDarkOverHero
-                ? "text-white/90 hover:text-accent hover:bg-white/10"
-                : "text-ink/85 hover:text-honey hover:bg-white/60"
-            }`}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={isDarkOverHero ? "text-accent" : "text-honey"}
+          {/* Direct Phone Call (only if configured) */}
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/\s+/g, "")}`}
+              className="hidden md:flex items-center gap-2 text-xs lg:text-sm font-semibold transition-colors py-1.5 px-3 rounded-full text-ink/85 hover:text-honey hover:bg-cream/60"
             >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            <span>+380 67 835 23 11</span>
-          </a>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-honey"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              <span>{phone}</span>
+            </a>
+          )}
 
-          {/* Social Links (Desktop) */}
-          <div
-            className={`hidden xl:flex items-center gap-3 border-l pl-4 text-xs font-medium ${
-              isDarkOverHero
-                ? "border-white/20 text-white/70"
-                : "border-ink/10 text-ink/65"
-            }`}
-          >
-            <a
-              href="https://www.tiktok.com/@honey.dsv"
-              target="_blank"
-              rel="noreferrer"
-              className={isDarkOverHero ? "hover:text-accent" : "hover:text-honey"}
-            >
-              TikTok
-            </a>
-            <span className="opacity-40">•</span>
-            <a
-              href="https://t.me/honey_dsv"
-              target="_blank"
-              rel="noreferrer"
-              className={isDarkOverHero ? "hover:text-accent" : "hover:text-honey"}
-            >
-              Telegram
-            </a>
-          </div>
+          {/* Social Links (Desktop - only real configured ones) */}
+          {activeSocials.length > 0 && (
+            <div className="hidden xl:flex items-center gap-2.5 border-l border-ink/10 pl-3.5 text-xs font-medium text-ink/65">
+              {activeSocials.map((item, idx) => (
+                <span key={item.key} className="flex items-center gap-2.5">
+                  {idx > 0 && <span className="opacity-30">•</span>}
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-honey transition-colors"
+                  >
+                    {item.label}
+                  </a>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Cart Trigger */}
           <Link
             to="/cart"
-            className={`relative p-2.5 rounded-full transition-all active:scale-95 ${
-              isDarkOverHero
-                ? "text-white hover:text-accent hover:bg-white/10"
-                : "text-ink hover:text-honey hover:bg-white/60"
-            }`}
+            className="relative p-2.5 rounded-full transition-all active:scale-95 text-ink hover:text-honey hover:bg-cream/60"
             aria-label="Кошик покупок"
           >
             <CartIcon />
@@ -149,11 +130,7 @@ export default function Header() {
 
           {/* Mobile Menu Hamburger */}
           <button
-            className={`lg:hidden p-2 rounded-xl transition-colors ${
-              isDarkOverHero
-                ? "text-white hover:bg-white/10"
-                : "text-ink hover:bg-white/60"
-            }`}
+            className="lg:hidden p-2 rounded-xl transition-colors text-ink hover:bg-cream/60"
             onClick={() => setOpen((o) => !o)}
             aria-label="Меню навігації"
           >
@@ -184,32 +161,33 @@ export default function Header() {
             ))}
           </nav>
 
-          <div className="mt-4 pt-4 border-t border-ink/5 space-y-3">
-            <a
-              href="tel:+380678352311"
-              className="flex items-center gap-2 text-sm font-semibold text-ink px-3 py-2 rounded-xl bg-cream/70"
-            >
-              <span className="text-honey">📞</span> +380 67 835 23 11
-            </a>
-            <div className="flex gap-4 px-3 text-sm text-ink/70">
-              <a
-                href="https://www.tiktok.com/@honey.dsv"
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-honey font-medium"
-              >
-                TikTok ↗
-              </a>
-              <a
-                href="https://t.me/honey_dsv"
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-honey font-medium"
-              >
-                Telegram ↗
-              </a>
+          {(phone || activeSocials.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-ink/5 space-y-3">
+              {phone && (
+                <a
+                  href={`tel:${phone.replace(/\s+/g, "")}`}
+                  className="flex items-center gap-2 text-sm font-semibold text-ink px-3 py-2 rounded-xl bg-cream/70"
+                >
+                  <span className="text-honey">📞</span> {phone}
+                </a>
+              )}
+              {activeSocials.length > 0 && (
+                <div className="flex flex-wrap gap-3 px-3 text-sm text-ink/70">
+                  {activeSocials.map((item) => (
+                    <a
+                      key={item.key}
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-honey font-medium"
+                    >
+                      {item.label} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       )}
     </header>

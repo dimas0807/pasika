@@ -4,7 +4,7 @@ import ProductCard from "../components/ProductCard";
 import TikTokCard from "../components/TikTokCard";
 import RealisticBee from "../components/RealisticBee";
 import WaxHoneycomb from "../components/WaxHoneycomb";
-import { Categories, Products, subscribe } from "../data/db";
+import { Categories, Products, Settings, subscribe } from "../data/db";
 
 const TRUST_BADGES = [
   {
@@ -123,14 +123,30 @@ const TIKTOK_VIDEOS = [
 
 export default function Home() {
   const [, setTick] = useState(0);
+  const [s, setS] = useState(() => Settings.get());
 
   useEffect(() => {
     Products.fetchAll();
     Categories.fetchAll();
-    return subscribe(() => setTick((t) => t + 1));
+    Settings.fetch().then((data) => data && setS(data));
+    return subscribe(() => {
+      setTick((t) => t + 1);
+      setS(Settings.get());
+    });
   }, []);
 
   const featured = Products.featured().slice(0, 5);
+
+  const aboutTitle = s?.about?.title || "Мед, який починається з бджіл";
+  const aboutLead = s?.about?.shortText || s?.about?.lead || "Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів.";
+  const aboutStory = s?.about?.fullDescription || s?.about?.story || "Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени.";
+  const hivesCount = s?.about?.hivesCount || s?.about?.stats?.hives || "100+";
+  const years = s?.about?.foundationYear
+    ? (s.about.foundationYear.length === 4 && !Number.isNaN(Number(s.about.foundationYear))
+        ? `${Math.max(1, new Date().getFullYear() - Number(s.about.foundationYear))}`
+        : s.about.foundationYear)
+    : s?.about?.stats?.years || "10";
+  const location = s?.about?.location || s?.store?.location || "Прикарпаття, с. Новоселиця";
 
   return (
     <div className="overflow-x-hidden">
@@ -154,12 +170,6 @@ export default function Home() {
         {/* Foreground Content Composed Into The Photograph */}
         <div className="container-p relative z-20 py-16 sm:py-20 lg:py-28 w-full">
           <div className="max-w-2xl text-white">
-            {/* Natural Tag Badge with 3D Bee */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold uppercase tracking-wider mb-5 shadow-xs">
-              <RealisticBee size={22} depth="near" />
-              <span>Родинна пасіка на Прикарпатті</span>
-            </div>
-
             {/* Main Headline */}
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.12] tracking-tight drop-shadow-md">
               Натуральний мед <br />
@@ -420,13 +430,13 @@ export default function Home() {
                 Наша історія
               </span>
               <h2 className="font-serif text-3xl sm:text-4xl font-extrabold text-ink mt-3 leading-snug">
-                Мед, який починається з бджіл
+                {aboutTitle}
               </h2>
               <p className="mt-4 text-ink/80 leading-relaxed text-sm sm:text-base">
-                Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів.
+                {aboutLead}
               </p>
-              <p className="mt-3 text-ink/75 leading-relaxed text-sm sm:text-base">
-                Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени.
+              <p className="mt-3 text-ink/75 leading-relaxed text-sm sm:text-base whitespace-pre-line">
+                {aboutStory}
               </p>
 
               {/* 4 Storytelling Badges */}
@@ -436,7 +446,7 @@ export default function Home() {
                     <RealisticBee size={24} depth="near" facing="right" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-ink">10 років досвіду</h4>
+                    <h4 className="text-sm font-bold text-ink">{years} років досвіду</h4>
                     <p className="text-xs text-ink/60 mt-0.5">Від першого вулика до власного виробництва</p>
                   </div>
                 </div>
@@ -446,7 +456,7 @@ export default function Home() {
                     🏡
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-ink">Понад 100 вуликів</h4>
+                    <h4 className="text-sm font-bold text-ink">Понад {hivesCount} вуликів</h4>
                     <p className="text-xs text-ink/60 mt-0.5">Одна родинна справа та щоденна турбота</p>
                   </div>
                 </div>
@@ -456,8 +466,8 @@ export default function Home() {
                     📍
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-ink">Прикарпаття</h4>
-                    <p className="text-xs text-ink/60 mt-0.5">Село Новоселиця, Снятинський район</p>
+                    <h4 className="text-sm font-bold text-ink">{location}</h4>
+                    <p className="text-xs text-ink/60 mt-0.5">Екологічно чистий регіон</p>
                   </div>
                 </div>
 

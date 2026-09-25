@@ -88,8 +88,14 @@ const DEFAULT_SETTINGS = {
   contacts: {
     phone: "+380 67 835 23 11",
     email: "hello@pasika-honey.ua",
-    tiktok: "@honey.dsv",
     telegram: "@pasika_honey",
+    viber: "+380 67 835 23 11",
+    instagram: "@honey_pasika",
+    facebook: "",
+    tiktok: "@honey.dsv",
+    pickupAddress: "Івано-Франківська обл., Снятинський р-н, с. Новоселиця",
+    pickupLat: "48.3341",
+    pickupLng: "25.2974",
   },
   payment: {
     bank: "monobank",
@@ -113,7 +119,10 @@ let memoryOrders = [];
 let memorySettings = { ...DEFAULT_SETTINGS };
 let memoryProducts = [...SEED_PRODUCTS];
 let memoryCategories = [...SEED_CATEGORIES];
+let memoryTelegramRecipients = [];
+let memoryTelegramInteractions = [];
 const memoryProductImages = new Map();
+const memoryReceipts = new Map();
 
 const UKR_TO_LAT = {
   а: "a", б: "b", в: "v", г: "h", ґ: "g", д: "d", е: "e", є: "ye", ж: "zh",
@@ -613,6 +622,29 @@ export async function onRequest(context) {
       const filename = `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
       const fileUrl = `/uploads/receipts/${filename}`;
 
+      const bytes = await file.arrayBuffer();
+      const mimeType =
+        file.type ||
+        (ext === ".pdf"
+          ? "application/pdf"
+          : ext === ".png"
+          ? "image/png"
+          : ext === ".webp"
+          ? "image/webp"
+          : "image/jpeg");
+
+      const record = {
+        bytes,
+        type: mimeType,
+        originalName: file.name,
+        filename,
+        size: file.size,
+        createdAt: Date.now(),
+      };
+      memoryReceipts.set(filename, record);
+      // Also map by original name e.g. IMG_1524.png
+      memoryReceipts.set(file.name, record);
+
       return jsonResponse({
         fileUrl,
         originalName: file.name,
@@ -623,13 +655,75 @@ export async function onRequest(context) {
     }
   }
 
-  // Serve or inspect uploaded receipts
-  if (path.startsWith("/uploads/receipts/") && method === "GET") {
-    const filename = path.replace("/uploads/receipts/", "");
-    return new Response(`Receipt: ${filename}`, {
-      status: 200,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+  // Secure receipt access
+  if (
+    (path.startsWith("/receipts/") ||
+      path.startsWith("/uploads/receipts/") ||
+      path.startsWith("/api/receipts/")) &&
+    method === "GET"
+  ) {
+    let filename = path
+      .replace(/^\/api\//, "/")
+      .replace(/^\/uploads\/receipts\//, "")
+      .replace(/^\/receipts\//, "")
+      .replace(/^\//, "");
+    if (filename.includes("/")) filename = filename.split("/")[0];
+    const decodedFilename = decodeURIComponent(filename);
+
+    // 1. Authentication check: Admin session or token
+    const token = (
+      url.searchParams.get("token") ||
+      request.headers.get("x-customer-token") ||
+      request.headers.get("x-checkout-token") ||
+      ""
+    ).trim();
+
+    let isAuthorized = !!session; // Admin session
+    if (!isAuthorized && token) {
+      const matchOrder = memoryOrders.find(
+        (o) =>
+          o.customerToken === token &&
+          (o.receipt?.fileUrl?.includes(filename) ||
+            o.receipt?.name === decodedFilename)
+      );
+      if (matchOrder) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return jsonResponse({ error: "Доступ до чека заборонено: необхідна авторизація" }, 403);
+    }
+
+    // 2. Lookup receipt item
+    let receiptItem =
+      memoryReceipts.get(filename) ||
+      memoryReceipts.get(decodedFilename);
+
+    if (!receiptItem) {
+      const order = memoryOrders.find(
+        (o) =>
+          o.receipt?.name === decodedFilename ||
+          o.receipt?.fileUrl?.endsWith(filename)
+      );
+      if (order?.receipt?.filename) {
+        receiptItem = memoryReceipts.get(order.receipt.filename);
+      }
+    }
+
+    if (receiptItem && receiptItem.bytes) {
+      return new Response(receiptItem.bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": receiptItem.type,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(receiptItem.originalName || filename)}"`,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
+    // If file is physically absent
+    return jsonResponse({ error: "Файл чека недоступний" }, 404);
   }
 
   // Product Image Upload
@@ -998,6 +1092,97 @@ export async function onRequest(context) {
     // Admin Telegram Log
     if (path === "/admin/telegram-log" && method === "GET") {
       return jsonResponse([]);
+    }
+
+    // Admin Telegram Config
+    if (path === "/admin/telegram/config" && method === "GET") {
+      return jsonResponse({
+        enabled: memorySettings.telegram?.enabled ?? true,
+        hasToken: Boolean(memorySettings.telegram?.botToken),
+        botToken: memorySettings.telegram?.botToken ? "••••••••••••••••" : "",
+        botUsername: memorySettings.telegram?.botUsername || "",
+        status: memorySettings.telegram?.lastStatus || (memorySettings.telegram?.botToken ? "configured" : "unconfigured"),
+      });
+    }
+
+    if (path === "/admin/telegram/config" && method === "PUT") {
+      const body = await request.json().catch(() => ({}));
+      if (!memorySettings.telegram) memorySettings.telegram = {};
+      if (body.enabled !== undefined) memorySettings.telegram.enabled = Boolean(body.enabled);
+      if (body.botToken && body.botToken !== "••••••••••••••••") {
+        memorySettings.telegram.botToken = String(body.botToken).trim();
+      }
+      return jsonResponse({
+        enabled: memorySettings.telegram.enabled,
+        hasToken: Boolean(memorySettings.telegram.botToken),
+        botToken: memorySettings.telegram.botToken ? "••••••••••••••••" : "",
+        botUsername: memorySettings.telegram.botUsername || "",
+        status: memorySettings.telegram.botToken ? "configured" : "unconfigured",
+      });
+    }
+
+    // Admin Telegram Recipients
+    if (path === "/admin/telegram/recipients" && method === "GET") {
+      return jsonResponse(memoryTelegramRecipients);
+    }
+
+    if (path === "/admin/telegram/recipients" && method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const id = "tr_" + Date.now().toString(36);
+      const recipient = {
+        id,
+        name: String(body.name || "").trim(),
+        username: String(body.username || "").trim(),
+        chat_id: String(body.chat_id || "").trim(),
+        role: body.role || "manager",
+        is_active: body.is_active !== undefined ? Boolean(body.is_active) : true,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      if (!recipient.name || !recipient.chat_id) {
+        return jsonResponse({ error: "Вкажіть ім'я та Chat ID" }, 400);
+      }
+      memoryTelegramRecipients.push(recipient);
+      return jsonResponse(recipient, 201);
+    }
+
+    if (path.startsWith("/admin/telegram/recipients/") && method === "PUT") {
+      const id = path.replace("/admin/telegram/recipients/", "");
+      const body = await request.json().catch(() => ({}));
+      const idx = memoryTelegramRecipients.findIndex((r) => r.id === id);
+      if (idx < 0) return jsonResponse({ error: "Отримувача не знайдено" }, 404);
+      memoryTelegramRecipients[idx] = {
+        ...memoryTelegramRecipients[idx],
+        ...body,
+        updated_at: Date.now(),
+      };
+      return jsonResponse(memoryTelegramRecipients[idx]);
+    }
+
+    if (path.startsWith("/admin/telegram/recipients/") && method === "DELETE") {
+      const id = path.replace("/admin/telegram/recipients/", "");
+      memoryTelegramRecipients = memoryTelegramRecipients.filter((r) => r.id !== id);
+      return jsonResponse({ ok: true, id });
+    }
+
+    if (path.startsWith("/admin/telegram/recipients/") && path.endsWith("/toggle") && method === "POST") {
+      const id = path.replace("/admin/telegram/recipients/", "").replace("/toggle", "");
+      const idx = memoryTelegramRecipients.findIndex((r) => r.id === id);
+      if (idx < 0) return jsonResponse({ error: "Отримувача не знайдено" }, 404);
+      memoryTelegramRecipients[idx].is_active = !memoryTelegramRecipients[idx].is_active;
+      memoryTelegramRecipients[idx].updated_at = Date.now();
+      return jsonResponse(memoryTelegramRecipients[idx]);
+    }
+
+    if (path.startsWith("/admin/telegram/recipients/") && path.endsWith("/test") && method === "POST") {
+      const id = path.replace("/admin/telegram/recipients/", "").replace("/test", "");
+      const recipient = memoryTelegramRecipients.find((r) => r.id === id);
+      if (!recipient) return jsonResponse({ error: "Отримувача не знайдено" }, 404);
+      return jsonResponse({ ok: true, simulated: true, message: `Тестове повідомлення для ${recipient.name} змодельовано успішно` });
+    }
+
+    if (path === "/admin/telegram/recent-chats" && method === "GET") {
+      return jsonResponse(memoryTelegramInteractions);
     }
   }
 

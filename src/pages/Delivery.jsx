@@ -30,7 +30,7 @@ export default function Delivery() {
         <h2 className="font-serif text-xl sm:text-2xl font-bold text-ink mb-4 flex items-center gap-2">
           <span>🚚</span> Способи доставки
         </h2>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="card p-6 bg-[#FAF6EE] border border-gold/20 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -66,6 +66,35 @@ export default function Delivery() {
               Вартість: за тарифами Укрпошти (від 45 грн)
             </div>
           </div>
+
+          {(s?.contacts?.pickupAddress || "").trim() && (
+            <div className="card p-6 bg-[#FAF6EE] border border-gold/20 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-3xl">📍</span>
+                  <span className="text-xs font-bold text-amber-800 bg-white px-2.5 py-1 rounded-full border border-amber-300">
+                    Самовивіз
+                  </span>
+                </div>
+                <h3 className="font-serif font-bold text-lg text-ink">Самовивіз</h3>
+                <p className="text-xs sm:text-sm text-ink/80 mt-2 leading-relaxed font-semibold">
+                  {s.contacts.pickupAddress}
+                </p>
+              </div>
+              {s.contacts.pickupLat && s.contacts.pickupLng && (
+                <div className="mt-4 pt-3 border-t border-ink/10">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.contacts.pickupLat},${s.contacts.pickupLng}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1 font-semibold"
+                  >
+                    <span>🗺️</span> Відкрити на карті
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -29,8 +29,8 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-cream/40">
-      <form onSubmit={submit} className="card p-8 w-full max-w-sm">
+    <div className="min-h-[80vh] flex items-center justify-center bg-cream/40 px-4">
+      <form onSubmit={submit} className="card p-6 sm:p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="text-3xl">🐝</div>
           <h1 className="font-serif text-2xl font-bold text-ink mt-2">Адмін-панель</h1>
@@ -38,7 +38,7 @@ export default function AdminLogin() {
         </div>
         <label className="label">Логін</label>
         <input
-          className="input mb-4"
+          className="input mb-4 min-h-[44px]"
           value={login}
           onChange={(e) => setLogin(e.target.value)}
           autoFocus
@@ -46,14 +46,14 @@ export default function AdminLogin() {
         />
         <label className="label">Пароль</label>
         <input
-          className="input mb-2"
+          className="input mb-2 min-h-[44px]"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
         {error && <p className="text-xs text-red-500 mt-2 text-center">{error}</p>}
-        <button className="btn-primary w-full mt-5 disabled:opacity-50" disabled={loading}>
+        <button className="btn-primary w-full mt-5 disabled:opacity-50 min-h-[44px]" disabled={loading}>
           {loading ? "Перевірка..." : "Увійти"}
         </button>
       </form>

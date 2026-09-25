@@ -96,8 +96,14 @@ export const DEFAULT_SETTINGS = {
   contacts: {
     phone: "+380 67 835 23 11",
     email: "hello@pasika-honey.ua",
-    tiktok: "@honey.dsv",
     telegram: "@pasika_honey",
+    viber: "+380 67 835 23 11",
+    instagram: "@honey_pasika",
+    facebook: "",
+    tiktok: "@honey.dsv",
+    pickupAddress: "Прикарпаття, с. Новоселиця, Снятинський район",
+    pickupLat: "48.4523",
+    pickupLng: "25.5684",
   },
   payment: {
     bank: "monobank",

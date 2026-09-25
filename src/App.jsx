@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Link } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -84,8 +84,14 @@ export default function App() {
 function NotFound() {
   return (
     <div className="container-p py-24 text-center">
+      <div className="text-4xl mb-3">🍯</div>
       <h1 className="font-serif text-3xl font-bold text-ink">404</h1>
       <p className="text-ink/60 mt-2">Сторінку не знайдено.</p>
+      <div className="mt-6">
+        <Link to="/" className="btn-primary text-sm">
+          Повернутися на головну
+        </Link>
+      </div>
     </div>
   );
 }

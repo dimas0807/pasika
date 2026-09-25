@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { getSession } from "./auth.js";
 import { db } from "./db.js";
-import { sendOrderTelegramNotification } from "./telegram.js";
+import { sendOrderTelegramNotification, notifyOrderStatusChange } from "./telegram.js";
 
 // Normalize Ukrainian phone numbers
 export function normalizePhone(raw) {
@@ -435,6 +435,14 @@ export function updateOrderStatus(req, res) {
     updateTx();
 
     const updated = getFullOrder(id);
+
+    // Trigger Telegram status update notification in background if status changed
+    if (prevStatus !== status) {
+      notifyOrderStatusChange(updated, prevStatus, status).catch((err) => {
+        console.warn("[Telegram Status Notification Error]:", err.message);
+      });
+    }
+
     return res.json(updated);
   } catch (err) {
     return res.status(400).json({ error: err.message });

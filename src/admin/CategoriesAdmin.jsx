@@ -184,8 +184,71 @@ export default function CategoriesAdmin() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-x-auto shadow-sm">
+      {/* Mobile Categories Cards View (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {loading && categories.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            <div className="inline-block animate-spin mr-2">⏳</div> Завантаження категорій...
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            Категорій ще немає. Додайте першу категорію.
+          </div>
+        ) : (
+          categories.map((c) => {
+            const count = getProductCount(c.slug);
+            return (
+              <div key={c.slug} className="card p-4 space-y-3 border border-ink/10 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl p-2 bg-cream/50 rounded-xl shrink-0">
+                    {c.icon || "🍯"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink text-base">{c.name}</div>
+                    <div className="font-mono text-xs text-ink/50 mt-0.5">slug: {c.slug}</div>
+                    {c.description && (
+                      <p className="text-xs text-ink/60 mt-1 line-clamp-2">{c.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-ink/5 text-xs">
+                  <span
+                    className={`inline-block px-2.5 py-1 rounded-full font-semibold ${
+                      count > 0 ? "bg-honey/15 text-honey" : "bg-ink/5 text-ink/50"
+                    }`}
+                  >
+                    {count} {count === 1 ? "товар" : count >= 2 && count <= 4 ? "товари" : "товарів"}
+                  </span>
+                  <span className="text-ink/50 font-mono">
+                    Порядок: {c.sort_order ?? 0}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-ink/5">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(c)}
+                    className="flex items-center justify-center py-2.5 px-3 rounded-xl border border-ink/15 text-ink/80 hover:bg-cream active:bg-cream/80 text-xs font-semibold min-h-[44px] transition-colors"
+                  >
+                    Редагувати
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClick(c)}
+                    className="flex items-center justify-center py-2.5 px-3 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 active:bg-red-100 text-xs font-medium min-h-[44px] transition-colors"
+                  >
+                    Видалити
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Table View (hidden md:block) */}
+      <div className="hidden md:block card overflow-x-auto shadow-sm">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="text-left text-ink/50 border-b border-ink/5 bg-cream/30">
@@ -340,7 +403,7 @@ export default function CategoriesAdmin() {
       {/* Create / Edit Modal */}
       {editingCategory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-ink/10 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-ink/10 animate-fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-ink/10 mb-4">
               <h3 className="font-serif text-lg font-bold text-ink flex items-center gap-2">
                 <span>{icon || "🏷️"}</span>
@@ -349,7 +412,7 @@ export default function CategoriesAdmin() {
               <button
                 type="button"
                 onClick={() => setEditingCategory(null)}
-                className="text-ink/40 hover:text-ink text-sm p-1 rounded-lg"
+                className="text-ink/40 hover:text-ink text-sm p-2 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
                 ✕
               </button>
@@ -367,7 +430,7 @@ export default function CategoriesAdmin() {
                   placeholder="наприклад, Квітковий мед"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="input"
+                  className="input min-h-[44px]"
                 />
               </div>
 
@@ -384,7 +447,7 @@ export default function CategoriesAdmin() {
                         setAutoSlug(!autoSlug);
                         if (!autoSlug) setSlug(transliterateUa(name));
                       }}
-                      className="text-xs text-honey hover:underline"
+                      className="text-xs text-honey hover:underline py-1"
                     >
                       {autoSlug ? "✓ Авто-транслітерація" : "Ручне редагування"}
                     </button>
@@ -399,7 +462,7 @@ export default function CategoriesAdmin() {
                     setAutoSlug(false);
                     setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""));
                   }}
-                  className={`input font-mono text-xs ${!isNew ? "bg-cream/40 text-ink/60 cursor-not-allowed" : ""}`}
+                  className={`input font-mono text-xs min-h-[44px] ${!isNew ? "bg-cream/40 text-ink/60 cursor-not-allowed" : ""}`}
                   placeholder="kvitkoviy-med"
                 />
                 {!isNew && (
@@ -418,7 +481,7 @@ export default function CategoriesAdmin() {
                     value={icon}
                     maxLength={4}
                     onChange={(e) => setIcon(e.target.value)}
-                    className="input w-16 text-center text-xl"
+                    className="input w-16 text-center text-xl min-h-[44px]"
                   />
                   <div className="flex flex-wrap gap-1.5">
                     {COMMON_ICONS.map((emoji) => (
@@ -426,7 +489,7 @@ export default function CategoriesAdmin() {
                         key={emoji}
                         type="button"
                         onClick={() => setIcon(emoji)}
-                        className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-colors ${
+                        className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors ${
                           icon === emoji ? "bg-honey/20 border-2 border-honey" : "bg-cream/50 hover:bg-cream border border-ink/10"
                         }`}
                       >
@@ -456,7 +519,7 @@ export default function CategoriesAdmin() {
                   type="number"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="input w-28 font-mono text-sm"
+                  className="input w-28 font-mono text-sm min-h-[44px]"
                 />
                 <p className="text-[11px] text-ink/40 mt-1">
                   Менше число = вище в списку та на головній сторінці (наприклад: 10, 20, 30).
@@ -469,14 +532,14 @@ export default function CategoriesAdmin() {
                   type="button"
                   onClick={() => setEditingCategory(null)}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl text-sm font-medium border border-ink/15 text-ink/70 hover:bg-cream transition-colors"
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium border border-ink/15 text-ink/70 hover:bg-cream transition-colors min-h-[44px]"
                 >
                   Скасувати
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="btn-primary text-sm py-2 px-5 shadow-sm disabled:opacity-50"
+                  className="btn-primary text-sm py-2.5 px-5 shadow-sm disabled:opacity-50 min-h-[44px]"
                 >
                   {saving ? "Збереження..." : isNew ? "Створити категорію" : "Зберегти зміни"}
                 </button>

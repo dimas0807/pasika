@@ -221,10 +221,45 @@ export function handleReceiptUpload(req, res) {
 // Secure Receipt File Serving
 export function serveReceiptFile(req, res) {
   const filename = path.basename(req.params.filename || "");
-  const filePath = path.join(STORAGE_DIR, filename);
+  let filePath = path.join(STORAGE_DIR, filename);
+
+  // If not directly found by filename, check database for alias (e.g. IMG_1524.png)
+  if (!fs.existsSync(filePath)) {
+    try {
+      const order = db
+        .prepare("SELECT receipt_url FROM orders WHERE receipt_name = ? OR receipt_url LIKE ?")
+        .get(filename, `%${filename}`);
+      if (order && order.receipt_url) {
+        const actualName = path.basename(order.receipt_url);
+        const resolvedPath = path.join(STORAGE_DIR, actualName);
+        if (fs.existsSync(resolvedPath)) {
+          filePath = resolvedPath;
+        }
+      }
+    } catch {
+      // ignore query error
+    }
+  }
 
   if (!filename || !fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "Файл чека не знайдено" });
+    return res.status(404).json({ error: "Файл чека недоступний" });
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+  };
+  const contentType = mimeTypes[ext] || "application/octet-stream";
+
+  function sendSecureFile() {
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.sendFile(filePath);
   }
 
   // 1. Admin access check
@@ -234,7 +269,7 @@ export function serveReceiptFile(req, res) {
   }
   const adminSession = getSession(adminToken);
   if (adminSession) {
-    return res.sendFile(filePath);
+    return sendSecureFile();
   }
 
   // 2. Customer token or checkout token check
@@ -255,7 +290,7 @@ export function serveReceiptFile(req, res) {
     .get(token, `%${filename}`, filename);
 
   if (order) {
-    return res.sendFile(filePath);
+    return sendSecureFile();
   }
 
   // Check if token matches an active pending receipt
@@ -264,7 +299,7 @@ export function serveReceiptFile(req, res) {
     .get(token, filename);
 
   if (pending) {
-    return res.sendFile(filePath);
+    return sendSecureFile();
   }
 
   return res.status(403).json({ error: "Доступ до чека заборонено: недійсний токен" });

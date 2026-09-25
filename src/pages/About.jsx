@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import RealisticBee from "../components/RealisticBee";
 import TikTokCard from "../components/TikTokCard";
 import { Settings, subscribe } from "../data/db";
+import { getSocialUrl } from "../utils/contacts";
 
 const VALUES = [
   {
@@ -136,10 +137,18 @@ export default function About() {
   }, []);
 
   const title = s?.about?.title || "«Ми пасічники і дуже любимо родинну справу»";
-  const lead = s?.about?.lead || "Ми знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, і з того часу любов до бджільництва виросла у власне виробництво.";
-  const location = s?.store?.location || "Прикарпаття • село Новоселиця";
-  const telegram = s?.contacts?.telegram || "@honey_dsv";
-  const telegramUrl = telegram.startsWith("http") ? telegram : `https://t.me/${telegram.replace(/^@/, "")}`;
+  const lead = s?.about?.shortText || s?.about?.lead || "Ми знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, і з того часу любов до бджільництва виросла у власне виробництво.";
+  const story = s?.about?.fullDescription || s?.about?.story || "На нашій пасіці налічується більше ста вуликів. Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени.";
+  const location = s?.about?.location || s?.store?.location || "Прикарпаття • село Новоселиця";
+  const hivesCount = s?.about?.hivesCount || s?.about?.stats?.hives || "100+";
+  const years = s?.about?.foundationYear
+    ? (s.about.foundationYear.length === 4 && !Number.isNaN(Number(s.about.foundationYear))
+        ? `${Math.max(1, new Date().getFullYear() - Number(s.about.foundationYear))}`
+        : s.about.foundationYear)
+    : s?.about?.stats?.years || "10";
+
+  const telegram = (s?.contacts?.telegram || "").trim();
+  const telegramUrl = telegram ? getSocialUrl("telegram", telegram) : null;
 
   return (
     <div className="overflow-x-hidden pb-16">
@@ -166,8 +175,8 @@ export default function About() {
 
               <div className="mt-6 space-y-4 text-ink/80 text-base sm:text-lg leading-relaxed max-w-2xl">
                 <p>{lead}</p>
-                <p className="text-ink/75 text-sm sm:text-base">
-                  {s?.about?.story ? s.about.story.split("\n\n")[0] : "На нашій пасіці налічується більше ста вуликів. Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени."}
+                <p className="text-ink/75 text-sm sm:text-base whitespace-pre-line">
+                  {story}
                 </p>
               </div>
 
@@ -189,14 +198,16 @@ export default function About() {
                 <Link to="/catalog" className="btn-primary text-sm sm:text-base px-7 py-3.5 font-bold shadow-md">
                   Переглянути продукцію
                 </Link>
-                <a
-                  href={telegramUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-secondary text-sm sm:text-base px-6 py-3.5"
-                >
-                  Написати у приватні
-                </a>
+                {telegramUrl && (
+                  <a
+                    href={telegramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary text-sm sm:text-base px-6 py-3.5"
+                  >
+                    Написати у Telegram →
+                  </a>
+                )}
               </div>
             </div>
 
@@ -217,8 +228,8 @@ export default function About() {
                     <RealisticBee size={32} depth="near" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-ink uppercase tracking-wide">10 років досвіду</div>
-                    <div className="text-[11px] text-ink/60">Родинна пасіка на Прикарпатті</div>
+                    <div className="text-xs font-bold text-ink uppercase tracking-wide">{years} років досвіду</div>
+                    <div className="text-[11px] text-ink/60">Родинна пасіка: {location}</div>
                   </div>
                 </div>
               </div>
@@ -281,10 +292,10 @@ export default function About() {
               Масштаб та родина
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-extrabold text-ink mt-3">
-              Понад 100 вуликів — одна родинна справа
+              Понад {hivesCount} вуликів — одна родинна справа
             </h2>
             <p className="mt-3 text-ink/75 text-sm sm:text-base leading-relaxed">
-              На пасіці налічується більше ста вуликів. За кожним вуликом стоять щоденна увага, терпіння та робота пасічників.
+              На пасіці налічується понад {hivesCount} вуликів. За кожним вуликом стоять щоденна увага, терпіння та робота пасічників.
             </p>
           </div>
 
@@ -292,7 +303,7 @@ export default function About() {
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <div className="card p-6 sm:p-8 bg-white border border-gold/30 rounded-3xl text-center shadow-xs">
               <div className="font-serif text-4xl sm:text-5xl font-extrabold text-honey">
-                100+
+                {hivesCount}
               </div>
               <div className="font-bold text-ink mt-2 text-base">Вуликів на пасіці</div>
               <p className="text-xs text-ink/65 mt-1 leading-relaxed">
@@ -302,7 +313,7 @@ export default function About() {
 
             <div className="card p-6 sm:p-8 bg-white border border-gold/30 rounded-3xl text-center shadow-xs">
               <div className="font-serif text-4xl sm:text-5xl font-extrabold text-honey">
-                10
+                {years}
               </div>
               <div className="font-bold text-ink mt-2 text-base">Років родинної справи</div>
               <p className="text-xs text-ink/65 mt-1 leading-relaxed">
@@ -314,9 +325,9 @@ export default function About() {
               <div className="text-3xl sm:text-4xl mb-1">
                 📍
               </div>
-              <div className="font-bold text-ink mt-2 text-base">Прикарпаття</div>
+              <div className="font-bold text-ink mt-2 text-base">{location}</div>
               <p className="text-xs text-ink/65 mt-1 leading-relaxed">
-                Село Новоселиця, Снятинський район
+                Екологічно чистий регіон України
               </p>
             </div>
           </div>
@@ -447,14 +458,16 @@ export default function About() {
               <Link to="/catalog" className="btn-primary text-xs py-2.5 px-5 font-bold">
                 Відкрити каталог
               </Link>
-              <a
-                href="https://t.me/honey_dsv"
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary text-xs py-2.5 px-5"
-              >
-                Написати в Telegram →
-              </a>
+              {telegramUrl && (
+                <a
+                  href={telegramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-secondary text-xs py-2.5 px-5"
+                >
+                  Написати в Telegram →
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -108,9 +108,33 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS telegram_logs (
       id TEXT PRIMARY KEY,
       order_id TEXT,
+      recipient_id TEXT,
+      chat_id TEXT,
       text TEXT NOT NULL,
       status TEXT NOT NULL,
       response_data TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_recipients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      username TEXT,
+      chat_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'manager',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_interactions (
+      id TEXT PRIMARY KEY,
+      chat_id TEXT NOT NULL,
+      username TEXT,
+      first_name TEXT,
+      last_name TEXT,
+      action TEXT NOT NULL,
+      payload TEXT,
       created_at INTEGER NOT NULL
     );
 
@@ -121,10 +145,21 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token);
     CREATE INDEX IF NOT EXISTS idx_telegram_logs_created_at ON telegram_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_telegram_recipients_active ON telegram_recipients(is_active);
+    CREATE INDEX IF NOT EXISTS idx_telegram_interactions_chat ON telegram_interactions(chat_id);
+    CREATE INDEX IF NOT EXISTS idx_telegram_interactions_created_at ON telegram_interactions(created_at);
   `);
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN customer_token TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE telegram_logs ADD COLUMN recipient_id TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE telegram_logs ADD COLUMN chat_id TEXT");
   } catch {}
 
   try {
@@ -255,8 +290,14 @@ function seedInitialData() {
       contacts: {
         phone: "+380 67 835 23 11",
         email: "hello@pasika-honey.ua",
-        tiktok: "@honey.dsv",
         telegram: "@pasika_honey",
+        viber: "+380 67 835 23 11",
+        instagram: "@honey_pasika",
+        facebook: "",
+        tiktok: "@honey.dsv",
+        pickupAddress: "Прикарпаття, с. Новоселиця, Снятинський район",
+        pickupLat: "48.4523",
+        pickupLng: "25.5684",
       },
       payment: {
         bank: "monobank",
@@ -293,5 +334,35 @@ function seedInitialData() {
       INSERT INTO admin_users (id, username, password_hash, salt, created_at)
       VALUES (?, ?, ?, ?, ?)
     `).run("admin_1", username, hash, salt, Date.now());
+  }
+
+  // 5. Migrate existing telegram chatId into telegram_recipients if recipients table is empty
+  const recipientCount = db.prepare("SELECT COUNT(*) AS count FROM telegram_recipients").get().count;
+  if (recipientCount === 0) {
+    let existingChatId = (process.env.TELEGRAM_CHAT_ID || "").trim();
+    if (settingsRow) {
+      try {
+        const parsed = JSON.parse(settingsRow.value);
+        if (parsed.telegram?.chatId) {
+          existingChatId = String(parsed.telegram.chatId).trim();
+        }
+      } catch {}
+    }
+
+    if (existingChatId) {
+      db.prepare(`
+        INSERT INTO telegram_recipients (id, name, username, chat_id, role, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        "tr_default_admin",
+        "Адміністратор PASIKA",
+        "@pasika_honey",
+        existingChatId,
+        "owner",
+        1,
+        Date.now(),
+        Date.now()
+      );
+    }
   }
 }

@@ -22,6 +22,42 @@ const DEFAULT_ABOUT = {
   image: "/images/about-apiary.jpg",
 };
 
+const DEFAULT_CONTACTS = {
+  phone: "+380 67 835 23 11",
+  email: "hello@pasika-honey.ua",
+  telegram: "@pasika_honey",
+  viber: "+380 67 835 23 11",
+  instagram: "@honey_pasika",
+  facebook: "",
+  tiktok: "@honey.dsv",
+  pickupAddress: "Прикарпаття, с. Новоселиця, Снятинський район",
+  pickupLat: "48.4523",
+  pickupLng: "25.5684",
+};
+
+function normalizeAbout(about = {}) {
+  const merged = { ...DEFAULT_ABOUT, ...about };
+  const short = merged.shortText || merged.lead || DEFAULT_ABOUT.shortText;
+  const full = merged.fullDescription || merged.story || DEFAULT_ABOUT.fullDescription;
+  const hives = merged.hivesCount || merged.stats?.hives || DEFAULT_ABOUT.hivesCount;
+  const years = merged.foundationYear || merged.stats?.years || DEFAULT_ABOUT.foundationYear;
+  const loc = merged.location || DEFAULT_ABOUT.location;
+
+  merged.shortText = short;
+  merged.lead = short;
+  merged.fullDescription = full;
+  merged.story = full;
+  merged.hivesCount = hives;
+  merged.foundationYear = years;
+  merged.location = loc;
+  merged.stats = {
+    ...(merged.stats || {}),
+    hives,
+    years,
+  };
+  return merged;
+}
+
 export function getPublicSettings(req, res) {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'app_settings'").get();
   let settings = {};
@@ -32,7 +68,8 @@ export function getPublicSettings(req, res) {
   }
 
   settings.store = { ...DEFAULT_STORE, ...(settings.store || {}) };
-  settings.about = { ...DEFAULT_ABOUT, ...(settings.about || {}) };
+  settings.contacts = { ...DEFAULT_CONTACTS, ...(settings.contacts || {}) };
+  settings.about = normalizeAbout(settings.about);
 
   delete settings.admin;
   if (settings.telegram) {
@@ -55,12 +92,14 @@ export function getAdminSettings(req, res) {
   }
 
   settings.store = { ...DEFAULT_STORE, ...(settings.store || {}) };
-  settings.about = { ...DEFAULT_ABOUT, ...(settings.about || {}) };
+  settings.contacts = { ...DEFAULT_CONTACTS, ...(settings.contacts || {}) };
+  settings.about = normalizeAbout(settings.about);
 
   const botToken = settings.telegram?.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const chatId = settings.telegram?.chatId || process.env.TELEGRAM_CHAT_ID || "";
 
   settings.telegram = {
+    enabled: settings.telegram?.enabled ?? true,
     hasToken: Boolean(botToken),
     botToken: botToken ? "••••••••••••••••" : "",
     chatId: chatId || "",
@@ -91,14 +130,34 @@ export function updateSettings(req, res) {
     if (body.telegram.chatId !== undefined) {
       finalTelegram.chatId = String(body.telegram.chatId).trim();
     }
+    if (body.telegram.enabled !== undefined) {
+      finalTelegram.enabled = Boolean(body.telegram.enabled);
+    }
   }
+
+  const mergedStore = {
+    ...DEFAULT_STORE,
+    ...(currentObj.store || {}),
+    ...(body.store || {}),
+  };
+
+  const mergedContacts = {
+    ...DEFAULT_CONTACTS,
+    ...(currentObj.contacts || {}),
+    ...(body.contacts || {}),
+  };
+
+  const mergedAbout = normalizeAbout({
+    ...(currentObj.about || {}),
+    ...(body.about || {}),
+  });
 
   const merged = {
     ...currentObj,
     ...body,
-    store: { ...DEFAULT_STORE, ...(currentObj.store || {}), ...(body.store || {}) },
-    about: { ...DEFAULT_ABOUT, ...(currentObj.about || {}), ...(body.about || {}) },
-    contacts: { ...(currentObj.contacts || {}), ...(body.contacts || {}) },
+    store: mergedStore,
+    about: mergedAbout,
+    contacts: mergedContacts,
     payment: { ...(currentObj.payment || {}), ...(body.payment || {}) },
     delivery: { ...(currentObj.delivery || {}), ...(body.delivery || {}) },
     telegram: finalTelegram,
@@ -111,6 +170,7 @@ export function updateSettings(req, res) {
   const responseSettings = {
     ...merged,
     telegram: {
+      enabled: finalTelegram.enabled ?? true,
       hasToken: Boolean(merged.telegram?.botToken),
       botToken: merged.telegram?.botToken ? "••••••••••••••••" : "",
       chatId: merged.telegram?.chatId || "",

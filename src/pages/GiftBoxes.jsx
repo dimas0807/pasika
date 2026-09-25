@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
-import { Products, subscribe } from "../data/db";
+import { Products, Settings, subscribe } from "../data/db";
+import { getSocialUrl } from "../utils/contacts";
 
 const OCCASIONS = [
   { icon: "💍", title: "Весілля та бонбоньєрки", desc: "Міні-баночки з персональними іменами молодят" },
@@ -12,13 +13,20 @@ const OCCASIONS = [
 
 export default function GiftBoxes() {
   const [, setTick] = useState(0);
+  const [s, setS] = useState(() => Settings.get());
 
   useEffect(() => {
     Products.fetchAll();
-    return subscribe(() => setTick((t) => t + 1));
+    Settings.fetch().then((data) => data && setS(data));
+    return subscribe(() => {
+      setTick((t) => t + 1);
+      setS(Settings.get());
+    });
   }, []);
 
   const boxes = Products.byCategory("gift-boxes");
+  const telegram = (s?.contacts?.telegram || "").trim();
+  const telegramUrl = telegram ? getSocialUrl("telegram", telegram) : null;
 
   return (
     <div className="pb-16">
@@ -78,15 +86,25 @@ export default function GiftBoxes() {
           </div>
 
           <div className="mt-10 text-center">
-            <a
-              href="https://t.me"
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              <span>Обговорити замовлення в Telegram</span>
-              <span>↗</span>
-            </a>
+            {telegramUrl ? (
+              <a
+                href={telegramUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <span>Обговорити замовлення в Telegram</span>
+                <span>↗</span>
+              </a>
+            ) : (
+              <Link
+                to="/contacts"
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <span>Зв'язатися щодо персонального замовлення</span>
+                <span>→</span>
+              </Link>
+            )}
           </div>
         </div>
       </section>

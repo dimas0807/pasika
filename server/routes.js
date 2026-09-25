@@ -40,7 +40,19 @@ import {
   uploadReceiptMulter,
   uploadReceiptValidationMiddleware,
 } from "./storage.js";
-import { testTelegramConnection } from "./telegram.js";
+import {
+  createTelegramRecipient,
+  deleteTelegramRecipient,
+  getRecentTelegramInteractions,
+  getTelegramConfig,
+  getTelegramRecipients,
+  handleTelegramWebhook,
+  testRecipientNotification,
+  testTelegramConnection,
+  toggleTelegramRecipient,
+  updateTelegramConfig,
+  updateTelegramRecipient,
+} from "./telegram.js";
 
 const router = Router();
 
@@ -109,10 +121,17 @@ router.post("/upload-receipt", uploadReceiptValidationMiddleware, (req, res) => 
 
 // Secure receipt access
 router.get("/receipts/:filename", serveReceiptFile);
+router.get("/uploads/receipts/:filename", serveReceiptFile);
 
 // Orders
 router.post("/orders", createOrder);
 router.get("/orders/:id", getPublicOrder);
+
+// Telegram Webhook (Public Bot API updates)
+router.post("/telegram/webhook", async (req, res) => {
+  const result = await handleTelegramWebhook(req.body);
+  return res.json(result);
+});
 
 // ---------------- Admin Protected Routes ----------------
 
@@ -151,15 +170,87 @@ router.post("/upload-product-image", (req, res) => {
 router.post("/admin/categories", saveCategory);
 router.delete("/admin/categories/:slug", deleteCategory);
 
-// Settings & Telegram
+// Settings & Security
 router.get("/admin/settings", getAdminSettings);
 router.put("/admin/settings", updateSettings);
 router.put("/admin/security", changeSecurityHandler);
-router.get("/admin/telegram-log", getTelegramLogs);
+
+// Telegram Bot Configuration
+router.get("/admin/telegram/config", (_req, res) => {
+  return res.json(getTelegramConfig());
+});
+
+router.put("/admin/telegram/config", (req, res) => {
+  try {
+    const config = updateTelegramConfig(req.body || {});
+    return res.json(config);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 router.post("/admin/telegram/test", async (req, res) => {
   const { botToken, chatId } = req.body || {};
   const result = await testTelegramConnection(botToken, chatId);
   return res.json(result);
 });
+
+// Telegram Recipients Management
+router.get("/admin/telegram/recipients", (_req, res) => {
+  return res.json(getTelegramRecipients());
+});
+
+router.post("/admin/telegram/recipients", (req, res) => {
+  try {
+    const recipient = createTelegramRecipient(req.body || {});
+    return res.status(201).json(recipient);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.put("/admin/telegram/recipients/:id", (req, res) => {
+  try {
+    const recipient = updateTelegramRecipient(req.params.id, req.body || {});
+    return res.json(recipient);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete("/admin/telegram/recipients/:id", (req, res) => {
+  try {
+    const result = deleteTelegramRecipient(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/admin/telegram/recipients/:id/toggle", (req, res) => {
+  try {
+    const result = toggleTelegramRecipient(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/admin/telegram/recipients/:id/test", async (req, res) => {
+  const result = await testRecipientNotification(req.params.id, req.body?.text);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
+// Telegram Start Flow Recent Chats
+router.get("/admin/telegram/recent-chats", (req, res) => {
+  const limit = req.query?.limit ? Number(req.query.limit) : 10;
+  return res.json(getRecentTelegramInteractions(limit));
+});
+
+// Telegram Delivery Log
+router.get("/admin/telegram-log", getTelegramLogs);
 
 export default router;

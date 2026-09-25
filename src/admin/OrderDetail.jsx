@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Orders } from "../data/db";
+import { Orders, resolveReceiptUrl } from "../data/db";
 
 const STATUSES = [
   { key: "NEW", label: "Нове" },
@@ -18,6 +18,16 @@ export default function OrderDetail() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  const rawReceiptUrl = order?.receipt?.fileUrl || order?.receipt?.dataUrl;
+  const receiptName = order?.receipt?.name || "Квитанція / чек";
+
+  const [receiptBlobUrl, setReceiptBlobUrl] = useState(() =>
+    rawReceiptUrl?.startsWith("data:") ? rawReceiptUrl : null
+  );
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptUnavailable, setReceiptUnavailable] = useState(false);
+  const [receiptMimeType, setReceiptMimeType] = useState(null);
+
   const loadOrder = useCallback(() => {
     Orders.fetchById(id)
       .then((o) => {
@@ -29,6 +39,57 @@ export default function OrderDetail() {
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
+
+  useEffect(() => {
+    if (!rawReceiptUrl || rawReceiptUrl.startsWith("data:")) {
+      return;
+    }
+
+    let active = true;
+    let localBlobUrl = null;
+    const fetchUrl = resolveReceiptUrl(rawReceiptUrl);
+
+    setReceiptLoading(true);
+    setReceiptUnavailable(false);
+
+    fetch(fetchUrl, { credentials: "include" })
+      .then(async (res) => {
+        if (!active) return;
+        if (!res.ok) {
+          setReceiptUnavailable(true);
+          setReceiptBlobUrl(null);
+          return;
+        }
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("text/html")) {
+          // Reject SPA HTML fallback (e.g. 404 rewrite)
+          setReceiptUnavailable(true);
+          setReceiptBlobUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        if (!active) return;
+        localBlobUrl = URL.createObjectURL(blob);
+        setReceiptBlobUrl(localBlobUrl);
+        setReceiptMimeType(blob.type || contentType);
+      })
+      .catch(() => {
+        if (active) {
+          setReceiptUnavailable(true);
+          setReceiptBlobUrl(null);
+        }
+      })
+      .finally(() => {
+        if (active) setReceiptLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (localBlobUrl) {
+        URL.revokeObjectURL(localBlobUrl);
+      }
+    };
+  }, [rawReceiptUrl]);
 
   const showNotification = (msg, isError = false) => {
     setFeedback({ text: msg, isError });
@@ -68,13 +129,10 @@ export default function OrderDetail() {
   }
 
   const isCard = order.payment?.method === "card";
-  const receiptUrl = order.receipt?.fileUrl || order.receipt?.dataUrl;
-  const receiptName = order.receipt?.name || "Квитанція / чек";
-  const isImageReceipt = receiptUrl && (
-    receiptUrl.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
-    receiptUrl.startsWith("data:image/") ||
-    receiptUrl.includes("/uploads/receipts/")
-  );
+  const isPdf =
+    (receiptMimeType && receiptMimeType.includes("pdf")) ||
+    receiptName.toLowerCase().endsWith(".pdf") ||
+    (rawReceiptUrl && rawReceiptUrl.toLowerCase().includes(".pdf"));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -101,9 +159,9 @@ export default function OrderDetail() {
       </div>
 
       {/* Main Header */}
-      <div className="card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="card p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="font-serif text-2xl md:text-3xl font-bold text-ink">
               Замовлення #{order.number}
             </h1>
@@ -119,14 +177,14 @@ export default function OrderDetail() {
               {STATUSES.find((s) => s.key === order.status)?.label || order.status}
             </span>
           </div>
-          <p className="text-xs text-ink/50 mt-1">
+          <p className="text-xs text-ink/50 mt-1 break-words">
             Дата оформлення: {new Date(order.createdAt).toLocaleString("uk-UA")} • ID:{" "}
-            <span className="font-mono text-ink/40">{order.id}</span>
+            <span className="font-mono text-ink/40 break-all">{order.id}</span>
           </p>
         </div>
 
         {/* Change status control */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <label className="text-xs text-ink/60 font-medium whitespace-nowrap">
             Змінити статус:
           </label>
@@ -134,7 +192,7 @@ export default function OrderDetail() {
             value={order.status}
             disabled={saving}
             onChange={(e) => handleStatusChange(e.target.value)}
-            className="input w-auto text-sm cursor-pointer font-medium"
+            className="input w-auto min-h-[44px] text-sm cursor-pointer font-medium"
           >
             {STATUSES.map((s) => (
               <option key={s.key} value={s.key}>
@@ -242,32 +300,56 @@ export default function OrderDetail() {
             <div>
               <span className="text-ink/60 text-xs block mb-1.5">Прикріплена квитанція / чек:</span>
               {isCard ? (
-                receiptUrl ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={receiptUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <span>📎</span> Відкрити оригінал чека
-                      </a>
-                      <span className="text-xs text-ink/50 truncate max-w-[200px]">{receiptName}</span>
+                rawReceiptUrl ? (
+                  receiptLoading ? (
+                    <div className="p-3 rounded-xl bg-cream/40 border border-ink/5 text-xs text-ink/60 flex items-center gap-2">
+                      <span className="inline-block animate-spin">⏳</span> Завантаження чека...
                     </div>
-
-                    {isImageReceipt && (
-                      <div className="mt-3 p-2 bg-cream/40 rounded-xl border border-ink/10 max-w-xs">
-                        <a href={receiptUrl} target="_blank" rel="noreferrer" title="Натисніть для збільшення">
-                          <img
-                            src={receiptUrl}
-                            alt="Чек замовлення"
-                            className="w-full h-auto max-h-48 object-contain rounded-lg border border-ink/5 hover:opacity-95"
-                          />
-                        </a>
+                  ) : receiptUnavailable ? (
+                    <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-sm text-amber-900 flex items-start gap-2.5">
+                      <span className="text-base select-none mt-0.5">⚠️</span>
+                      <div>
+                        <div className="font-semibold text-amber-950">Файл чека недоступний</div>
+                        <div className="text-xs text-amber-800/80 mt-0.5">
+                          Оригінальний файл ({receiptName}) відсутній на сервері або сесія застаріла.
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : receiptBlobUrl ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a
+                          href={receiptBlobUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <span>{isPdf ? "📄" : "📎"}</span> Відкрити оригінал чека
+                        </a>
+                        <span className="text-xs text-ink/50 truncate max-w-[200px]">{receiptName}</span>
+                      </div>
+
+                      {isPdf ? (
+                        <div className="mt-3 p-4 bg-cream/40 rounded-xl border border-ink/10 flex items-center gap-3 max-w-sm">
+                          <span className="text-3xl">📄</span>
+                          <div>
+                            <div className="font-medium text-sm text-ink">{receiptName}</div>
+                            <div className="text-xs text-ink/50">PDF-документ квитанції</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3 p-2 bg-cream/40 rounded-xl border border-ink/10 max-w-xs">
+                          <a href={receiptBlobUrl} target="_blank" rel="noreferrer" title="Натисніть для збільшення">
+                            <img
+                              src={receiptBlobUrl}
+                              alt={receiptName}
+                              className="w-full h-auto max-h-48 object-contain rounded-lg border border-ink/5 hover:opacity-95"
+                            />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ) : null
                 ) : (
                   <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600">
                     ⚠️ Клієнт обрав оплату зараз, але не надав файл квитанції.
@@ -292,10 +374,28 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Ordered Products Table */}
-      <div className="card p-6 space-y-4">
+      {/* Ordered Products */}
+      <div className="card p-4 sm:p-6 space-y-4">
         <h3 className="font-serif text-lg font-bold text-ink">Склад замовлення</h3>
-        <div className="overflow-x-auto">
+
+        {/* Mobile Items List (sm:hidden) */}
+        <div className="sm:hidden space-y-2.5">
+          {order.items?.map((item, idx) => (
+            <div key={item.id || item.product_id || idx} className="p-3 rounded-xl bg-cream/30 border border-ink/5 space-y-1.5 text-xs">
+              <div className="flex justify-between font-medium text-ink text-sm">
+                <span>{item.name}</span>
+                <span className="font-bold">{item.price * item.qty} грн</span>
+              </div>
+              <div className="flex justify-between text-ink/60">
+                <span>{item.weight || "—"}</span>
+                <span>{item.qty} шт × {item.price} грн</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table (hidden sm:block) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-ink/50 border-b border-ink/5 text-xs">

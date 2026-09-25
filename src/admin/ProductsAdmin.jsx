@@ -269,8 +269,117 @@ export default function ProductsAdmin() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-x-auto shadow-sm">
+      {/* Mobile Touch Cards View (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {loading && products.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            <div className="inline-block animate-spin mr-2">⏳</div> Завантаження товарів...
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="card p-8 text-center text-ink/40">
+            Товарів за вказаними фільтрами не знайдено.
+          </div>
+        ) : (
+          filteredProducts.map((p) => {
+            const isOutOfStock = p.stock <= 0;
+            const isLowStock = p.stock > 0 && p.stock <= 5;
+
+            return (
+              <div key={p.id} className="card p-4 space-y-3 border border-ink/10 shadow-xs">
+                {/* Header: Photo + Info */}
+                <div className="flex gap-3 items-start">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden border border-ink/10 bg-cream/40 shrink-0 flex items-center justify-center">
+                    <ProductImage image={p.image} category={p.category} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={`/admin/products/${p.id}`}
+                      className="font-serif font-bold text-ink hover:text-honey transition-colors text-base line-clamp-1"
+                    >
+                      {p.name}
+                    </Link>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-cream/80 text-ink/70">
+                        {catName(p.category)}
+                      </span>
+                      {p.weight && (
+                        <span className="text-xs text-ink/50">{p.weight}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price & Stock status */}
+                <div className="flex items-center justify-between pt-2 border-t border-ink/5">
+                  <div>
+                    <span className="text-xs text-ink/50 block">Ціна:</span>
+                    <span className="font-bold text-ink text-base">{p.price} грн</span>
+                    {p.oldPrice && (
+                      <span className="text-xs text-ink/40 line-through ml-2">{p.oldPrice} грн</span>
+                    )}
+                  </div>
+
+                  {/* Stock toggle button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleAvailability(p)}
+                    disabled={actionLoading === p.id}
+                    title="Натисніть для зміни наявності"
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold min-h-[44px] transition-colors ${
+                      isOutOfStock
+                        ? "bg-red-50 text-red-600 active:bg-red-100 border border-red-200"
+                        : isLowStock
+                        ? "bg-amber-50 text-amber-700 active:bg-amber-100 border border-amber-200"
+                        : "bg-leaf/10 text-leaf active:bg-leaf/20 border border-leaf/20"
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isOutOfStock ? "bg-red-500" : isLowStock ? "bg-amber-500" : "bg-leaf"
+                      }`}
+                    />
+                    <span>
+                      {isOutOfStock
+                        ? "Немає (0)"
+                        : isLowStock
+                        ? `Мало (${p.stock})`
+                        : `Є (${p.stock} шт)`}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Actions row: Edit, Duplicate, Delete */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-ink/5">
+                  <Link
+                    to={`/admin/products/${p.id}`}
+                    className="flex items-center justify-center py-2.5 px-2 rounded-xl border border-honey/50 bg-honey/10 text-ink font-semibold text-xs min-h-[44px] active:bg-honey/20 transition-colors text-center"
+                  >
+                    Редагувати
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => duplicate(p.id, p.name)}
+                    disabled={actionLoading === p.id}
+                    className="flex items-center justify-center py-2.5 px-2 rounded-xl border border-ink/15 text-ink/80 hover:bg-cream active:bg-cream/80 text-xs font-medium min-h-[44px] transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading === p.id ? "..." : "Дублювати"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductToDelete(p)}
+                    className="flex items-center justify-center py-2.5 px-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100 text-xs font-medium min-h-[44px] transition-colors"
+                  >
+                    Видалити
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Table View (hidden md:block) */}
+      <div className="hidden md:block card overflow-x-auto shadow-sm">
         <table className="w-full text-sm min-w-[760px]">
           <thead>
             <tr className="text-left text-ink/50 border-b border-ink/5 bg-cream/30">

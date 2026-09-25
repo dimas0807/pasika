@@ -40,7 +40,22 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+export const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+
+export function resolveReceiptUrl(rawUrl) {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) return rawUrl;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+  if (rawUrl.startsWith("/uploads/receipts/")) {
+    const filename = rawUrl.replace("/uploads/receipts/", "");
+    return `${API_BASE}/api/receipts/${encodeURIComponent(filename)}`;
+  }
+  if (rawUrl.startsWith("/receipts/")) {
+    const filename = rawUrl.replace("/receipts/", "");
+    return `${API_BASE}/api/receipts/${encodeURIComponent(filename)}`;
+  }
+  return `${API_BASE}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+}
 
 // Fetch helper with error handling and credentials
 export async function request(endpoint, options = {}) {
@@ -538,10 +553,53 @@ export const Storage = {
 
 // ---------------- Telegram Bot API ----------------
 export const Telegram = {
+  getConfig: async () => {
+    return await request("/api/admin/telegram/config");
+  },
+  updateConfig: async (config) => {
+    return await request("/api/admin/telegram/config", {
+      method: "PUT",
+      body: JSON.stringify(config),
+    });
+  },
   testConnection: async ({ botToken, chatId } = {}) => {
     return await request("/api/admin/telegram/test", {
       method: "POST",
       body: JSON.stringify({ botToken, chatId }),
     });
+  },
+  getRecipients: async () => {
+    return await request("/api/admin/telegram/recipients");
+  },
+  createRecipient: async (recipient) => {
+    return await request("/api/admin/telegram/recipients", {
+      method: "POST",
+      body: JSON.stringify(recipient),
+    });
+  },
+  updateRecipient: async (id, recipient) => {
+    return await request(`/api/admin/telegram/recipients/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(recipient),
+    });
+  },
+  deleteRecipient: async (id) => {
+    return await request(`/api/admin/telegram/recipients/${id}`, {
+      method: "DELETE",
+    });
+  },
+  toggleRecipient: async (id) => {
+    return await request(`/api/admin/telegram/recipients/${id}/toggle`, {
+      method: "POST",
+    });
+  },
+  testRecipient: async (id, text = "") => {
+    return await request(`/api/admin/telegram/recipients/${id}/test`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
+  },
+  getRecentChats: async (limit = 10) => {
+    return await request(`/api/admin/telegram/recent-chats?limit=${limit}`);
   },
 };
