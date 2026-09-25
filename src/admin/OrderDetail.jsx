@@ -11,12 +11,32 @@ const STATUSES = [
   { key: "CANCELLED", label: "Скасовано" },
 ];
 
+const STATUS_LABELS = {
+  NEW: "Нове",
+  PROCESSING: "В обробці",
+  PACKED: "Запаковано",
+  SHIPPED: "Відправлено",
+  COMPLETED: "Виконано",
+  CANCELLED: "Скасовано",
+};
+
 export default function OrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(() => Orders.byId(id));
   const [loading, setLoading] = useState(!order);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  // Tracking edit state
+  const [editingTracking, setEditingTracking] = useState(false);
+  const [trackingNumberInput, setTrackingNumberInput] = useState("");
+  const [deliveryServiceInput, setDeliveryServiceInput] = useState("Нова пошта");
+  const [savingTracking, setSavingTracking] = useState(false);
+  const [copiedTtn, setCopiedTtn] = useState(false);
+
+  // Soft delete modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteActionLoading, setDeleteActionLoading] = useState(false);
 
   const rawReceiptUrl = order?.receipt?.fileUrl || order?.receipt?.dataUrl;
   const receiptName = order?.receipt?.name || "Квитанція / чек";
@@ -31,7 +51,11 @@ export default function OrderDetail() {
   const loadOrder = useCallback(() => {
     Orders.fetchById(id)
       .then((o) => {
-        if (o) setOrder(o);
+        if (o) {
+          setOrder(o);
+          setTrackingNumberInput(o.delivery?.trackingNumber || "");
+          setDeliveryServiceInput(o.delivery?.deliveryService || o.delivery?.provider || "Нова пошта");
+        }
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -62,7 +86,6 @@ export default function OrderDetail() {
         }
         const contentType = res.headers.get("content-type") || "";
         if (contentType.includes("text/html")) {
-          // Reject SPA HTML fallback (e.g. 404 rewrite)
           setReceiptUnavailable(true);
           setReceiptBlobUrl(null);
           return;
@@ -101,11 +124,70 @@ export default function OrderDetail() {
     try {
       const updated = await Orders.updateStatus(order.id, newStatus);
       setOrder(updated);
-      showNotification(`Статус змінено на "${STATUSES.find((s) => s.key === newStatus)?.label || newStatus}"`);
+      showNotification(`Статус змінено на "${STATUS_LABELS[newStatus] || newStatus}"`);
     } catch (err) {
       showNotification("Помилка зміни статусу: " + err.message, true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCopyTtn = (ttn) => {
+    if (!ttn) return;
+    navigator.clipboard.writeText(ttn).then(() => {
+      setCopiedTtn(true);
+      showNotification(`ТТН ${ttn} скопійовано`);
+      setTimeout(() => setCopiedTtn(false), 2500);
+    });
+  };
+
+  const handleSaveTracking = async (e) => {
+    if (e) e.preventDefault();
+    const cleanTtn = trackingNumberInput.trim();
+    if (!cleanTtn) {
+      showNotification("Введіть номер ТТН", true);
+      return;
+    }
+    setSavingTracking(true);
+    try {
+      const updated = await Orders.updateTracking(order.id, {
+        trackingNumber: cleanTtn,
+        deliveryService: deliveryServiceInput,
+      });
+      setOrder(updated);
+      setEditingTracking(false);
+      showNotification("Номер ТТН збережено. Статус оновлено на «Відправлено»");
+    } catch (err) {
+      showNotification("Помилка збереження ТТН: " + err.message, true);
+    } finally {
+      setSavingTracking(false);
+    }
+  };
+
+  const handleSoftDelete = async () => {
+    setDeleteActionLoading(true);
+    try {
+      await Orders.delete(order.id);
+      setDeleteModalOpen(false);
+      showNotification(`Замовлення #${order.number} переміщено в кошик`);
+      loadOrder();
+    } catch (err) {
+      showNotification("Помилка видалення: " + err.message, true);
+    } finally {
+      setDeleteActionLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setDeleteActionLoading(true);
+    try {
+      await Orders.restore(order.id);
+      showNotification(`Замовлення #${order.number} відновлено`);
+      loadOrder();
+    } catch (err) {
+      showNotification("Помилка відновлення: " + err.message, true);
+    } finally {
+      setDeleteActionLoading(false);
     }
   };
 
@@ -134,6 +216,16 @@ export default function OrderDetail() {
     receiptName.toLowerCase().endsWith(".pdf") ||
     (rawReceiptUrl && rawReceiptUrl.toLowerCase().includes(".pdf"));
 
+  const trackingNumber = order.delivery?.trackingNumber || order.tracking_number;
+  const deliveryService = order.delivery?.deliveryService || order.delivery?.provider || "Нова пошта";
+  const trackingUrl = order.delivery?.trackingUrl || (
+    trackingNumber
+      ? deliveryService.toLowerCase().includes("укр")
+        ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
+        : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`
+      : null
+  );
+
   return (
     <div className="max-w-4xl space-y-6">
       {/* Toast */}
@@ -148,17 +240,81 @@ export default function OrderDetail() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-xs">
+          <div className="card p-6 max-w-md w-full bg-white shadow-2xl rounded-2xl border border-ink/10 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">🗑️</span>
+              <div>
+                <h3 className="font-serif font-bold text-lg text-ink">
+                  Перемістити замовлення #{order.number} у кошик?
+                </h3>
+                <p className="text-sm text-ink/70 mt-1">
+                  Замовлення буде приховано з основного списку, але вся історія залишиться в базі даних. Ви зможете відновити його будь-коли.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-ink/10">
+              <button
+                type="button"
+                disabled={deleteActionLoading}
+                onClick={() => setDeleteModalOpen(false)}
+                className="btn-secondary text-xs py-2 px-4 rounded-xl min-h-[44px]"
+              >
+                Скасувати
+              </button>
+              <button
+                type="button"
+                disabled={deleteActionLoading}
+                onClick={handleSoftDelete}
+                className="btn-primary bg-red-600 hover:bg-red-700 text-white text-xs py-2 px-4 rounded-xl min-h-[44px]"
+              >
+                {deleteActionLoading ? "Переміщення..." : "Перемістити в кошик"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb & Navigation */}
-      <div>
+      <div className="flex items-center justify-between">
         <Link
           to="/admin/orders"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink/60 hover:text-honey transition-colors"
         >
           <span>←</span> До списку замовлень
         </Link>
+
+        {order.isDeleted ? (
+          <span className="badge bg-red-100 text-red-700 text-xs font-bold">
+            В кошику (Видалено {order.deletedAt ? new Date(order.deletedAt).toLocaleDateString("uk-UA") : ""})
+          </span>
+        ) : null}
       </div>
 
-      {/* Main Header */}
+      {/* Deleted Order Warning Banner */}
+      {order.isDeleted && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <span className="font-bold">Це замовлення знаходиться у кошику.</span>
+              <p className="text-xs text-amber-800/80">Воно приховане з основного списку замовлень та дашборду.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={deleteActionLoading}
+            onClick={handleRestore}
+            className="btn-primary bg-leaf hover:bg-leaf/90 text-white text-xs py-2 px-4 rounded-xl self-start sm:self-auto font-semibold shadow-xs"
+          >
+            {deleteActionLoading ? "Відновлення..." : "🔄 Відновити замовлення"}
+          </button>
+        </div>
+      )}
+
+      {/* Main Header Card */}
       <div className="card p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -171,10 +327,12 @@ export default function OrderDetail() {
                   ? "bg-leaf/20 text-leaf"
                   : order.status === "CANCELLED"
                   ? "bg-red-100 text-red-600"
+                  : order.status === "SHIPPED"
+                  ? "bg-indigo-100 text-indigo-900"
                   : "bg-honey/15 text-honey"
               }`}
             >
-              {STATUSES.find((s) => s.key === order.status)?.label || order.status}
+              {STATUS_LABELS[order.status] || order.status}
             </span>
           </div>
           <p className="text-xs text-ink/50 mt-1 break-words">
@@ -183,35 +341,56 @@ export default function OrderDetail() {
           </p>
         </div>
 
-        {/* Change status control */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-xs text-ink/60 font-medium whitespace-nowrap">
-            Змінити статус:
-          </label>
-          <select
-            value={order.status}
-            disabled={saving}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className="input w-auto min-h-[44px] text-sm cursor-pointer font-medium"
-          >
-            {STATUSES.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+        {/* Change status control & Trash action */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-ink/60 font-medium whitespace-nowrap">
+              Статус:
+            </label>
+            <select
+              value={order.status}
+              disabled={saving || order.isDeleted}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              className="input w-auto min-h-[44px] text-sm cursor-pointer font-medium"
+            >
+              {STATUSES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {!order.isDeleted ? (
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              className="p-2.5 rounded-xl text-ink/40 hover:text-red-600 hover:bg-red-50 border border-ink/10 transition-colors min-h-[44px]"
+              title="Перемістити в кошик"
+            >
+              🗑️
+            </button>
+          ) : null}
         </div>
       </div>
 
       {/* Grid of info cards */}
       <div className="grid md:grid-cols-2 gap-5">
-        {/* Customer card */}
+        {/* Customer card with Deduplication History */}
         <div className="card p-5 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
-            <span className="text-lg">👤</span>
-            <h3 className="font-serif font-bold text-ink">Дані покупця</h3>
+          <div className="flex items-center justify-between pb-2 border-b border-ink/5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">👤</span>
+              <h3 className="font-serif font-bold text-ink">Дані покупця</h3>
+            </div>
+            {order.customer?.totalOrders ? (
+              <span className="text-xs font-semibold bg-honey/15 text-honey px-2.5 py-0.5 rounded-full">
+                Замовлень: {order.customer.totalOrders}
+              </span>
+            ) : null}
           </div>
-          <div className="text-sm space-y-1.5 text-ink/80">
+
+          <div className="text-sm space-y-2 text-ink/80">
             <div>
               <span className="text-ink/40 text-xs block">ПІБ:</span>
               <span className="font-semibold text-ink text-base">
@@ -238,35 +417,151 @@ export default function OrderDetail() {
                 </a>
               </div>
             )}
+
+            {/* Link to customer profile */}
+            <div className="pt-2 border-t border-ink/5 flex items-center justify-between text-xs">
+              <span className="text-ink/50">
+                Загальна сума покупок: <strong className="text-ink">{order.customer?.totalSpent || order.total} грн</strong>
+              </span>
+              <Link
+                to={`/admin/customers?search=${encodeURIComponent(order.customer?.phone || "")}`}
+                className="text-honey hover:underline font-semibold"
+              >
+                Профіль клієнта →
+              </Link>
+            </div>
           </div>
         </div>
 
-        {/* Delivery card */}
+        {/* Delivery & Tracking (ТТН) card */}
         <div className="card p-5 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
-            <span className="text-lg">🚚</span>
-            <h3 className="font-serif font-bold text-ink">Доставка</h3>
+          <div className="flex items-center justify-between pb-2 border-b border-ink/5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🚚</span>
+              <h3 className="font-serif font-bold text-ink">Доставка та ТТН</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingTracking(!editingTracking)}
+              className="text-xs text-honey hover:underline font-semibold"
+            >
+              {editingTracking ? "Скасувати" : trackingNumber ? "Змінити ТТН" : "+ Додати ТТН"}
+            </button>
           </div>
-          <div className="text-sm space-y-1.5 text-ink/80">
-            <div>
-              <span className="text-ink/40 text-xs block">Служба доставки:</span>
-              <span className="font-semibold text-ink">
-                {order.delivery?.provider || "Нова пошта"}
-              </span>
+
+          {editingTracking ? (
+            <form onSubmit={handleSaveTracking} className="space-y-3 bg-cream/30 p-3 rounded-xl border border-ink/5">
+              <div>
+                <label className="block text-xs text-ink/60 font-medium mb-1">Служба доставки:</label>
+                <select
+                  value={deliveryServiceInput}
+                  onChange={(e) => setDeliveryServiceInput(e.target.value)}
+                  className="input text-xs"
+                >
+                  <option value="Нова пошта">Нова пошта</option>
+                  <option value="Укрпошта">Укрпошта</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-ink/60 font-medium mb-1">Номер накладної (ТТН):</label>
+                <input
+                  type="text"
+                  placeholder="Введіть номер ТТН..."
+                  value={trackingNumberInput}
+                  onChange={(e) => setTrackingNumberInput(e.target.value)}
+                  className="input text-xs font-mono"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingTracking(false)}
+                  className="btn-secondary text-xs py-1.5 px-3 rounded-lg"
+                >
+                  Скасувати
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTracking}
+                  className="btn-primary text-xs py-1.5 px-3 rounded-lg"
+                >
+                  {savingTracking ? "Збереження..." : "Зберегти ТТН"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="text-sm space-y-2 text-ink/80">
+              <div className="flex justify-between items-baseline">
+                <div>
+                  <span className="text-ink/40 text-xs block">Служба доставки:</span>
+                  <span className="font-semibold text-ink">
+                    {deliveryService}
+                  </span>
+                </div>
+                {order.delivery?.shippedAt && (
+                  <span className="text-[11px] text-ink/50">
+                    Відправлено: {new Date(order.delivery.shippedAt).toLocaleDateString("uk-UA")}
+                  </span>
+                )}
+              </div>
+
+              {/* TTN Section */}
+              <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2">
+                <span className="text-xs text-indigo-900 font-semibold block">Номер накладної (ТТН):</span>
+                {trackingNumber ? (
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-mono text-base font-bold text-indigo-950 tracking-wider">
+                      {trackingNumber}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyTtn(trackingNumber)}
+                        className="btn-secondary text-xs py-1 px-2.5 rounded-lg border-indigo-200 text-indigo-900 bg-white hover:bg-indigo-50"
+                      >
+                        {copiedTtn ? "✓ Скопійовано" : "📋 Скопіювати"}
+                      </button>
+                      {trackingUrl && (
+                        <a
+                          href={trackingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-primary text-xs py-1 px-2.5 rounded-lg shadow-2xs inline-flex items-center gap-1"
+                        >
+                          Відстежити ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-indigo-700/70 italic flex items-center justify-between">
+                    <span>ТТН ще не додано.</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTracking(true)}
+                      className="text-honey font-semibold underline not-italic"
+                    >
+                      Додати зараз
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <span className="text-ink/40 text-xs block">Населений пункт:</span>
+                <span className="font-medium text-ink">
+                  📍 {order.delivery?.city || "Не вказано"}
+                </span>
+              </div>
+              <div>
+                <span className="text-ink/40 text-xs block">Відділення / Адреса:</span>
+                <span className="font-medium text-ink">
+                  🏤 {order.delivery?.branch || "Не вказано"}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-ink/40 text-xs block">Населений пункт:</span>
-              <span className="font-medium text-ink">
-                📍 {order.delivery?.city || "Не вказано"}
-              </span>
-            </div>
-            <div>
-              <span className="text-ink/40 text-xs block">Відділення / Адреса:</span>
-              <span className="font-medium text-ink">
-                🏤 {order.delivery?.branch || "Не вказано"}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Payment card */}
@@ -446,6 +741,49 @@ export default function OrderDetail() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Status History Timeline (Section 15) */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center gap-2 pb-2 border-b border-ink/5">
+          <span className="text-lg">📜</span>
+          <h3 className="font-serif font-bold text-ink">Історія статусів замовлення</h3>
+        </div>
+
+        {order.statusHistory && order.statusHistory.length > 0 ? (
+          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-ink/10">
+            {order.statusHistory.map((h, i) => (
+              <div key={h.id || i} className="relative">
+                {/* Bullet */}
+                <div className="absolute -left-6 top-1.5 w-3 h-3 rounded-full bg-honey ring-4 ring-cream" />
+                <div className="text-xs space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-ink">
+                      {h.fromStatus ? `${STATUS_LABELS[h.fromStatus] || h.fromStatus} ➔ ` : "Створено ➔ "}
+                      {STATUS_LABELS[h.toStatus] || h.toStatus}
+                    </span>
+                    <span className="text-ink/40">•</span>
+                    <span className="text-ink/50">
+                      {new Date(h.createdAt).toLocaleString("uk-UA")}
+                    </span>
+                    <span className="px-1.5 py-0.2 bg-cream text-ink/60 rounded text-[10px] font-mono">
+                      {h.changedBy || "system"}
+                    </span>
+                  </div>
+                  {h.comment && (
+                    <p className="text-ink/70 text-xs italic mt-0.5">
+                      «{h.comment}»
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-ink/40 italic">
+            Історія переходів статусів фіксується автоматично при кожній зміні.
+          </p>
+        )}
       </div>
     </div>
   );

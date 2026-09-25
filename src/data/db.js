@@ -285,9 +285,23 @@ export const Products = {
 // ---------------- Orders ----------------
 export const Orders = {
   all: () => state.orders,
-  fetchAll: async (status) => {
+  fetchAll: async (filters = {}) => {
     try {
-      const query = status && status !== "all" ? `?status=${status}` : "";
+      let query = "";
+      if (typeof filters === "string") {
+        query = filters && filters !== "all" ? `?status=${filters}` : "";
+      } else if (filters && typeof filters === "object") {
+        const searchParams = new URLSearchParams();
+        if (filters.status && filters.status !== "all") searchParams.set("status", filters.status);
+        if (filters.deleted) searchParams.set("deleted", filters.deleted);
+        if (filters.search) searchParams.set("search", filters.search);
+        if (filters.customerId) searchParams.set("customerId", filters.customerId);
+        if (filters.startDate) searchParams.set("startDate", filters.startDate);
+        if (filters.endDate) searchParams.set("endDate", filters.endDate);
+        const qs = searchParams.toString();
+        if (qs) query = `?${qs}`;
+      }
+
       const orders = await request(`/api/admin/orders${query}`);
       state.orders = orders;
       notify();
@@ -337,16 +351,72 @@ export const Orders = {
     }
     return res;
   },
-  updateStatus: async (id, status) => {
+  updateStatus: async (id, status, comment = null) => {
     const updated = await request(`/api/admin/orders/${id}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, comment }),
     });
     const idx = state.orders.findIndex((o) => o.id === id);
     if (idx >= 0) state.orders[idx] = updated;
     notify();
     return updated;
   },
+  updateTracking: async (id, trackingData) => {
+    const updated = await request(`/api/admin/orders/${id}/tracking`, {
+      method: "PATCH",
+      body: JSON.stringify(trackingData),
+    });
+    const idx = state.orders.findIndex((o) => o.id === id);
+    if (idx >= 0) state.orders[idx] = updated;
+    notify();
+    return updated;
+  },
+  delete: async (id) => {
+    const res = await request(`/api/admin/orders/${id}`, {
+      method: "DELETE",
+    });
+    state.orders = state.orders.filter((o) => o.id !== id);
+    notify();
+    return res;
+  },
+  restore: async (id) => {
+    const res = await request(`/api/admin/orders/${id}/restore`, {
+      method: "POST",
+    });
+    if (res.order) {
+      const idx = state.orders.findIndex((o) => o.id === id);
+      if (idx >= 0) state.orders[idx] = res.order;
+      else state.orders.unshift(res.order);
+      notify();
+    }
+    return res;
+  },
+};
+
+// ---------------- Customers ----------------
+export const Customers = {
+  fetchAll: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.set("search", params.search);
+    if (params.sort) searchParams.set("sort", params.sort);
+    const qs = searchParams.toString();
+    return await request(`/api/admin/customers${qs ? `?${qs}` : ""}`);
+  },
+  fetchById: async (id) => {
+    return await request(`/api/admin/customers/${id}`);
+  },
+};
+
+// ---------------- Backups ----------------
+export const Backups = {
+  list: async () => {
+    return await request("/api/admin/backups");
+  },
+  create: async () => {
+    return await request("/api/admin/backup/create", { method: "POST" });
+  },
+  downloadUrl: "/api/admin/backup",
+  downloadSpecificUrl: (filename) => `/api/admin/backups/${encodeURIComponent(filename)}`,
 };
 
 // ---------------- Settings ----------------

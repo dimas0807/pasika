@@ -157,12 +157,17 @@ export function formatStatusChangeNotification(order, prevStatus, newStatus, cha
   if (newStatus === "SHIPPED") icon = "🚚";
   if (newStatus === "COMPLETED") icon = "🏁";
 
+  const trackingNumber = order.tracking_number || order.delivery?.trackingNumber || "";
+  const deliveryService = order.delivery_service || order.delivery?.deliveryService || order.delivery_provider || "";
+
   const lines = [
     `${icon} <b>Зміна статусу замовлення ${orderNumber}</b>`,
     ``,
     `Попередній: <s>${prevLabel}</s>`,
     `Новий статус: <b>${newLabel}</b>`,
     customerName ? `Клієнт: ${customerName}` : null,
+    trackingNumber ? `🏷 ТТН: <code>${trackingNumber}</code>` : null,
+    deliveryService ? `🚚 Служба: ${deliveryService}` : null,
     changerName ? `Змінив: ${changerName}` : null,
   ];
 
@@ -177,15 +182,31 @@ export function buildOrderInlineKeyboard(order, currentStatus = null) {
   const orderUrl = `${baseUrl}/admin/orders/${order.id}`;
 
   const status = currentStatus || order.status || "NEW";
+  const trackingNumber = order.tracking_number || order.delivery?.trackingNumber;
+  const isUp =
+    order.delivery_provider_key === "up" ||
+    (order.delivery_service && order.delivery_service.toLowerCase().includes("укр"));
+  const trackingUrl = trackingNumber
+    ? isUp
+      ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
+      : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`
+    : null;
 
-  const rows = [
-    [
-      {
-        text: "📋 Відкрити замовлення",
-        url: orderUrl,
-      },
-    ],
+  const topRow = [
+    {
+      text: "📋 Відкрити замовлення",
+      url: orderUrl,
+    },
   ];
+
+  if (trackingUrl) {
+    topRow.push({
+      text: "🌐 Відстежити ТТН",
+      url: trackingUrl,
+    });
+  }
+
+  const rows = [topRow];
 
   if (status === "NEW") {
     rows.push([

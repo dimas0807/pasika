@@ -900,10 +900,34 @@ export async function onRequest(context) {
     // Admin Orders
     if (path === "/admin/orders" && method === "GET") {
       const status = url.searchParams.get("status");
-      const list = status && status !== "all"
-        ? memoryOrders.filter((o) => o.status === status)
-        : memoryOrders;
+      const isDeleted = url.searchParams.get("deleted") === "true";
+      let list = memoryOrders.filter((o) => (isDeleted ? Boolean(o.deleted_at) : !o.deleted_at));
+      if (status && status !== "all") {
+        list = list.filter((o) => o.status === status);
+      }
       return jsonResponse(list);
+    }
+    if (path.startsWith("/admin/orders/") && path.endsWith("/tracking") && method === "PATCH") {
+      const id = path.replace("/admin/orders/", "").replace("/tracking", "");
+      const body = await request.json().catch(() => ({}));
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        const o = memoryOrders[idx];
+        o.tracking_number = body.trackingNumber || "";
+        o.delivery_service = body.deliveryService || "Нова пошта";
+        o.status = "SHIPPED";
+        o.shipped_at = Date.now();
+        if (!o.delivery) o.delivery = {};
+        o.delivery.trackingNumber = o.tracking_number;
+        o.delivery.deliveryService = o.delivery_service;
+        o.delivery.shippedAt = o.shipped_at;
+        const trackUrl = o.delivery_service.toLowerCase().includes("укр")
+          ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(o.tracking_number)}`
+          : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(o.tracking_number)}`;
+        o.delivery.trackingUrl = trackUrl;
+        return jsonResponse(o);
+      }
+      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
     }
     if (path.startsWith("/admin/orders/") && path.endsWith("/status") && method === "PATCH") {
       const id = path.replace("/admin/orders/", "").replace("/status", "");
@@ -911,7 +935,36 @@ export async function onRequest(context) {
       const idx = memoryOrders.findIndex((o) => o.id === id);
       if (idx >= 0) {
         memoryOrders[idx].status = body.status;
+        if (!memoryOrders[idx].statusHistory) memoryOrders[idx].statusHistory = [];
+        memoryOrders[idx].statusHistory.push({
+          fromStatus: memoryOrders[idx].status,
+          toStatus: body.status,
+          comment: body.comment || null,
+          changedBy: "admin",
+          createdAt: Date.now(),
+        });
         return jsonResponse(memoryOrders[idx]);
+      }
+      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+    }
+    if (path.startsWith("/admin/orders/") && path.endsWith("/restore") && method === "POST") {
+      const id = path.replace("/admin/orders/", "").replace("/restore", "");
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        memoryOrders[idx].deleted_at = null;
+        memoryOrders[idx].isDeleted = false;
+        return jsonResponse({ success: true, order: memoryOrders[idx] });
+      }
+      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+    }
+    if (path.startsWith("/admin/orders/") && method === "DELETE") {
+      const id = path.replace("/admin/orders/", "");
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        memoryOrders[idx].deleted_at = Date.now();
+        memoryOrders[idx].deletedAt = memoryOrders[idx].deleted_at;
+        memoryOrders[idx].isDeleted = true;
+        return jsonResponse({ success: true });
       }
       return jsonResponse({ error: "Замовлення не знайдено" }, 404);
     }
@@ -920,6 +973,97 @@ export async function onRequest(context) {
       const order = memoryOrders.find((o) => o.id === id);
       if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       return jsonResponse(order);
+    }
+
+    // Admin Customers
+    if (path === "/admin/customers" && method === "GET") {
+      const map = new Map();
+      for (const o of memoryOrders) {
+        const phone = o.customer?.phone;
+        if (!phone) continue;
+        if (!map.has(phone)) {
+          map.set(phone, {
+            id: "c_" + phone.replace(/\D/g, ""),
+            phone,
+            first_name: o.customer.firstName || "",
+            last_name: o.customer.lastName || "",
+            email: o.customer.email || "",
+            total_orders: 0,
+            total_spent: 0,
+            last_order_at: o.createdAt,
+          });
+        }
+        const c = map.get(phone);
+        c.total_orders += 1;
+        c.total_spent += o.total || 0;
+        if (o.createdAt > c.last_order_at) c.last_order_at = o.createdAt;
+      }
+      return jsonResponse(Array.from(map.values()));
+    }
+    if (path.startsWith("/admin/customers/") && method === "GET") {
+      const id = path.replace("/admin/customers/", "");
+      let foundCustomer = null;
+      let customerOrdersList = [];
+      for (const o of memoryOrders) {
+        const cId = "c_" + (o.customer?.phone || "").replace(/\D/g, "");
+        if (cId === id || o.customer_id === id) {
+          if (!foundCustomer) {
+            foundCustomer = {
+              id: cId,
+              phone: o.customer?.phone || "",
+              first_name: o.customer?.firstName || "",
+              last_name: o.customer?.lastName || "",
+              email: o.customer?.email || "",
+            };
+          }
+          customerOrdersList.push(o);
+        }
+      }
+      if (!foundCustomer) return jsonResponse({ error: "Клієнта не знайдено" }, 404);
+      return jsonResponse({
+        ...foundCustomer,
+        orders: customerOrdersList,
+      });
+    }
+
+    // Admin Backups
+    if (path === "/admin/backups" && method === "GET") {
+      return jsonResponse({
+        databasePath: "edge_memory_store",
+        backupDirectory: "edge_storage",
+        backups: [
+          {
+            filename: `pasika-edge-snapshot-${new Date().toISOString().slice(0, 10)}.json`,
+            size: 16384,
+            sizeFormatted: "16 KB",
+            createdAt: Date.now(),
+          },
+        ],
+      });
+    }
+    if (path === "/admin/backup/create" && method === "POST") {
+      const filename = `pasika-edge-snapshot-${Date.now()}.json`;
+      return jsonResponse({
+        success: true,
+        filename,
+        size: 16384,
+        sizeFormatted: "16 KB",
+        createdAt: Date.now(),
+      }, 201);
+    }
+    if ((path === "/admin/backup" || path.startsWith("/admin/backups/")) && method === "GET") {
+      const snapshot = JSON.stringify({
+        orders: memoryOrders,
+        products: memoryProducts,
+        settings: memorySettings,
+      }, null, 2);
+      return new Response(snapshot, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Disposition": 'attachment; filename="pasika-edge-backup.json"',
+        },
+      });
     }
 
     // Admin Products

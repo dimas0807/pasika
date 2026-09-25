@@ -5,6 +5,7 @@ import { Auth } from "../data/db";
 const NAV = [
   { to: "/admin", label: "Головна", icon: "📊", end: true },
   { to: "/admin/orders", label: "Замовлення", icon: "📦" },
+  { to: "/admin/customers", label: "Клієнти", icon: "👥" },
   { to: "/admin/products", label: "Товари", icon: "🍯" },
   { to: "/admin/categories", label: "Категорії", icon: "🏷️" },
   { to: "/admin/settings", label: "Налаштування", icon: "⚙️" },

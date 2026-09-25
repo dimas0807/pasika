@@ -255,18 +255,42 @@ export function deleteCategory(req, res) {
 export function getDashboardStats(req, res) {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  
+  // Start of this week (Monday)
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0 for Monday, 6 for Sunday
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
 
-  const totalOrders = db.prepare("SELECT COUNT(*) as count FROM orders").get().count;
-  const ordersToday = db.prepare("SELECT COUNT(*) as count FROM orders WHERE created_at >= ?").get(startOfDay).count;
-  const newOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'NEW'").get().count;
-  const processingOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'PROCESSING'").get().count;
-  const completedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'COMPLETED'").get().count;
-  const totalRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE status != 'CANCELLED'").get().rev;
+  // Start of this month
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  const totalOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL").get().count;
+  const ordersToday = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND created_at >= ?").get(startOfDay).count;
+  const ordersThisWeek = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND created_at >= ?").get(startOfWeek).count;
+  const ordersThisMonth = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND created_at >= ?").get(startOfMonth).count;
+
+  const newOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'NEW'").get().count;
+  const processingOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'PROCESSING'").get().count;
+  const packedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'PACKED'").get().count;
+  const shippedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'SHIPPED'").get().count;
+  const completedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'COMPLETED'").get().count;
+  const cancelledOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'CANCELLED'").get().count;
+
+  const totalRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE deleted_at IS NULL AND status != 'CANCELLED'").get().rev;
+  const completedRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE deleted_at IS NULL AND status = 'COMPLETED'").get().rev;
+
+  const activeOrdersCount = Math.max(totalOrders - cancelledOrders, 0);
+  const averageCheck = activeOrdersCount > 0 ? Math.round(totalRevenue / activeOrdersCount) : 0;
+
+  // Customers metrics
+  const totalCustomers = db.prepare("SELECT COUNT(*) as count FROM customers").get()?.count || 0;
+  const newCustomers = db.prepare("SELECT COUNT(*) as count FROM customers WHERE total_orders = 1").get()?.count || 0;
+  const repeatCustomers = db.prepare("SELECT COUNT(*) as count FROM customers WHERE total_orders > 1").get()?.count || 0;
 
   // Recent 6 orders
   const recentOrders = db.prepare(`
-    SELECT id, number, status, total, customer_first_name, customer_last_name, created_at
+    SELECT id, number, status, total, customer_first_name, customer_last_name, tracking_number, delivery_service, created_at
     FROM orders
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC
     LIMIT 6
   `).all().map((o) => ({
@@ -274,6 +298,8 @@ export function getDashboardStats(req, res) {
     number: o.number,
     status: o.status,
     total: o.total,
+    trackingNumber: o.tracking_number,
+    deliveryService: o.delivery_service,
     customer: { firstName: o.customer_first_name, lastName: o.customer_last_name },
     createdAt: o.created_at,
   }));
@@ -283,7 +309,7 @@ export function getDashboardStats(req, res) {
     SELECT name, SUM(qty) as qty
     FROM order_items
     JOIN orders ON order_items.order_id = orders.id
-    WHERE orders.status != 'CANCELLED'
+    WHERE orders.deleted_at IS NULL AND orders.status != 'CANCELLED'
     GROUP BY name
     ORDER BY qty DESC
     LIMIT 5
@@ -293,6 +319,7 @@ export function getDashboardStats(req, res) {
   const salesOrders = db.prepare(`
     SELECT id, number, total, created_at
     FROM orders
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC
     LIMIT 10
   `).all();
@@ -309,10 +336,20 @@ export function getDashboardStats(req, res) {
     kpis: {
       totalOrders,
       ordersToday,
+      ordersThisWeek,
+      ordersThisMonth,
       newOrders,
       processingOrders,
+      packedOrders,
+      shippedOrders,
       completedOrders,
+      cancelledOrders,
       totalRevenue,
+      completedRevenue,
+      averageCheck,
+      totalCustomers,
+      newCustomers,
+      repeatCustomers,
     },
     recentOrders,
     topProducts,

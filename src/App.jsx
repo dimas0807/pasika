@@ -21,6 +21,7 @@ import ProductsAdmin from "./admin/ProductsAdmin";
 import ProductForm from "./admin/ProductForm";
 import OrdersAdmin from "./admin/OrdersAdmin";
 import OrderDetail from "./admin/OrderDetail";
+import CustomersAdmin from "./admin/CustomersAdmin";
 import SettingsAdmin from "./admin/SettingsAdmin";
 import CategoriesAdmin from "./admin/CategoriesAdmin";
 import HelpAdmin from "./admin/HelpAdmin";
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="products/:id" element={<ProductForm />} />
           <Route path="orders" element={<OrdersAdmin />} />
           <Route path="orders/:id" element={<OrderDetail />} />
+          <Route path="customers" element={<CustomersAdmin />} />
           <Route path="categories" element={<CategoriesAdmin />} />
           <Route path="settings" element={<SettingsAdmin />} />
           <Route path="help" element={<HelpAdmin />} />

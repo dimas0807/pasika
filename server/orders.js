@@ -39,6 +39,39 @@ export function getFullOrder(orderId, customerToken = null) {
     receiptAccessUrl = `${order.receipt_url}?token=${t}`;
   }
 
+  // Customer statistics lookup
+  let customerStats = null;
+  if (order.customer_id) {
+    const cust = db.prepare("SELECT * FROM customers WHERE id = ?").get(order.customer_id);
+    if (cust) {
+      customerStats = {
+        id: cust.id,
+        totalOrders: cust.total_orders,
+        totalSpent: cust.total_spent,
+        firstOrderAt: cust.first_order_at,
+        lastOrderAt: cust.last_order_at,
+      };
+    }
+  }
+
+  // Status history timeline
+  const statusHistory = db
+    .prepare(
+      "SELECT id, from_status, to_status, comment, changed_by, created_at FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC"
+    )
+    .all(orderId);
+
+  // Tracking URL builder
+  let trackingUrl = null;
+  if (order.tracking_number) {
+    const isUp =
+      order.delivery_provider_key === "up" ||
+      (order.delivery_service && order.delivery_service.toLowerCase().includes("укр"));
+    trackingUrl = isUp
+      ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(order.tracking_number)}`
+      : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(order.tracking_number)}`;
+  }
+
   return {
     id: order.id,
     number: order.number,
@@ -46,11 +79,15 @@ export function getFullOrder(orderId, customerToken = null) {
     createdAt: order.created_at,
     updatedAt: order.updated_at,
     total: order.total,
+    customerId: order.customer_id || null,
     customer: {
+      id: order.customer_id || null,
       firstName: order.customer_first_name,
       lastName: order.customer_last_name,
       phone: order.customer_phone,
       email: order.customer_email || "",
+      totalOrders: customerStats?.totalOrders || 1,
+      totalSpent: customerStats?.totalSpent || order.total,
     },
     delivery: {
       provider: order.delivery_provider,
@@ -59,6 +96,11 @@ export function getFullOrder(orderId, customerToken = null) {
       cityId: order.delivery_city_id,
       branch: order.delivery_branch_name,
       branchId: order.delivery_branch_id,
+      trackingNumber: order.tracking_number || null,
+      deliveryService: order.delivery_service || order.delivery_provider || "Нова Пошта",
+      trackingUrl,
+      shippedAt: order.shipped_at || null,
+      completedAt: order.completed_at || null,
     },
     payment: {
       method: order.payment_method,
@@ -74,6 +116,16 @@ export function getFullOrder(orderId, customerToken = null) {
           name: order.receipt_name || "Чек",
         }
       : null,
+    deletedAt: order.deleted_at || null,
+    isDeleted: Boolean(order.deleted_at),
+    statusHistory: statusHistory.map((h) => ({
+      id: h.id,
+      fromStatus: h.from_status,
+      toStatus: h.to_status,
+      comment: h.comment,
+      changedBy: h.changed_by,
+      createdAt: h.created_at,
+    })),
     items: items.map((i) => ({
       id: i.product_id,
       name: i.name,
@@ -250,6 +302,44 @@ export async function createOrder(req, res) {
         updateStockStmt.run(entry.qty, now, entry.product.id);
       }
 
+      // Customer deduplication & persistent profile linking by normalized phone
+      let customer = db.prepare("SELECT * FROM customers WHERE phone = ?").get(normalizedPhone);
+      let customerId;
+      if (customer) {
+        customerId = customer.id;
+        db.prepare(`
+          UPDATE customers
+          SET first_name = COALESCE(NULLIF(?, ''), first_name),
+              last_name = COALESCE(NULLIF(?, ''), last_name),
+              email = COALESCE(NULLIF(?, ''), email),
+              total_orders = total_orders + 1,
+              total_spent = total_spent + ?,
+              last_order_at = ?,
+              updated_at = ?
+          WHERE id = ?
+        `).run(cleanFirst, cleanLast, cleanEmail || "", calculatedTotal, now, now, customerId);
+      } else {
+        customerId = "c_" + Date.now().toString(36) + "_" + crypto.randomBytes(3).toString("hex");
+        db.prepare(`
+          INSERT INTO customers (
+            id, phone, first_name, last_name, email,
+            total_orders, total_spent, first_order_at, last_order_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          customerId,
+          normalizedPhone,
+          cleanFirst,
+          cleanLast,
+          cleanEmail || null,
+          1,
+          calculatedTotal,
+          now,
+          now,
+          now,
+          now
+        );
+      }
+
       // Mark receipt as claimed if uploaded during checkout
       if (rawReceiptPath && checkoutToken) {
         const receiptFilename = rawReceiptPath.split("/").pop();
@@ -260,16 +350,16 @@ export async function createOrder(req, res) {
         `).run(checkoutToken, receiptFilename);
       }
 
-      // Insert order
+      // Insert order with customer_id and delivery_service
       db.prepare(`
         INSERT INTO orders (
           id, number, status, customer_first_name, customer_last_name,
-          customer_phone, customer_email, total, delivery_provider,
+          customer_phone, customer_email, customer_id, total, delivery_provider,
           delivery_provider_key, delivery_city_id, delivery_city_name,
-          delivery_branch_id, delivery_branch_name, payment_method,
+          delivery_branch_id, delivery_branch_name, delivery_service, payment_method,
           comment, receipt_url, receipt_name, idempotency_key, customer_token,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         newOrderNumber,
@@ -278,6 +368,7 @@ export async function createOrder(req, res) {
         cleanLast,
         normalizedPhone,
         cleanEmail || null,
+        customerId,
         calculatedTotal,
         providerName,
         cleanProviderKey,
@@ -285,6 +376,7 @@ export async function createOrder(req, res) {
         cityName,
         branchId,
         branchName,
+        providerName,
         cleanPayment,
         comment?.trim() || null,
         rawReceiptPath || null,
@@ -292,6 +384,21 @@ export async function createOrder(req, res) {
         idempotencyKey || null,
         customerToken,
         now,
+        now
+      );
+
+      // Record initial creation in status history
+      const historyId = "osh_" + crypto.randomBytes(8).toString("hex");
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        historyId,
+        orderId,
+        null,
+        "NEW",
+        "Замовлення оформлено на сайті",
+        "customer",
         now
       );
 
@@ -366,22 +473,73 @@ export function getPublicOrder(req, res) {
 
 // ---------------- Admin Handlers ----------------
 export function getAdminOrders(req, res) {
-  const { status } = req.query;
-  let rows;
-  if (status && status !== "all") {
-    rows = db.prepare("SELECT id FROM orders WHERE status = ? ORDER BY created_at DESC").all(status);
+  const { status, deleted, search, customerId, startDate, endDate } = req.query;
+
+  let query = "SELECT id FROM orders WHERE 1=1";
+  const params = [];
+
+  // Soft delete filter: active by default, or deleted only
+  if (deleted === "true" || deleted === "only") {
+    query += " AND deleted_at IS NOT NULL";
+  } else if (deleted === "all") {
+    // include both active and soft-deleted
   } else {
-    rows = db.prepare("SELECT id FROM orders ORDER BY created_at DESC").all();
+    // default: active orders only
+    query += " AND deleted_at IS NULL";
   }
 
-  const orders = rows.map((r) => getFullOrder(r.id));
+  if (status && status !== "all") {
+    query += " AND status = ?";
+    params.push(status);
+  }
+
+  if (customerId) {
+    query += " AND customer_id = ?";
+    params.push(customerId);
+  }
+
+  if (startDate) {
+    const sTime = Number(startDate);
+    if (!isNaN(sTime)) {
+      query += " AND created_at >= ?";
+      params.push(sTime);
+    }
+  }
+
+  if (endDate) {
+    const eTime = Number(endDate);
+    if (!isNaN(eTime)) {
+      query += " AND created_at <= ?";
+      params.push(eTime);
+    }
+  }
+
+  if (search && search.trim()) {
+    const q = search.trim();
+    const pattern = `%${q}%`;
+    query += ` AND (
+      CAST(number AS TEXT) LIKE ? OR
+      customer_first_name LIKE ? OR
+      customer_last_name LIKE ? OR
+      customer_phone LIKE ? OR
+      customer_email LIKE ? OR
+      delivery_city_name LIKE ? OR
+      tracking_number LIKE ?
+    )`;
+    params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+
+  query += " ORDER BY created_at DESC";
+
+  const rows = db.prepare(query).all(...params);
+  const orders = rows.map((r) => getFullOrder(r.id)).filter(Boolean);
   return res.json(orders);
 }
 
 export function updateOrderStatus(req, res) {
   try {
     const { id } = req.params;
-    const { status } = req.body || {};
+    const { status, comment } = req.body || {};
 
     const ALLOWED_STATUSES = ["NEW", "PROCESSING", "PACKED", "SHIPPED", "COMPLETED", "CANCELLED"];
     if (!ALLOWED_STATUSES.includes(status)) {
@@ -394,13 +552,13 @@ export function updateOrderStatus(req, res) {
     }
 
     const prevStatus = existing.status;
+    const now = Date.now();
 
     const updateTx = db.transaction(() => {
       // If transitioning to CANCELLED from another status, restore product stock
       if (status === "CANCELLED" && prevStatus !== "CANCELLED") {
         const items = db.prepare("SELECT product_id, qty FROM order_items WHERE order_id = ?").all(id);
         const restoreStockStmt = db.prepare("UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?");
-        const now = Date.now();
         for (const item of items) {
           restoreStockStmt.run(item.qty, now, item.product_id);
         }
@@ -409,7 +567,6 @@ export function updateOrderStatus(req, res) {
       else if (prevStatus === "CANCELLED" && status !== "CANCELLED") {
         const items = db.prepare("SELECT product_id, qty FROM order_items WHERE order_id = ?").all(id);
 
-        // Pre-check stock inside transaction: prevent negative stock
         for (const item of items) {
           const prod = db.prepare("SELECT name, stock FROM products WHERE id = ?").get(item.product_id);
           if (!prod) {
@@ -423,13 +580,34 @@ export function updateOrderStatus(req, res) {
         }
 
         const deductStockStmt = db.prepare("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?");
-        const now = Date.now();
         for (const item of items) {
           deductStockStmt.run(item.qty, now, item.product_id);
         }
       }
 
-      db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").run(status, Date.now(), id);
+      // Record shipped_at or completed_at dates if transitioning to those statuses
+      let shippedAt = existing.shipped_at;
+      let completedAt = existing.completed_at;
+      if (status === "SHIPPED" && !shippedAt) {
+        shippedAt = now;
+      }
+      if (status === "COMPLETED" && !completedAt) {
+        completedAt = now;
+      }
+
+      db.prepare(`
+        UPDATE orders
+        SET status = ?, shipped_at = ?, completed_at = ?, updated_at = ?
+        WHERE id = ?
+      `).run(status, shippedAt, completedAt, now, id);
+
+      // Record in status history
+      const historyId = "osh_" + crypto.randomBytes(8).toString("hex");
+      const historyComment = comment || `Зміна статусу з ${prevStatus} на ${status}`;
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(historyId, id, prevStatus, status, historyComment, "admin", now);
     });
 
     updateTx();
@@ -444,6 +622,115 @@ export function updateOrderStatus(req, res) {
     }
 
     return res.json(updated);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+export function updateOrderTracking(req, res) {
+  try {
+    const { id } = req.params;
+    const { trackingNumber, deliveryService, setShipped } = req.body || {};
+
+    const cleanTracking = String(trackingNumber || "").trim();
+    const cleanService = (deliveryService || "").trim() || "Нова Пошта";
+
+    const existing = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Замовлення не знайдено" });
+    }
+
+    const now = Date.now();
+    let newStatus = existing.status;
+    const shouldShip =
+      setShipped === true ||
+      (cleanTracking && (existing.status === "NEW" || existing.status === "PROCESSING" || existing.status === "PACKED"));
+
+    if (shouldShip) {
+      newStatus = "SHIPPED";
+    }
+
+    const shippedAt = shouldShip || existing.shipped_at ? (existing.shipped_at || now) : null;
+
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE orders
+        SET tracking_number = ?,
+            delivery_service = ?,
+            status = ?,
+            shipped_at = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).run(cleanTracking || null, cleanService, newStatus, shippedAt, now, id);
+
+      const hid = "osh_" + crypto.randomBytes(8).toString("hex");
+      const comment = cleanTracking
+        ? `Оновлено ТТН: ${cleanTracking} (${cleanService})`
+        : `Змінено службу доставки: ${cleanService}`;
+
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(hid, id, existing.status, newStatus, comment, "admin", now);
+    })();
+
+    const updated = getFullOrder(id);
+
+    // Notify Telegram if tracking added or status changed
+    if (newStatus !== existing.status || cleanTracking) {
+      notifyOrderStatusChange(updated, existing.status, newStatus).catch(() => {});
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+export function softDeleteOrder(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Замовлення не знайдено" });
+    }
+
+    const now = Date.now();
+    db.transaction(() => {
+      db.prepare("UPDATE orders SET deleted_at = ?, updated_at = ? WHERE id = ?").run(now, now, id);
+      const hid = "osh_" + crypto.randomBytes(8).toString("hex");
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(hid, id, existing.status, existing.status, "Замовлення переміщено до кошика видалених (soft delete)", "admin", now);
+    })();
+
+    return res.json({ success: true, id, deletedAt: now });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+export function restoreOrder(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Замовлення не знайдено" });
+    }
+
+    const now = Date.now();
+    db.transaction(() => {
+      db.prepare("UPDATE orders SET deleted_at = NULL, updated_at = ? WHERE id = ?").run(now, id);
+      const hid = "osh_" + crypto.randomBytes(8).toString("hex");
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(hid, id, existing.status, existing.status, "Замовлення відновлено з кошика видалених", "admin", now);
+    })();
+
+    const restored = getFullOrder(id);
+    return res.json({ success: true, order: restored });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }

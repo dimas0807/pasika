@@ -10,6 +10,7 @@ export default function OrderSuccess() {
   const [order, setOrder] = useState(() => Orders.byId(id));
   const [loading, setLoading] = useState(!order);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [copiedTtn, setCopiedTtn] = useState(false);
 
   useEffect(() => {
     Orders.fetchById(id, token)
@@ -22,6 +23,14 @@ export default function OrderSuccess() {
       })
       .finally(() => setLoading(false));
   }, [id, token]);
+
+  const handleCopyTtn = (ttn) => {
+    if (!ttn) return;
+    navigator.clipboard.writeText(ttn).then(() => {
+      setCopiedTtn(true);
+      setTimeout(() => setCopiedTtn(false), 2500);
+    });
+  };
 
   if (loading) {
     return (
@@ -64,6 +73,16 @@ export default function OrderSuccess() {
   const deliveryCity = typeof order.delivery?.city === "object" ? order.delivery.city.name : order.delivery?.city;
   const deliveryBranch = typeof order.delivery?.branch === "object" ? order.delivery.branch.name : order.delivery?.branch;
 
+  const trackingNumber = order.delivery?.trackingNumber || order.tracking_number || order.delivery?.tracking_number;
+  const deliveryService = order.delivery?.deliveryService || order.delivery?.provider || "Нова пошта";
+  const trackingUrl = order.delivery?.trackingUrl || (
+    trackingNumber
+      ? deliveryService.toLowerCase().includes("укр")
+        ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
+        : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`
+      : null
+  );
+
   return (
     <div className="container-p py-14 sm:py-20 max-w-lg mx-auto text-center">
       {/* Success icon */}
@@ -83,8 +102,60 @@ export default function OrderSuccess() {
         Ми вже отримали його та готуємо до пакування.
       </p>
 
+      {/* Delivery Tracking Card (Section 14) */}
+      {trackingNumber && (
+        <div className="card p-5 mt-6 text-left bg-indigo-50/70 border border-indigo-200/80 shadow-sm rounded-3xl space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🚚</span>
+              <div>
+                <h3 className="font-serif font-bold text-base text-indigo-950">Відстеження доставки</h3>
+                <span className="text-xs text-indigo-800/80">{deliveryService}</span>
+              </div>
+            </div>
+            <span className="badge bg-indigo-100 text-indigo-900 font-semibold text-xs">
+              {order.status === "COMPLETED" ? "Вручено" : "Відправлено"}
+            </span>
+          </div>
+
+          <div className="p-3 bg-white rounded-2xl border border-indigo-100 flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <span className="text-[11px] text-ink/50 block">Номер накладної (ТТН):</span>
+              <span className="font-mono font-bold text-base text-ink tracking-wider">
+                {trackingNumber}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleCopyTtn(trackingNumber)}
+                className="btn-secondary text-xs py-1.5 px-3 rounded-xl border-indigo-200 text-indigo-900 bg-indigo-50/50 hover:bg-indigo-100/60"
+              >
+                {copiedTtn ? "✓ Скопійовано" : "📋 Скопіювати ТТН"}
+              </button>
+              {trackingUrl && (
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary text-xs py-1.5 px-3.5 rounded-xl shadow-2xs inline-flex items-center gap-1 font-semibold"
+                >
+                  Відстежити ↗
+                </a>
+              )}
+            </div>
+          </div>
+
+          {order.delivery?.shippedAt && (
+            <p className="text-[11px] text-indigo-900/70 text-right">
+              Дата відправки: {new Date(order.delivery.shippedAt).toLocaleDateString("uk-UA")}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Order Details Card */}
-      <div className="card p-6 mt-8 text-left bg-white border border-ink/10 shadow-sm rounded-3xl space-y-2.5 text-xs sm:text-sm">
+      <div className="card p-6 mt-6 text-left bg-white border border-ink/10 shadow-sm rounded-3xl space-y-2.5 text-xs sm:text-sm">
         <Row label="Клієнт" value={customerName} />
         <Row label="Телефон" value={order.customer?.phone} />
         <Row label="Доставка" value={`${order.delivery?.provider || ""}`} />
@@ -108,7 +179,7 @@ export default function OrderSuccess() {
         <div>
           <div className="font-bold text-ink">Сповіщення надіслано в Telegram</div>
           <div className="text-[11px] text-ink/50 mt-0.5">
-            Пасічник отримав ваше замовлення та незабаром зв'яжеться з вами.
+            Пасічник отримав ваше замовлення та оновлює статус замовлення в реальному часі.
           </div>
         </div>
       </div>

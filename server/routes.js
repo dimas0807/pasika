@@ -18,7 +18,17 @@ import {
   getFullOrder,
   getPublicOrder,
   updateOrderStatus,
+  updateOrderTracking,
+  softDeleteOrder,
+  restoreOrder,
 } from "./orders.js";
+import { getAdminCustomers, getAdminCustomerById } from "./customers.js";
+import {
+  handleDownloadBackup,
+  handleCreateBackup,
+  handleListBackups,
+  handleDownloadSpecificBackup,
+} from "./backup.js";
 import {
   deleteProduct,
   duplicateProduct,
@@ -146,6 +156,19 @@ router.get("/admin/orders/:id", (req, res) => {
   return res.json(order);
 });
 router.patch("/admin/orders/:id/status", updateOrderStatus);
+router.patch("/admin/orders/:id/tracking", updateOrderTracking);
+router.delete("/admin/orders/:id", softDeleteOrder);
+router.post("/admin/orders/:id/restore", restoreOrder);
+
+// Customers History
+router.get("/admin/customers", getAdminCustomers);
+router.get("/admin/customers/:id", getAdminCustomerById);
+
+// Database Backup & Persistence
+router.get("/admin/backup", handleDownloadBackup);
+router.post("/admin/backup/create", handleCreateBackup);
+router.get("/admin/backups", handleListBackups);
+router.get("/admin/backups/:filename", handleDownloadSpecificBackup);
 
 router.get("/admin/products", getAllProducts);
 router.post("/admin/products", saveProduct);

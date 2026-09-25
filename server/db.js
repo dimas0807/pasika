@@ -1,10 +1,14 @@
 import Database from "better-sqlite3";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "../pasika.db");
+export const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "../pasika.db");
+
+// Ensure persistent directory exists
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 export const db = new Database(DB_PATH);
 
@@ -138,6 +142,31 @@ export function initDatabase() {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      phone TEXT UNIQUE NOT NULL,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT,
+      total_orders INTEGER NOT NULL DEFAULT 0,
+      total_spent REAL NOT NULL DEFAULT 0,
+      first_order_at INTEGER NOT NULL,
+      last_order_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS order_status_history (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      comment TEXT,
+      changed_by TEXT NOT NULL DEFAULT 'system',
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
@@ -148,10 +177,36 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_telegram_recipients_active ON telegram_recipients(is_active);
     CREATE INDEX IF NOT EXISTS idx_telegram_interactions_chat ON telegram_interactions(chat_id);
     CREATE INDEX IF NOT EXISTS idx_telegram_interactions_created_at ON telegram_interactions(created_at);
+    CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+    CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id);
   `);
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN customer_token TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN customer_id TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN tracking_number TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_service TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN shipped_at INTEGER");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN completed_at INTEGER");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN deleted_at INTEGER");
   } catch {}
 
   try {
@@ -166,7 +221,126 @@ export function initDatabase() {
     db.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer_token ON orders(customer_token)");
   } catch {}
 
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id)");
+  } catch {}
+
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_orders_deleted_at ON orders(deleted_at)");
+  } catch {}
+
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_orders_tracking_number ON orders(tracking_number)");
+  } catch {}
+
+  migrateDataPersistence();
   seedInitialData();
+}
+
+// Canonical Ukrainian phone normalizer
+export function normalizePhone(raw) {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("0")) {
+    return "+38" + digits;
+  }
+  if (digits.length === 11 && digits.startsWith("80")) {
+    return "+3" + digits;
+  }
+  if (digits.length === 12 && digits.startsWith("380")) {
+    return "+" + digits;
+  }
+  return null;
+}
+
+function migrateDataPersistence() {
+  // 1. Backfill delivery_service from delivery_provider if null
+  try {
+    db.prepare("UPDATE orders SET delivery_service = delivery_provider WHERE delivery_service IS NULL").run();
+  } catch {}
+
+  // 2. Backfill customers from existing orders
+  try {
+    const unlinkedOrders = db.prepare("SELECT * FROM orders WHERE customer_id IS NULL").all();
+    if (unlinkedOrders.length > 0) {
+      for (const order of unlinkedOrders) {
+        const normPhone = normalizePhone(order.customer_phone);
+        if (!normPhone) continue;
+
+        let customer = db.prepare("SELECT * FROM customers WHERE phone = ?").get(normPhone);
+        if (!customer) {
+          const customerId = "c_" + crypto.randomBytes(8).toString("hex");
+          const stats = db.prepare(`
+            SELECT 
+              COUNT(*) AS count, 
+              COALESCE(SUM(CASE WHEN status != 'CANCELLED' THEN total ELSE 0 END), 0) AS spent,
+              MIN(created_at) AS first_date,
+              MAX(created_at) AS last_date
+            FROM orders
+            WHERE customer_phone = ? OR customer_phone = ?
+          `).get(order.customer_phone, normPhone);
+
+          db.prepare(`
+            INSERT INTO customers (
+              id, phone, first_name, last_name, email,
+              total_orders, total_spent, first_order_at, last_order_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            customerId,
+            normPhone,
+            order.customer_first_name || "Клієнт",
+            order.customer_last_name || "",
+            order.customer_email || null,
+            stats.count || 1,
+            stats.spent || 0,
+            stats.first_date || order.created_at,
+            stats.last_date || order.created_at,
+            order.created_at,
+            order.updated_at || order.created_at
+          );
+          customer = { id: customerId };
+        }
+
+        db.prepare("UPDATE orders SET customer_id = ? WHERE id = ?").run(customer.id, order.id);
+      }
+    }
+  } catch (err) {
+    console.warn("[Customers backfill warning]:", err.message);
+  }
+
+  // 3. Backfill order_status_history for any existing orders without history
+  try {
+    const ordersWithoutHistory = db.prepare(`
+      SELECT o.id, o.status, o.created_at
+      FROM orders o
+      LEFT JOIN order_status_history h ON o.id = h.order_id
+      WHERE h.id IS NULL
+    `).all();
+
+    if (ordersWithoutHistory.length > 0) {
+      const insertHistory = db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const tx = db.transaction(() => {
+        for (const o of ordersWithoutHistory) {
+          const hid = "osh_" + crypto.randomBytes(8).toString("hex");
+          insertHistory.run(
+            hid,
+            o.id,
+            null,
+            o.status || "NEW",
+            "Початковий запис історії замовлення",
+            "system",
+            o.created_at
+          );
+        }
+      });
+      tx();
+    }
+  } catch (err) {
+    console.warn("[Status history backfill warning]:", err.message);
+  }
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {

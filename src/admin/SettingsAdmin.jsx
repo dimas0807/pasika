@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Auth, Settings, Telegram } from "../data/db";
+import { Auth, Settings, Telegram, Backups } from "../data/db";
 
 const TABS = [
   { id: "store", label: "Магазин", icon: "🏪" },
   { id: "payment", label: "Оплата", icon: "💳" },
   { id: "delivery", label: "Доставка", icon: "🚚" },
   { id: "telegram", label: "Telegram", icon: "💬" },
+  { id: "backup", label: "Резервні копії", icon: "💾" },
   { id: "about", label: "Про нас", icon: "🌿" },
   { id: "contacts", label: "Контакти", icon: "📞" },
   { id: "security", label: "Безпека", icon: "🔒" },
@@ -1224,13 +1225,18 @@ export default function SettingsAdmin() {
             </section>
           )}
 
+          {/* TAB: BACKUP */}
+          {activeTab === "backup" && (
+            <BackupSection />
+          )}
+
           {/* TAB 7: SECURITY */}
           {activeTab === "security" && (
             <SecuritySection />
           )}
 
-          {/* Save button bar (for all tabs except security which has its own form) */}
-          {activeTab !== "security" && (
+          {/* Save button bar (for all tabs except security and backup which have their own forms/actions) */}
+          {activeTab !== "security" && activeTab !== "backup" && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-ink/10">
               <div className="text-xs text-ink/50 text-center sm:text-left">
                 Зміни набувають чинності відразу після збереження та оновлюють публічний сайт.
@@ -1380,6 +1386,179 @@ export default function SettingsAdmin() {
         </div>
       )}
     </div>
+  );
+}
+
+function BackupSection() {
+  const [backups, setBackups] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const loadBackups = async () => {
+    setLoading(true);
+    try {
+      const data = await Backups.list();
+      setBackups(data?.backups || []);
+    } catch (err) {
+      console.error("Error loading backups:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBackups();
+  }, []);
+
+  const showNotification = (text, isError = false) => {
+    setFeedback({ text, isError });
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const res = await Backups.create();
+      showNotification(`Резервну копію «${res.filename}» (${res.sizeFormatted || ""}) успішно створено!`);
+      loadBackups();
+    } catch (err) {
+      showNotification("Помилка створення бекапу: " + err.message, true);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <section className="card p-5 sm:p-6 space-y-6 animate-fade-in border-t-4 border-honey/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-ink/5">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">💾</span>
+          <div>
+            <h2 className="font-serif text-lg font-bold text-ink">
+              Резервні копії бази даних SQLite (pasika.db)
+            </h2>
+            <p className="text-xs text-ink/50">
+              Постійне збереження всіх замовлень, клієнтів, товарів, статусів та налаштувань
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={Backups.downloadUrl}
+            download
+            className="btn-secondary text-xs py-2 px-3.5 rounded-xl min-h-[44px] inline-flex items-center gap-1.5 font-semibold"
+            title="Завантажити зліпок поточної бази даних прямо зараз"
+          >
+            📥 Завантажити Live .db
+          </a>
+          <button
+            type="button"
+            disabled={creating}
+            onClick={handleCreate}
+            className="btn-primary text-xs py-2 px-4 rounded-xl min-h-[44px] shadow-xs flex items-center gap-1.5 font-bold"
+          >
+            {creating ? "⏳ Створення..." : "⚡ Створити резервну копію"}
+          </button>
+        </div>
+      </div>
+
+      {feedback && (
+        <div
+          className={`p-3.5 rounded-xl text-xs sm:text-sm font-semibold border flex items-center gap-2 ${
+            feedback.isError
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-leaf/10 text-leaf border-leaf/30"
+          }`}
+        >
+          <span>{feedback.isError ? "⚠️" : "✓"}</span>
+          <span>{feedback.text}</span>
+        </div>
+      )}
+
+      {/* Safety & Persistence Info Box */}
+      <div className="p-4 bg-cream/40 rounded-2xl border border-ink/5 space-y-2 text-xs text-ink/75 leading-relaxed">
+        <div className="font-bold text-ink flex items-center gap-1.5">
+          <span>🛡️</span>
+          <span>Захист від втрати даних при перезапусках та деплоях:</span>
+        </div>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            <strong>SQLite WAL Mode:</strong> База даних працює в режимі Write-Ahead Logging (WAL) для забезпечення транзакційної надійності (ACID).
+          </li>
+          <li>
+            <strong>Безпечні міграції:</strong> Сервер ніколи не виконує <code>DROP TABLE</code> або деструктивне перезаписування таблиць при запуску.
+          </li>
+          <li>
+            <strong>Постійний носій (Volume):</strong> База зберігається на диску сервера. Резервні копії створюються без блокування користувачів (online backup).
+          </li>
+        </ul>
+      </div>
+
+      {/* Snapshots Table */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm text-ink">
+            Збережені файли резервних копій ({backups.length})
+          </h3>
+          <button
+            type="button"
+            onClick={loadBackups}
+            className="text-xs text-ink/60 hover:text-ink underline"
+          >
+            Оновити список
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="p-6 text-center text-ink/40 text-xs">
+            <span className="inline-block animate-spin mr-2">⏳</span> Завантаження списку копій...
+          </div>
+        ) : backups.length === 0 ? (
+          <div className="p-6 text-center text-ink/40 text-xs card bg-cream/20 border border-ink/5">
+            Збережених резервних копій поки немає. Натисніть «Створити резервну копію», щоб створити першу точку відновлення.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[500px]">
+              <thead>
+                <tr className="text-left text-ink/50 border-b border-ink/5 pb-2">
+                  <th className="py-2">Файл копії</th>
+                  <th className="py-2">Розмір</th>
+                  <th className="py-2">Дата створення</th>
+                  <th className="py-2 text-right">Дія</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink/5">
+                {backups.map((b) => (
+                  <tr key={b.filename} className="hover:bg-cream/30 transition-colors">
+                    <td className="py-2.5 font-mono text-ink font-semibold">
+                      {b.filename}
+                    </td>
+                    <td className="py-2.5 text-ink/70">
+                      {b.sizeFormatted || `${Math.round(b.size / 1024)} KB`}
+                    </td>
+                    <td className="py-2.5 text-ink/60">
+                      {new Date(b.createdAt).toLocaleString("uk-UA")}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <a
+                        href={Backups.downloadSpecificUrl(b.filename)}
+                        download={b.filename}
+                        className="btn-secondary text-[11px] py-1 px-3 rounded-lg inline-flex items-center gap-1 font-semibold"
+                      >
+                        📥 Завантажити (.db)
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
