@@ -34,13 +34,13 @@ export default function BeeFlightSystem() {
       {/* Desktop Only: Additional Bees with staggered timing & depths */}
       {!isMobile && (
         <>
-          {/* Bee #2: Foreground Worker (Large, crisp, near camera) */}
+          {/* Bee #2: Foreground Worker (Right -> Left, Head Points Forward Left) */}
           <div
             className="absolute top-0 left-0 bee-traj-2"
             style={{ animationDelay: "-9s" }}
           >
             <div className="bee-organic-hover" style={{ animationDelay: "-1.5s" }}>
-              <RealisticBee size={54} depth="near" />
+              <RealisticBee size={54} depth="near" facing="left" />
             </div>
           </div>
 

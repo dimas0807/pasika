@@ -8,10 +8,12 @@ import { useId } from "react";
  */
 export default function RealisticBee({
   size = 52,
-  depth = "mid",    // 'near' | 'mid' | 'far'
-  pollen = true,    // visible yellow pollen baskets on hind legs
-  angle = 0,        // flight angle
-  flapping = true,  // animate wings
+  depth = "mid",       // 'near' | 'mid' | 'far'
+  pollen = true,       // boolean or number (0 to 1) for golden pollen basket intensity
+  angle = 0,           // flight heading angle in degrees (0deg = straight forward)
+  banking = 0,         // banking angle (roll)
+  facing = "right",    // 'right' (default, head pointing East/Forward) | 'left' (head pointing West)
+  flapping = true,     // animate wings
   className = "",
   style = {},
 }) {
@@ -46,10 +48,10 @@ export default function RealisticBee({
     <div
       className={`pointer-events-none select-none inline-block ${className}`}
       style={{
-        transform: `rotate(${angle}deg)`,
+        transform: `rotate(${angle}deg) rotateX(${banking}deg)`,
         filter: `${depthConfig.filter} ${depthConfig.blur || ""}`,
         opacity: depthConfig.opacity,
-        transition: "transform 0.3s ease-out, filter 0.3s ease-out",
+        transition: "transform 0.15s ease-out, filter 0.25s ease-out",
         ...style,
       }}
       aria-hidden="true"
@@ -119,48 +121,53 @@ export default function RealisticBee({
         {/* Ambient atmospheric warm glow */}
         <ellipse cx="50" cy="40" rx="38" ry="26" fill={`url(#ambient_${uid})`} />
 
-        {/* ==================================================
-            1. LEGS (Articulated with natural joints & pollen basket)
-            ================================================== */}
-        <g stroke="#241B10" strokeLinecap="round" strokeLinejoin="round" fill="none">
-          {/* Forelegs (reaching forward in flight) */}
-          <path d="M 40 43 Q 32 50 28 55 T 24 60" strokeWidth="1.2" opacity="0.9" />
-          <path d="M 43 42 Q 36 47 33 53" strokeWidth="0.9" opacity="0.65" />
+        {/* Anatomical Orientation Group: when facing="right" (default), mirrors so Head is Forward at Right */}
+        <g transform={facing === "right" ? "translate(100, 0) scale(-1, 1)" : undefined}>
+          {/* ==================================================
+              1. LEGS (Articulated with natural joints & pollen basket)
+              ================================================== */}
+          <g stroke="#241B10" strokeLinecap="round" strokeLinejoin="round" fill="none">
+            {/* Forelegs (reaching forward in flight) */}
+            <path d="M 40 43 Q 32 50 28 55 T 24 60" strokeWidth="1.2" opacity="0.9" />
+            <path d="M 43 42 Q 36 47 33 53" strokeWidth="0.9" opacity="0.65" />
 
-          {/* Midlegs (angled downward for stability) */}
-          <path d="M 50 45 Q 45 56 40 63 T 36 68" strokeWidth="1.3" opacity="0.92" />
-          <path d="M 52 44 Q 48 53 45 60" strokeWidth="1" opacity="0.7" />
+            {/* Midlegs (angled downward for stability) */}
+            <path d="M 50 45 Q 45 56 40 63 T 36 68" strokeWidth="1.3" opacity="0.92" />
+            <path d="M 52 44 Q 48 53 45 60" strokeWidth="1" opacity="0.7" />
 
-          {/* Hindlegs with Corbicula (Pollen Basket) */}
-          <path d="M 62 46 Q 60 60 54 70 T 48 76" strokeWidth="1.6" opacity="0.95" />
-          <path d="M 64 45 Q 63 56 59 66" strokeWidth="1.1" opacity="0.75" />
+            {/* Hindlegs with Corbicula (Pollen Basket) */}
+            <path d="M 62 46 Q 60 60 54 70 T 48 76" strokeWidth="1.6" opacity="0.95" />
+            <path d="M 64 45 Q 63 56 59 66" strokeWidth="1.1" opacity="0.75" />
 
-          {/* Realistic Bright Golden Pollen Pellet gathered on hind leg */}
-          {pollen && (
-            <g>
-              <ellipse
-                cx="56"
-                cy="64"
-                rx="3.2"
-                ry="5"
-                fill={`url(#pollenBasket_${uid})`}
-                stroke="#C47D06"
-                strokeWidth="0.6"
-                transform="rotate(-15 56 64)"
-              />
-              {/* Pollen dust texture highlights */}
-              <circle cx="55.2" cy="62.5" r="0.8" fill="#FFF9C4" opacity="0.9" />
-              <circle cx="57" cy="65" r="0.6" fill="#FFF59D" opacity="0.8" />
-            </g>
-          )}
-        </g>
+            {/* Realistic Bright Golden Pollen Pellet gathered on hind leg */}
+            {Boolean(pollen) && (
+              <g
+                opacity={typeof pollen === "number" ? Math.max(0, Math.min(1, pollen)) : 1}
+                style={{ transition: "opacity 0.4s ease-in-out" }}
+              >
+                <ellipse
+                  cx="56"
+                  cy="64"
+                  rx="3.2"
+                  ry="5"
+                  fill={`url(#pollenBasket_${uid})`}
+                  stroke="#C47D06"
+                  strokeWidth="0.6"
+                  transform="rotate(-15 56 64)"
+                />
+                {/* Pollen dust texture highlights */}
+                <circle cx="55.2" cy="62.5" r="0.8" fill="#FFF9C4" opacity="0.9" />
+                <circle cx="57" cy="65" r="0.6" fill="#FFF59D" opacity="0.8" />
+              </g>
+            )}
+          </g>
 
-        {/* ==================================================
-            2. ABDOMEN (3D Foreshortened, Segmented Chitin Tergites)
-            ================================================== */}
-        <g>
-          {/* Base 3D body volume */}
-          <ellipse cx="69" cy="40" rx="23" ry="14" fill={`url(#abdo3D_${uid})`} />
+          {/* ==================================================
+              2. ABDOMEN (3D Foreshortened, Segmented Chitin Tergites)
+              ================================================== */}
+          <g>
+            {/* Base 3D body volume */}
+            <ellipse cx="69" cy="40" rx="23" ry="14" fill={`url(#abdo3D_${uid})`} />
 
           {/* Tergite segment shadows for 3D cylindrical depth */}
           <path
@@ -315,6 +322,7 @@ export default function RealisticBee({
             strokeLinecap="round"
             opacity="0.75"
           />
+        </g>
         </g>
       </svg>
     </div>
