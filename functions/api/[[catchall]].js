@@ -114,12 +114,160 @@ const DEFAULT_SETTINGS = {
   },
 };
 
+const SEED_ORDERS = [
+  {
+    id: "ord_1001",
+    number: 1001,
+    orderCode: "PAS-1001",
+    order_code: "PAS-1001",
+    status: "DELIVERED",
+    total: 600,
+    createdAt: Date.now() - 3 * 86400000,
+    updatedAt: Date.now() - 86400000,
+    customer: {
+      firstName: "Оксана",
+      lastName: "Мельник",
+      phone: "+380671234567",
+      email: "oksana@example.com",
+    },
+    delivery: {
+      provider: "Нова пошта",
+      providerKey: "np",
+      deliveryService: "Нова пошта",
+      city: "Київ",
+      branch: "Відділення №1 (вул. Пирогівський шлях, 135)",
+      trackingNumber: "20450123456789",
+      trackingUrl: "https://novaposhta.ua/tracking/?cargo_number=20450123456789",
+    },
+    payment: {
+      method: "card",
+      paymentMethod: "card",
+      methodLabel: "Оплачено карткою",
+      paymentStatus: "Оплачено",
+      status: "paid",
+      receiptStatus: "Підтверджено",
+      receipt: "attached",
+      receiptRequired: true,
+    },
+    receipt: {
+      fileUrl: "/images/receipt-demo.jpg",
+      name: "check_monobank_1001.pdf",
+    },
+    items: [
+      { id: "p1", name: "Мед натуральний", weight: "500 г", price: 220, qty: 1 },
+      { id: "p2", name: "Мед натуральний", weight: "1 кг", price: 380, qty: 1 },
+    ],
+    statusHistory: [
+      { fromStatus: "NEW", toStatus: "PAID", comment: "Оплату перевірено", changedBy: "admin", createdAt: Date.now() - 3 * 86400000 },
+      { fromStatus: "PAID", toStatus: "PACKED", comment: "Запаковано на пасіці", changedBy: "admin", createdAt: Date.now() - 2 * 86400000 },
+      { fromStatus: "PACKED", toStatus: "SHIPPED", comment: "Передано перевізнику", changedBy: "admin", createdAt: Date.now() - 86400000 },
+      { fromStatus: "SHIPPED", toStatus: "DELIVERED", comment: "Отримано клієнтом", changedBy: "admin", createdAt: Date.now() - 10000000 },
+    ],
+  },
+  {
+    id: "ord_1002",
+    number: 1002,
+    orderCode: "PAS-1002",
+    order_code: "PAS-1002",
+    status: "PROCESSING",
+    total: 450,
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 3600000,
+    customer: {
+      firstName: "Богдан",
+      lastName: "Кравчук",
+      phone: "+380509876543",
+      email: "bogdan@example.com",
+    },
+    delivery: {
+      provider: "Нова пошта",
+      providerKey: "np",
+      deliveryService: "Нова пошта",
+      city: "Львів",
+      branch: "Відділення №5",
+      trackingNumber: null,
+      trackingUrl: null,
+    },
+    payment: {
+      method: "cod",
+      paymentMethod: "cash_on_delivery",
+      methodLabel: "Оплата при отриманні",
+      paymentStatus: "Очікує оплати",
+      status: "pending",
+      receiptStatus: "Не потрібен",
+      receipt: "not_required",
+      receiptRequired: false,
+    },
+    receipt: null,
+    items: [
+      { id: "p8", name: "Подарунковий бокс «Медовий»", weight: "набір", price: 450, qty: 1 },
+    ],
+    statusHistory: [
+      { fromStatus: "NEW", toStatus: "PROCESSING", comment: "Прийнято в роботу", changedBy: "admin", createdAt: Date.now() - 3600000 },
+    ],
+  },
+  {
+    id: "ord_1003",
+    number: 1003,
+    orderCode: "PAS-1003",
+    order_code: "PAS-1003",
+    status: "AWAITING_PAYMENT",
+    total: 260,
+    createdAt: Date.now() - 1800000,
+    updatedAt: Date.now() - 1800000,
+    customer: {
+      firstName: "Юлія",
+      lastName: "Ткаченко",
+      phone: "+380631234000",
+      email: "yulia@example.com",
+    },
+    delivery: {
+      provider: "Укрпошта",
+      providerKey: "up",
+      deliveryService: "Укрпошта",
+      city: "Івано-Франківськ",
+      branch: "Відділення 76018",
+      trackingNumber: null,
+      trackingUrl: null,
+    },
+    payment: {
+      method: "card",
+      paymentMethod: "card",
+      methodLabel: "Оплата на картку",
+      paymentStatus: "Очікує підтвердження",
+      status: "receipt_review",
+      receiptStatus: "Прикріплено",
+      receipt: "attached",
+      receiptRequired: true,
+    },
+    receipt: {
+      fileUrl: "/images/receipt-demo.jpg",
+      name: "receipt_yulia.jpg",
+    },
+    items: [
+      { id: "p4", name: "Горіхи в меді", weight: "250 г", price: 260, qty: 1 },
+    ],
+    statusHistory: [
+      { fromStatus: "NEW", toStatus: "AWAITING_PAYMENT", comment: "Очікує перевірки чека", changedBy: "system", createdAt: Date.now() - 1800000 },
+    ],
+  },
+];
+
 // In-memory cache for edge runtime worker lifetime
-let memoryOrders = [];
+let memoryOrders = [...SEED_ORDERS];
 let memorySettings = { ...DEFAULT_SETTINGS };
 let memoryProducts = [...SEED_PRODUCTS];
 let memoryCategories = [...SEED_CATEGORIES];
-let memoryTelegramRecipients = [];
+let memoryTelegramRecipients = [
+  {
+    id: "rec_default",
+    name: "Адміністратор",
+    chatId: "287686358",
+    role: "admin",
+    enabled: true,
+    createdAt: Date.now(),
+  },
+];
 let memoryTelegramInteractions = [];
 let memoryDeliveryAccounts = [
   {
@@ -633,15 +781,15 @@ export async function onRequest(context) {
   if (path.startsWith("/orders/track/") && method === "GET") {
     const rawQuery = decodeURIComponent(path.replace("/orders/track/", "")).trim();
     const cleanNum = Number(rawQuery.replace(/^PAS-/i, ""));
-    const order = memoryOrders.find(
-      (o) =>
-        String(o.id) === rawQuery ||
-        (cleanNum && o.number === cleanNum) ||
-        (o.orderCode && o.orderCode.toLowerCase() === rawQuery.toLowerCase()) ||
-        (o.order_code && o.order_code.toLowerCase() === rawQuery.toLowerCase()) ||
-        (o.delivery?.trackingNumber && o.delivery.trackingNumber === rawQuery) ||
-        (o.tracking_number && o.tracking_number === rawQuery)
-    );
+    const matchOrder = (o) =>
+      String(o.id) === rawQuery ||
+      (cleanNum && o.number === cleanNum) ||
+      (o.orderCode && o.orderCode.toLowerCase() === rawQuery.toLowerCase()) ||
+      (o.order_code && o.order_code.toLowerCase() === rawQuery.toLowerCase()) ||
+      (o.delivery?.trackingNumber && o.delivery.trackingNumber === rawQuery) ||
+      (o.tracking_number && o.tracking_number === rawQuery);
+
+    const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
     if (!order) {
       return jsonResponse({ found: false, error: "Замовлення з таким номером або ТТН не знайдено" }, 404);
     }
@@ -666,7 +814,8 @@ export async function onRequest(context) {
   // Public Order Lookup
   if (path.startsWith("/orders/") && method === "GET") {
     const id = path.replace("/orders/", "");
-    const order = memoryOrders.find((o) => o.id === id);
+    const matchOrder = (o) => o.id === id || String(o.number) === id || o.orderCode === id;
+    const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
     if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
     return jsonResponse(order);
   }
@@ -1084,7 +1233,14 @@ export async function onRequest(context) {
     }
     if (path.startsWith("/admin/orders/") && path.endsWith("/confirm-payment") && method === "POST") {
       const id = path.replace("/admin/orders/", "").replace("/confirm-payment", "");
-      const idx = memoryOrders.findIndex((o) => o.id === id);
+      let idx = memoryOrders.findIndex((o) => o.id === id || String(o.number) === id || o.orderCode === id);
+      if (idx < 0) {
+        const seed = SEED_ORDERS.find((o) => o.id === id || String(o.number) === id || o.orderCode === id);
+        if (seed) {
+          memoryOrders.unshift({ ...seed });
+          idx = 0;
+        }
+      }
       if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       memoryOrders[idx].status = "PAID";
       memoryOrders[idx].updatedAt = Date.now();
@@ -1101,7 +1257,8 @@ export async function onRequest(context) {
 
     if (path.startsWith("/admin/orders/") && method === "GET") {
       const id = path.replace("/admin/orders/", "");
-      const order = memoryOrders.find((o) => o.id === id);
+      const matchOrder = (o) => o.id === id || String(o.number) === id || o.orderCode === id;
+      const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
       if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       return jsonResponse(order);
     }
@@ -1170,7 +1327,14 @@ export async function onRequest(context) {
     }
     if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/ttn") && method === "POST") {
       const id = path.replace("/admin/delivery/orders/", "").replace("/ttn", "");
-      const idx = memoryOrders.findIndex((o) => o.id === id);
+      let idx = memoryOrders.findIndex((o) => o.id === id || String(o.number) === id || o.orderCode === id);
+      if (idx < 0) {
+        const seed = SEED_ORDERS.find((o) => o.id === id || String(o.number) === id || o.orderCode === id);
+        if (seed) {
+          memoryOrders.unshift({ ...seed });
+          idx = 0;
+        }
+      }
       if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       const fakeTtn = "20450" + Math.floor(10000000 + Math.random() * 90000000);
       memoryOrders[idx].tracking_number = fakeTtn;
