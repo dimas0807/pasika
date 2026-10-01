@@ -191,10 +191,28 @@ export function formatStatusChangeNotification(order, prevStatus, newStatus, cha
 }
 
 /**
+ * Resolve public base URL for Telegram buttons (Telegram Bot API rejects localhost)
+ */
+export function getAppBaseUrl() {
+  const custom = (process.env.APP_URL || process.env.PUBLIC_URL || "").trim();
+  if (custom && !custom.includes("localhost") && !custom.includes("127.0.0.1")) {
+    return custom.replace(/\/$/, "");
+  }
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    const domain = process.env.RAILWAY_PUBLIC_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${domain}`;
+  }
+  if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("localhost")) {
+    return process.env.FRONTEND_URL.replace(/\/$/, "");
+  }
+  return "https://pasika-production.up.railway.app";
+}
+
+/**
  * Build inline keyboard with action buttons
  */
 export function buildOrderInlineKeyboard(order, currentStatus = null) {
-  const baseUrl = (process.env.APP_URL || process.env.PUBLIC_URL || "http://localhost:3001").replace(/\/$/, "");
+  const baseUrl = getAppBaseUrl();
   const orderUrl = `${baseUrl}/admin/orders/${order.id}`;
 
   const status = currentStatus || order.status || "NEW";

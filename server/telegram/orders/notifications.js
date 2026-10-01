@@ -7,7 +7,7 @@
 import { sendMessage } from "../client/botApi.js";
 import { getTelegramCredentials } from "../config/botConfig.js";
 import { getTelegramRecipients } from "../recipients/recipientsManager.js";
-import { formatOrderMessage, buildOrderInlineKeyboard, formatStatusChangeNotification } from "../messages/formatter.js";
+import { formatOrderMessage, buildOrderInlineKeyboard, formatStatusChangeNotification, getAppBaseUrl } from "../messages/formatter.js";
 import { logTelegramEvent } from "../logging/telegramLogger.js";
 
 /**
@@ -149,7 +149,7 @@ export async function notifyOrderStatusChange(order, prevStatus, newStatus, chan
     if (recipients.length === 0) return { ok: true, noRecipients: true };
 
     const text = formatStatusChangeNotification(order, prevStatus, newStatus, changerName);
-    const baseUrl = (process.env.APP_URL || process.env.PUBLIC_URL || "http://localhost:3001").replace(/\/$/, "");
+    const baseUrl = getAppBaseUrl();
     const orderUrl = `${baseUrl}/admin/orders/${order.id}`;
 
     const replyMarkup = {
