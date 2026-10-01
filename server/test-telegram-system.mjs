@@ -1,6 +1,7 @@
 import { initDatabase, db } from "./db.js";
 import {
   getTelegramConfig,
+  getTelegramCredentials,
   updateTelegramConfig,
   getTelegramRecipients,
   createTelegramRecipient,
@@ -48,6 +49,7 @@ function mockRes() {
 console.log("\n--- 1. Telegram Bot Config & Token Security ---");
 
 // Initial state
+const preTestCreds = getTelegramCredentials();
 const initialConfig = getTelegramConfig();
 test("1.1 Read initial Telegram config", initialConfig !== null, `Enabled: ${initialConfig.enabled}`);
 
@@ -362,10 +364,11 @@ test("4.15 SQLite main order status changed to 'CANCELLED'", statusAfterReject =
 // ============================================================================
 console.log("\n--- 5. Order Notification Dispatch & Error Handling ---");
 
+const expectedActiveCount = getTelegramRecipients().filter((r) => r.is_active).length;
 capturedRequests = [];
 updateTelegramConfig({ enabled: true });
 const dispatchResult = await sendOrderTelegramNotification(sampleOrder);
-test("5.1 Multi-recipient dispatch sends message to all active recipients", dispatchResult.ok === true && dispatchResult.sentCount === 2, `Sent: ${dispatchResult.sentCount} of ${dispatchResult.total}`);
+test("5.1 Multi-recipient dispatch sends message to all active recipients", dispatchResult.ok === true && dispatchResult.sentCount === expectedActiveCount, `Sent: ${dispatchResult.sentCount} of ${dispatchResult.total}`);
 
 // Verify logs table
 const latestLog = db.prepare("SELECT * FROM telegram_logs WHERE order_id = ? ORDER BY created_at DESC LIMIT 1").get(sampleOrder.id);
@@ -386,7 +389,7 @@ updateTelegramConfig({ enabled: true });
 toggleTelegramRecipient(managerRecipient.id); // Deactivate manager
 capturedRequests = [];
 const singleRecipientDispatch = await sendOrderTelegramNotification(sampleOrder);
-test("5.5 Deactivated recipient does not receive notification", singleRecipientDispatch.sentCount === 1, `Sent count: ${singleRecipientDispatch.sentCount}`);
+test("5.5 Deactivated recipient does not receive notification", singleRecipientDispatch.sentCount === expectedActiveCount - 1, `Sent count: ${singleRecipientDispatch.sentCount}`);
 toggleTelegramRecipient(managerRecipient.id); // Re-activate manager
 
 // 5.6 Telegram API Failure Resilience: If Telegram API throws or returns 500/401, order creation MUST succeed!
@@ -447,10 +450,10 @@ db.prepare("DELETE FROM orders WHERE id = ?").run(testOrderId);
 db.prepare("DELETE FROM telegram_recipients WHERE id = ?").run(ownerRecipient.id);
 db.prepare("DELETE FROM telegram_recipients WHERE id = ?").run(managerRecipient.id);
 
-// Reset config back to clean unconfigured state for the user
+// Reset config back to pre-test state
 updateTelegramConfig({
   enabled: true,
-  botToken: "",
+  botToken: preTestCreds.token,
 });
 
 // ============================================================================

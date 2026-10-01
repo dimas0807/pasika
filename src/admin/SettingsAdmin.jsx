@@ -212,22 +212,31 @@ export default function SettingsAdmin() {
     setTgTestResult(null);
     try {
       const token = settings?.telegram?.botToken;
-      const res = await Telegram.testConnection({ botToken: token });
-      setTgTestResult({
-        success: Boolean(res.ok),
-        message: res.message || (res.ok ? "Тест підключення успішний!" : (res.error || "Помилка підключення")),
-        botName: res.botName,
-        botUsername: res.botUsername,
-      });
-      if (res.ok) {
+      const chatId = settings?.telegram?.chatId || "287686358";
+      const res = await Telegram.testConnection({ botToken: token, chatId });
+      if (res && res.ok) {
+        setTgTestResult({
+          success: true,
+          message: res.message || "Telegram підключено успішно ✅",
+          botName: res.botName,
+          botUsername: res.botUsername,
+        });
         setSettings((s) => ({
           ...s,
           telegram: {
             ...(s?.telegram || {}),
             status: "connected",
-            botUsername: res.botUsername,
+            botUsername: res.botUsername || s?.telegram?.botUsername,
           },
         }));
+      } else {
+        const errorText = res?.error || res?.description || "Помилка підключення до Telegram API";
+        setTgTestResult({
+          success: false,
+          message: errorText,
+          botName: res?.botName,
+          botUsername: res?.botUsername,
+        });
       }
     } catch (err) {
       setTgTestResult({
@@ -549,10 +558,10 @@ export default function SettingsAdmin() {
                   </label>
                 </div>
 
-                {/* Token input & Check Connection */}
-                <div>
-                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                    <div className="flex-1 min-w-0">
+                {/* Token and Chat ID inputs & Check Connection */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
                       <label className="label text-xs sm:text-sm font-semibold">
                         Telegram Bot Token
                       </label>
@@ -564,7 +573,7 @@ export default function SettingsAdmin() {
                         className="input font-mono text-base sm:text-xs min-h-[44px]"
                       />
                       <p className="text-[11px] text-ink/50 mt-1">
-                        🔒 Токен надійно зберігається на сервері. Отримайте його в боті{" "}
+                        🔒 Токен зберігається на сервері. Отримайте його в боті{" "}
                         <a
                           href="https://t.me/BotFather"
                           target="_blank"
@@ -576,13 +585,34 @@ export default function SettingsAdmin() {
                       </p>
                     </div>
 
+                    <div>
+                      <label className="label text-xs sm:text-sm font-semibold">
+                        Telegram Chat ID для сповіщень
+                      </label>
+                      <input
+                        type="text"
+                        value={settings?.telegram?.chatId ?? "287686358"}
+                        onChange={setPath("telegram.chatId")}
+                        placeholder="287686358"
+                        className="input font-mono text-base sm:text-xs min-h-[44px]"
+                      />
+                      <p className="text-[11px] text-ink/50 mt-1">
+                        Куди надсилати сповіщення про замовлення (основний Chat ID: <code>287686358</code>)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <p className="text-xs text-ink/60">
+                      Натисніть кнопку для реальної перевірки зв'язку через Bot API
+                    </p>
                     <button
                       type="button"
                       onClick={runTelegramTest}
                       disabled={testingTg}
-                      className="btn-secondary text-xs py-2.5 px-4 min-h-[44px] shrink-0 font-bold inline-flex items-center gap-1.5"
+                      className="btn-secondary text-xs py-2.5 px-5 min-h-[44px] shrink-0 font-bold inline-flex items-center gap-1.5"
                     >
-                      {testingTg ? "⏳ Перевірка..." : "🔌 Перевірити підключення"}
+                      {testingTg ? "⏳ Перевірка зв'язку..." : "🔌 Перевірити підключення"}
                     </button>
                   </div>
 
@@ -596,16 +626,23 @@ export default function SettingsAdmin() {
                     >
                       {tgTestResult.success ? (
                         <div>
-                          <strong>✓ Успіх!</strong> {tgTestResult.message}
+                          <div className="font-bold flex items-center gap-1.5 text-leaf">
+                            <span>✅</span>
+                            <span>{tgTestResult.message}</span>
+                          </div>
                           {tgTestResult.botName && (
-                            <div className="mt-0.5 text-ink/70">
-                              Бот: <strong>{tgTestResult.botName}</strong> ({tgTestResult.botUsername})
+                            <div className="mt-1 text-ink/70">
+                              Бот: <strong>{tgTestResult.botName}</strong> ({tgTestResult.botUsername || "без username"})
                             </div>
                           )}
                         </div>
                       ) : (
                         <div>
-                          <strong>⚠️ Помилка:</strong> {tgTestResult.message}
+                          <div className="font-bold flex items-center gap-1.5 text-red-600">
+                            <span>❌</span>
+                            <span>Помилка Telegram API:</span>
+                          </div>
+                          <p className="mt-1 text-red-700">{tgTestResult.message}</p>
                         </div>
                       )}
                     </div>

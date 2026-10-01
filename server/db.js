@@ -510,15 +510,19 @@ function seedInitialData() {
     `).run("admin_1", username, hash, salt, Date.now());
   }
 
-  // 5. Migrate existing telegram chatId into telegram_recipients if recipients table is empty
+  // 5. Migrate or seed telegram chatId into telegram_recipients if recipients table is empty
   const recipientCount = db.prepare("SELECT COUNT(*) AS count FROM telegram_recipients").get().count;
   if (recipientCount === 0) {
-    let existingChatId = (process.env.TELEGRAM_CHAT_ID || "").trim();
+    let existingChatId = (process.env.TELEGRAM_CHAT_ID || "287686358").trim();
     if (settingsRow) {
       try {
         const parsed = JSON.parse(settingsRow.value);
         if (parsed.telegram?.chatId) {
           existingChatId = String(parsed.telegram.chatId).trim();
+        } else {
+          if (!parsed.telegram) parsed.telegram = {};
+          parsed.telegram.chatId = existingChatId;
+          db.prepare("UPDATE settings SET value = ? WHERE key = 'app_settings'").run(JSON.stringify(parsed));
         }
       } catch {}
     }

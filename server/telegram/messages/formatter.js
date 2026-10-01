@@ -112,28 +112,44 @@ export function formatOrderMessage(order, options = {}) {
     statusBlock += "\n";
   }
 
+  // Date
+  const rawDate = order.createdAt || order.created_at || Date.now();
+  const dateObj = new Date(rawDate);
+  const formattedDate = !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleString("uk-UA", {
+        timeZone: "Europe/Kyiv",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "щойно";
+
+  // Delivery line
+  const deliveryParts = [provider, city !== "Місто не вказано" ? city : "", branch !== "Відділення не вказано" ? branch : ""].filter(Boolean);
+  const deliveryText = deliveryParts.length > 0 ? deliveryParts.join(", ") : provider;
+
   const sections = [
     headerTitle,
     ``,
-    `№ замовлення: <b>${orderNumber}</b>`,
+    `📦 <b>Замовлення:</b> <b>${orderNumber}</b>`,
     statusBlock || null,
-    `👤 <b>Клієнт:</b>\n${customerName}`,
     ``,
-    `📞 <b>Телефон:</b>\n${customerPhone}`,
-    customerEmail ? `\n📧 <b>Email:</b>\n${customerEmail}` : null,
+    `👤 <b>Клієнт:</b> ${customerName}`,
+    `📞 <b>Телефон:</b> ${customerPhone}`,
+    customerEmail ? `📧 <b>Email:</b> ${customerEmail}` : null,
     ``,
-    `🍯 <b>Товари:</b>\n${itemsLines.join("\n")}`,
+    `🛒 <b>Товари:</b>\n${itemsLines.join("\n")}`,
     ``,
-    `💰 <b>Разом:</b>\n<b>${totalSum}</b>`,
+    `💰 <b>Сума:</b> <b>${totalSum}</b>`,
     ``,
-    `🚚 <b>Доставка:</b>\n${provider}`,
-    ``,
-    `📍 <b>Населений пункт:</b>\n${city}`,
-    ``,
-    `🏤 <b>Відділення:</b>\n${branch}`,
+    `🚚 <b>Доставка:</b>\n${deliveryText}`,
     ``,
     `💳 <b>Оплата:</b>\n${paymentMethodLabel}${receiptStatus}`,
-    comment ? `\n💬 <b>Коментар:</b>\n${comment}` : null,
+    ``,
+    `📅 <b>Дата:</b> ${formattedDate}`,
+    comment ? `\n💬 <b>Коментар:</b> ${comment}` : null,
   ];
 
   return sections.filter((s) => s !== null && s !== undefined).join("\n");

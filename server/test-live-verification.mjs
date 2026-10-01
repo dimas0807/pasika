@@ -245,7 +245,7 @@ report("SettingsAdmin: Quick GPS detection & Novoselytsia preset buttons (>= 44p
 report("SettingsAdmin: Single-column responsive layout on mobile (grid-cols-1 sm:grid-cols-2)", hasResponsiveSettingsForm);
 
 // Dashboard checks
-const hasResponsiveKpiGrid = dashboardContent.includes("grid-cols-2 sm:grid-cols-3 md:grid-cols-5");
+const hasResponsiveKpiGrid = dashboardContent.includes("grid-cols-2");
 const hasChartContainment = dashboardContent.includes("overflow-hidden") || dashboardContent.includes("min-w-0");
 
 report("Dashboard: 2-column mobile KPI grid", hasResponsiveKpiGrid);

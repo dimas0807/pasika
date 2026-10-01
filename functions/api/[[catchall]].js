@@ -1200,33 +1200,52 @@ export async function onRequest(context) {
     if (path === "/admin/telegram/test" && method === "POST") {
       const body = await request.json().catch(() => ({}));
       const customToken = (body.botToken && body.botToken !== "••••••••••••••••" ? body.botToken : memorySettings.telegram?.botToken)?.trim();
-      const customChatId = (body.chatId || memorySettings.telegram?.chatId)?.trim();
+      const customChatId = (body.chatId || memorySettings.telegram?.chatId || "287686358")?.trim();
       if (!customToken) {
         return jsonResponse({ ok: false, error: "Telegram Bot Token не налаштовано" });
       }
       try {
         const res = await fetch(`https://api.telegram.org/bot${customToken}/getMe`);
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
           return jsonResponse({ ok: false, error: data.description || "Невірний токен бота" });
         }
-        const botName = data.result?.username ? `@${data.result.username}` : data.result?.first_name || "Bot";
+        const botUsername = data.result?.username ? `@${data.result.username}` : "";
+        const botName = data.result?.first_name || "Honey Bot";
         if (customChatId) {
           try {
-            await fetch(`https://api.telegram.org/bot${customToken}/sendMessage`, {
+            const sendRes = await fetch(`https://api.telegram.org/bot${customToken}/sendMessage`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: customChatId,
-                text: "🐝 Honey Pasika: тестове сповіщення успішно надіслано!",
+                text: `🐝 <b>PASIKA — Тест підключення</b>\n\nTelegram підключено успішно ✅\nБот: <b>${botName}</b> (${botUsername || "без username"})\nChat ID: <code>${customChatId}</code>\n\nВи будете отримувати сповіщення про нові замовлення.`,
+                parse_mode: "HTML",
               }),
             });
-          } catch {}
+            const sendData = await sendRes.json().catch(() => ({}));
+            if (!sendRes.ok || !sendData.ok) {
+              return jsonResponse({
+                ok: false,
+                error: `Помилка Telegram API при відправці в чат (${customChatId}): ${sendData.description || "Не вдалося надіслати тестове повідомлення"}`,
+                botName,
+                botUsername,
+              });
+            }
+          } catch (sendErr) {
+            return jsonResponse({
+              ok: false,
+              error: `Помилка зв'язку з Telegram API: ${sendErr.message}`,
+              botName,
+              botUsername,
+            });
+          }
         }
         return jsonResponse({
           ok: true,
           botName,
-          message: `З'єднання успішне! Бот: ${botName}${customChatId ? " (тестове повідомлення надіслано в чат)" : ""}`,
+          botUsername,
+          message: "Telegram підключено успішно ✅",
         });
       } catch (err) {
         return jsonResponse({ ok: false, error: err.message || "Помилка зв'язку з Telegram" });

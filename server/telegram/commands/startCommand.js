@@ -107,45 +107,38 @@ export async function handleStartCommand(message, token) {
     payload: { text, date: message.date },
   });
 
-  // 2. Check if user is already an authorized recipient
-  const recipient = getTelegramRecipientByChatId(chatId);
-
-  // 3. Prepare response text
-  let replyText = "";
-
-  if (recipient && recipient.is_active) {
-    replyText = [
-      `🐝 <b>Вітаємо у службовому боті PASIKA!</b>`,
-      ``,
-      `👤 Ви підключені як отримувач: <b>${recipient.name}</b>`,
-      `Роль: <b>${recipient.role}</b>`,
-      `Chat ID: <code>${chatId}</code>`,
-      ``,
-      `✅ Система сповіщень активна. Ви отримуватимете нові замовлення з сайту PASIKA.`,
-    ].join("\n");
-  } else if (recipient && !recipient.is_active) {
-    replyText = [
-      `🐝 <b>Службовий бот PASIKA</b>`,
-      ``,
-      `👤 Ви зареєстровані як <b>${recipient.name}</b>, але профіль наразі <b>деактивовано</b> в адмін-панелі.`,
-      `Chat ID: <code>${chatId}</code>`,
-      ``,
-      `Зверніться до власника або адміністратора для повторної активації.`,
-    ].join("\n");
-  } else {
-    const fullName = `${from.first_name || ""} ${from.last_name || ""}`.trim();
-    replyText = [
-      `🐝 <b>Вітаємо у службовому боті PASIKA!</b>`,
-      ``,
-      `Ваш Chat ID: <code>${chatId}</code>`,
-      fullName ? `Ім'я: ${fullName}` : null,
-      from.username ? `Username: @${from.username}` : null,
-      ``,
-      `📌 <b>Щоб отримувати службові сповіщення про замовлення:</b>`,
-      `Передайте цей Chat ID власнику або додайте його в панелі керування PASIKA:`,
-      `<i>Налаштування → Telegram → Додати отримувача</i>`,
-    ].filter(Boolean).join("\n");
+  // 2. Check if user is already an authorized recipient, or auto-register 287686358
+  let recipient = getTelegramRecipientByChatId(chatId);
+  if (!recipient && (chatId === "287686358" || String(chatId).trim() === "287686358")) {
+    try {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO telegram_recipients (id, name, username, chat_id, role, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(
+        "tr_owner_287686358",
+        from.first_name ? `${from.first_name} ${from.last_name || ""}`.trim() : "Адміністратор PASIKA",
+        from.username ? `@${from.username}` : "@pasika_honey",
+        "287686358",
+        "owner",
+        now,
+        now
+      );
+      recipient = getTelegramRecipientByChatId(chatId);
+    } catch {}
   }
+
+  // 3. Prepare response text matching the exact specification:
+  // 🐝 PASIKA — Замовлення
+  // Бот підключений успішно ✅
+  // Ви будете отримувати сповіщення про нові замовлення.
+  const replyText = [
+    `🐝 <b>PASIKA — Замовлення</b>`,
+    ``,
+    `Бот підключений успішно ✅`,
+    ``,
+    `Ви будете отримувати сповіщення про нові замовлення.`,
+  ].join("\n");
 
   // 4. Send reply message if token is configured
   if (token) {

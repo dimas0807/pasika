@@ -121,51 +121,71 @@ export function updateTelegramStatus({ status, botUsername, error }) {
 }
 
 /**
- * Test Telegram bot connection and optionally send a test message
+ * Test Telegram bot connection and send an actual test message to Chat ID
  */
 export async function testTelegramConnection(customToken, customChatId) {
   const creds = getTelegramCredentials();
   const token = (customToken && customToken !== "••••••••••••••••" ? customToken : creds.token)?.trim();
 
   if (!token) {
-    updateTelegramStatus({ status: "unconfigured", error: "Token not set" });
-    return { ok: false, error: "Telegram Bot Token не налаштовано" };
+    updateTelegramStatus({ status: "unconfigured", error: "Telegram Bot Token не налаштовано" });
+    return {
+      ok: false,
+      error: "Telegram Bot Token не налаштовано. Введіть токен у налаштуваннях або у файлі .env.",
+    };
   }
 
   try {
     const apiRes = await getMe(token);
 
     if (!apiRes.ok || !apiRes.result) {
-      const errMsg = apiRes.error || "Невірний токен бота";
+      const errMsg = apiRes.error || apiRes.description || "Невірний токен бота (Telegram API)";
       updateTelegramStatus({ status: "error", error: errMsg });
       return { ok: false, error: errMsg };
     }
 
     const botUsername = apiRes.result?.username ? `@${apiRes.result.username}` : "";
     const botName = apiRes.result?.first_name || "Honey Bot";
-    updateTelegramStatus({ status: "connected", botUsername, error: null });
 
-    // If customChatId is provided, also send a test message
-    const chatId = (customChatId || "").trim();
-    if (chatId) {
-      try {
-        await sendMessage(token, {
-          chat_id: chatId,
-          text: `🐝 <b>Honey Pasika</b>: тестове сповіщення успішно надіслано!\nЗ'єднання з ботом ${botUsername || botName} працює ідеально.`,
-        });
-      } catch (sendErr) {
-        console.warn("[Telegram test send message warning]:", sendErr.message);
+    // Target chat ID for test message: customChatId, or stored recipients, or default 287686358
+    const targetChatId = (customChatId || creds.legacyChatId || "287686358").trim();
+
+    if (targetChatId) {
+      const sendRes = await sendMessage(token, {
+        chat_id: targetChatId,
+        text: [
+          `🐝 <b>PASIKA — Тест підключення</b>`,
+          ``,
+          `Telegram підключено успішно ✅`,
+          `Бот: <b>${botName}</b> (${botUsername || "без username"})`,
+          `Chat ID: <code>${targetChatId}</code>`,
+          ``,
+          `Ви будете отримувати сповіщення про нові замовлення.`,
+        ].join("\n"),
+      });
+
+      if (!sendRes.ok) {
+        const sendError = sendRes.error || sendRes.description || "Не вдалося надіслати тестове повідомлення";
+        updateTelegramStatus({ status: "error", botUsername, error: sendError });
+        return {
+          ok: false,
+          error: `Помилка Telegram API при відправці в чат (${targetChatId}): ${sendError}`,
+          botName,
+          botUsername,
+        };
       }
     }
+
+    updateTelegramStatus({ status: "connected", botUsername, error: null });
 
     return {
       ok: true,
       botName,
       botUsername,
-      message: `З'єднання успішне! Бот: ${botUsername || botName}${chatId ? " (тестове повідомлення надіслано в чат)" : ""}`,
+      message: "Telegram підключено успішно ✅",
     };
   } catch (err) {
     updateTelegramStatus({ status: "error", error: err.message });
-    return { ok: false, error: err.message || "Помилка зв'язку з сервером Telegram" };
+    return { ok: false, error: err.message || "Помилка зв'язку з Telegram API" };
   }
 }
