@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { Categories, Products, Settings, subscribe } from "../data/db";
@@ -36,9 +36,8 @@ export default function Header() {
   const [expandedMobile, setExpandedMobile] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
+  const closeTimeoutRef = useRef(null);
   const location = useLocation();
-  const isHome = location.pathname === "/";
-  const isTransparent = isHome && !scrolled;
 
   useEffect(() => {
     Settings.fetch().then((data) => data && setS(data));
@@ -51,17 +50,17 @@ export default function Header() {
     });
   }, []);
 
-  // Filter real gift boxes from existing products catalog
+  // Filter real existing gift boxes from catalog
   const giftBoxes = useMemo(() => {
     return products.filter((p) => p.category === "gift-boxes" || p.giftBox);
   }, [products]);
 
-  // Dynamically resolve social networks configured in Admin Settings
+  // Dynamically resolve real admin-configured social networks (no empty networks)
   const configuredSocials = useMemo(() => {
     const list = [
       { key: "viber", label: "Viber", icon: <IconViber className="w-4 h-4 text-[#7360F2]" /> },
       { key: "telegram", label: "Telegram", icon: <IconTelegram className="w-4 h-4 text-[#2AABEE]" /> },
-      { key: "tiktok", label: "TikTok", icon: <IconTikTok className="w-4 h-4 text-ink" /> },
+      { key: "tiktok", label: "TikTok", icon: <IconTikTok className="w-4 h-4 text-[#292821]" /> },
       { key: "instagram", label: "Instagram", icon: <IconInstagram className="w-4 h-4 text-[#E4405F]" /> },
       { key: "facebook", label: "Facebook", icon: <IconFacebook className="w-4 h-4 text-[#1877F2]" /> },
     ];
@@ -78,17 +77,17 @@ export default function Header() {
       .filter((net) => Boolean(net.url));
   }, [s]);
 
-  // Scroll detection for transparent matte glass-to-solid transition on Home page
+  // Scroll detection to subtly refine shadow
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 35);
+      setScrolled(window.scrollY > 20);
     };
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [location.pathname]);
 
-  // Close mobile drawer and dropdown on route change
+  // Close mobile drawer and dropdowns on route changes
   useEffect(() => {
     setOpen(false);
     setActiveDropdown(null);
@@ -106,7 +105,25 @@ export default function Header() {
     };
   }, [open]);
 
-  const phone = (s?.contacts?.phone || s?.store?.phone || "+380 (97) 123-45-67").trim();
+  // Dropdown hover timing helpers for fluid, flicker-free interaction
+  const handleMouseEnter = (id) => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setActiveDropdown(id);
+  };
+
+  const handleMouseLeave = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = setTimeout(() => {
+      setActiveDropdown(null);
+    }, 140);
+  };
+
+  const phone = (s?.contacts?.phone || s?.store?.phone || "+380 67 835 23 11").trim();
 
   const toggleMobileGroup = (id) => {
     setExpandedMobile((prev) => (prev === id ? null : id));
@@ -114,43 +131,44 @@ export default function Header() {
 
   return (
     <>
+      {/* ==============================================================
+          MAIN HEADER CONTAINER
+          - SOLID WARM IVORY/CREAM BACKGROUND (#FFFDF8) ON ALL PAGES
+          - ZERO TRANSPARENCY, ZERO GLASS, ZERO BLUR
+          - HERO PHOTOGRAPHY BEGINS CLEANLY BELOW THIS HEADER
+          - STICKY TOP-0 WITH REFINED SOLID ARTISANAL BORDER & SHADOW
+          ============================================================== */}
       <header
-        className={`z-40 transition-all duration-300 ${
-          isHome
-            ? `fixed top-0 inset-x-0 ${
-                isTransparent
-                  ? "bg-white/[0.04] backdrop-blur-md border-b border-white/10 text-white shadow-[0_4px_30px_rgba(0,0,0,0.12)]"
-                  : "bg-[#FFFDF8]/90 backdrop-blur-xl border-b border-amber-900/10 text-ink shadow-[0_8px_30px_rgba(41,40,33,0.04)]"
-              }`
-            : "sticky top-0 inset-x-0 bg-[#FFFDF8]/90 backdrop-blur-xl border-b border-amber-900/10 text-ink shadow-[0_8px_30px_rgba(41,40,33,0.04)]"
+        className={`sticky top-0 inset-x-0 z-40 bg-[#FFFDF8] site-header-solid border-b border-[#E8DEC8] transition-shadow duration-200 ${
+          scrolled
+            ? "shadow-[0_4px_16px_rgba(41,40,33,0.07)]"
+            : "shadow-[0_2px_8px_rgba(41,40,33,0.03)]"
         }`}
+        style={{
+          backgroundColor: "#FFFDF8",
+          opacity: 1,
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+        }}
       >
-        <div className="container-p flex items-center justify-between h-16 sm:h-18 md:h-20">
+        <div className="container-p flex items-center justify-between h-18 sm:h-20">
           
-          {/* 1. Brand Logo: Clean "Honey Pasika" + Subtle "Сімейна пасіка" */}
+          {/* 1. BRAND LOGO: Honey Pasika + СІМЕЙНА ПАСІКА (Solid Deep Ink / Warm Brown) */}
           <Link
             to="/"
-            className="flex flex-col group shrink-0 transition-opacity hover:opacity-95"
+            className="flex flex-col shrink-0 group transition-opacity hover:opacity-95"
             aria-label="Honey Pasika — Головна"
           >
-            <span
-              className={`font-serif text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight leading-none transition-colors ${
-                isTransparent ? "text-white drop-shadow-sm" : "text-ink"
-              }`}
-            >
+            <span className="font-serif text-2xl sm:text-[25px] font-bold tracking-[-0.01em] leading-none text-[#292821]">
               Honey Pasika
             </span>
-            <span
-              className={`text-[9px] sm:text-[10px] tracking-[0.2em] uppercase font-semibold mt-1 transition-colors ${
-                isTransparent ? "text-white/70" : "text-ink/45"
-              }`}
-            >
+            <span className="text-[9.5px] tracking-[0.24em] uppercase font-semibold text-[#8C6D46] mt-0.5">
               Сімейна пасіка
             </span>
           </Link>
 
-          {/* 2. Desktop Navigation: Головна | Каталог ▾ | Подарункові бокси ▾ | Про пасіку ▾ */}
-          <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium">
+          {/* 2. DESKTOP NAVIGATION: Головна | Каталог ▾ | Подарункові бокси ▾ | Про пасіку ▾ */}
+          <nav className="hidden lg:flex items-center gap-7 xl:gap-8 text-[14px] font-medium tracking-normal text-[#292821]">
             {NAV.map((n) => {
               // 2.1 — Каталог dropdown
               if (n.id === "catalog") {
@@ -158,51 +176,55 @@ export default function Header() {
                 return (
                   <div
                     key={n.id}
-                    className="relative group py-2"
-                    onMouseEnter={() => setActiveDropdown("catalog")}
-                    onMouseLeave={() => setActiveDropdown(null)}
+                    className="relative py-2"
+                    onMouseEnter={() => handleMouseEnter("catalog")}
+                    onMouseLeave={handleMouseLeave}
                   >
                     <NavLink
                       to={n.to}
                       className={({ isActive }) =>
-                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-200 ${
+                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-150 ${
                           isActive
-                            ? isTransparent
-                              ? "text-accent font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-accent after:rounded-full"
-                              : "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
-                            : isTransparent
-                            ? "text-white/90 hover:text-white"
-                            : "text-ink/75 hover:text-honey"
+                            ? "text-honey font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-honey after:rounded-full"
+                            : "text-[#292821]/80 hover:text-honey"
                         }`
                       }
                     >
                       <span>{n.label}</span>
                       <IconChevronDown
                         className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
-                          isOpen ? "rotate-180" : ""
+                          isOpen ? "rotate-180 text-honey" : ""
                         }`}
                       />
                     </NavLink>
 
-                    {/* Catalog Dropdown Card */}
+                    {/* Catalog Dropdown: 100% Opaque Solid Warm Ivory Card (Completely covers Hero) */}
                     <div
-                      className={`absolute top-full left-0 pt-2 transition-all duration-200 z-50 ${
+                      className={`absolute top-full left-0 pt-2 transition-all duration-150 z-50 ${
                         isOpen
                           ? "opacity-100 visible translate-y-0 pointer-events-auto"
                           : "opacity-0 invisible translate-y-1 pointer-events-none"
                       }`}
                     >
-                      <div className="bg-[#FFFDF8]/98 backdrop-blur-2xl border border-amber-900/10 rounded-2xl p-2.5 shadow-2xl min-w-[240px] text-ink space-y-0.5">
+                      <div
+                        className="bg-[#FFFDF8] site-dropdown-solid border border-[#E2D6C0] rounded-2xl p-2.5 shadow-[0_18px_45px_rgba(41,40,33,0.16)] min-w-[240px] text-[#292821] space-y-0.5"
+                        style={{
+                          backgroundColor: "#FFFDF8",
+                          opacity: 1,
+                          backdropFilter: "none",
+                          WebkitBackdropFilter: "none",
+                        }}
+                      >
                         <Link
                           to="/catalog"
                           onClick={() => setActiveDropdown(null)}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-honey hover:bg-honey/10 transition-colors"
+                          className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#B87A10] hover:bg-[#F7F1E5] hover:text-[#8F5E06] transition-colors"
                         >
                           <span>Всі товари каталогу</span>
-                          <IconChevronRight className="w-3.5 h-3.5 opacity-70" />
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-80" />
                         </Link>
 
-                        <div className="h-px bg-amber-900/10 my-1" />
+                        <div className="h-px bg-[#E8DEC8] my-1" />
 
                         {categories.map((cat) => {
                           const targetUrl =
@@ -212,10 +234,10 @@ export default function Header() {
                               key={cat.slug}
                               to={targetUrl}
                               onClick={() => setActiveDropdown(null)}
-                              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-ink/80 hover:text-honey hover:bg-cream/70 transition-colors group/cat"
+                              className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors group/cat"
                             >
                               <span>{cat.name}</span>
-                              <IconChevronRight className="w-3.5 h-3.5 opacity-30 group-hover/cat:opacity-80 group-hover/cat:translate-x-0.5 transition-all" />
+                              <IconChevronRight className="w-3.5 h-3.5 opacity-35 group-hover/cat:opacity-90 group-hover/cat:translate-x-0.5 transition-all" />
                             </Link>
                           );
                         })}
@@ -231,64 +253,68 @@ export default function Header() {
                 return (
                   <div
                     key={n.id}
-                    className="relative group py-2"
-                    onMouseEnter={() => setActiveDropdown("gift-boxes")}
-                    onMouseLeave={() => setActiveDropdown(null)}
+                    className="relative py-2"
+                    onMouseEnter={() => handleMouseEnter("gift-boxes")}
+                    onMouseLeave={handleMouseLeave}
                   >
                     <NavLink
                       to={n.to}
                       className={({ isActive }) =>
-                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-200 ${
+                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-150 ${
                           isActive
-                            ? isTransparent
-                              ? "text-accent font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-accent after:rounded-full"
-                              : "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
-                            : isTransparent
-                            ? "text-white/90 hover:text-white"
-                            : "text-ink/75 hover:text-honey"
+                            ? "text-honey font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-honey after:rounded-full"
+                            : "text-[#292821]/80 hover:text-honey"
                         }`
                       }
                     >
                       <span>{n.label}</span>
                       <IconChevronDown
                         className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
-                          isOpen ? "rotate-180" : ""
+                          isOpen ? "rotate-180 text-honey" : ""
                         }`}
                       />
                     </NavLink>
 
-                    {/* Gift Boxes Dropdown Card with Real Catalog Boxes */}
+                    {/* Gift Boxes Dropdown: 100% Opaque Solid Warm Ivory Card */}
                     <div
-                      className={`absolute top-full left-0 pt-2 transition-all duration-200 z-50 ${
+                      className={`absolute top-full left-0 pt-2 transition-all duration-150 z-50 ${
                         isOpen
                           ? "opacity-100 visible translate-y-0 pointer-events-auto"
                           : "opacity-0 invisible translate-y-1 pointer-events-none"
                       }`}
                     >
-                      <div className="bg-[#FFFDF8]/98 backdrop-blur-2xl border border-amber-900/10 rounded-2xl p-2.5 shadow-2xl min-w-[260px] text-ink space-y-0.5">
+                      <div
+                        className="bg-[#FFFDF8] site-dropdown-solid border border-[#E2D6C0] rounded-2xl p-2.5 shadow-[0_18px_45px_rgba(41,40,33,0.16)] min-w-[270px] text-[#292821] space-y-0.5"
+                        style={{
+                          backgroundColor: "#FFFDF8",
+                          opacity: 1,
+                          backdropFilter: "none",
+                          WebkitBackdropFilter: "none",
+                        }}
+                      >
                         <Link
                           to="/gift-boxes"
                           onClick={() => setActiveDropdown(null)}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-honey hover:bg-honey/10 transition-colors"
+                          className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#B87A10] hover:bg-[#F7F1E5] hover:text-[#8F5E06] transition-colors"
                         >
                           <span className="flex items-center gap-2">
                             <IconBox className="w-3.5 h-3.5" />
                             <span>Всі подарункові бокси</span>
                           </span>
-                          <IconChevronRight className="w-3.5 h-3.5 opacity-70" />
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-80" />
                         </Link>
 
-                        {giftBoxes.length > 0 && <div className="h-px bg-amber-900/10 my-1" />}
+                        {giftBoxes.length > 0 && <div className="h-px bg-[#E8DEC8] my-1" />}
 
                         {giftBoxes.map((box) => (
                           <Link
                             key={box.id || box.slug}
                             to={`/product/${box.slug}`}
                             onClick={() => setActiveDropdown(null)}
-                            className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-ink/80 hover:text-honey hover:bg-cream/70 transition-colors group/box"
+                            className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-medium text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors group/box"
                           >
                             <span className="truncate pr-2">{box.name}</span>
-                            <span className="text-[11px] font-bold text-ink/50 group-hover/box:text-honey shrink-0">
+                            <span className="text-[11px] font-bold text-[#292821]/60 group-hover/box:text-[#B87A10] shrink-0">
                               {box.price} грн
                             </span>
                           </Link>
@@ -299,70 +325,82 @@ export default function Header() {
                 );
               }
 
-              // 2.3 — Про пасіку dropdown (Про нас, Доставка, Контакти)
+              // 2.3 — Про пасіку dropdown
               if (n.id === "about") {
                 const isOpen = activeDropdown === "about";
                 return (
                   <div
                     key={n.id}
-                    className="relative group py-2"
-                    onMouseEnter={() => setActiveDropdown("about")}
-                    onMouseLeave={() => setActiveDropdown(null)}
+                    className="relative py-2"
+                    onMouseEnter={() => handleMouseEnter("about")}
+                    onMouseLeave={handleMouseLeave}
                   >
                     <NavLink
                       to={n.to}
                       className={({ isActive }) =>
-                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-200 ${
+                        `relative flex items-center gap-1.5 py-1.5 transition-colors duration-150 ${
                           isActive
-                            ? isTransparent
-                              ? "text-accent font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-accent after:rounded-full"
-                              : "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
-                            : isTransparent
-                            ? "text-white/90 hover:text-white"
-                            : "text-ink/75 hover:text-honey"
+                            ? "text-honey font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-honey after:rounded-full"
+                            : "text-[#292821]/80 hover:text-honey"
                         }`
                       }
                     >
                       <span>{n.label}</span>
                       <IconChevronDown
                         className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
-                          isOpen ? "rotate-180" : ""
+                          isOpen ? "rotate-180 text-honey" : ""
                         }`}
                       />
                     </NavLink>
 
-                    {/* About Dropdown with Real Project Pages */}
+                    {/* About Dropdown: 100% Opaque Solid Warm Ivory Card */}
                     <div
-                      className={`absolute top-full left-0 pt-2 transition-all duration-200 z-50 ${
+                      className={`absolute top-full left-0 pt-2 transition-all duration-150 z-50 ${
                         isOpen
                           ? "opacity-100 visible translate-y-0 pointer-events-auto"
                           : "opacity-0 invisible translate-y-1 pointer-events-none"
                       }`}
                     >
-                      <div className="bg-[#FFFDF8]/98 backdrop-blur-2xl border border-amber-900/10 rounded-2xl p-2.5 shadow-2xl min-w-[220px] text-ink space-y-0.5">
+                      <div
+                        className="bg-[#FFFDF8] site-dropdown-solid border border-[#E2D6C0] rounded-2xl p-2.5 shadow-[0_18px_45px_rgba(41,40,33,0.16)] min-w-[220px] text-[#292821] space-y-0.5"
+                        style={{
+                          backgroundColor: "#FFFDF8",
+                          opacity: 1,
+                          backdropFilter: "none",
+                          WebkitBackdropFilter: "none",
+                        }}
+                      >
                         <Link
                           to="/about"
                           onClick={() => setActiveDropdown(null)}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-ink/80 hover:text-honey hover:bg-cream/70 transition-colors"
+                          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
                         >
-                          <span>Історія пасіки та родина</span>
-                          <IconChevronRight className="w-3.5 h-3.5 opacity-40" />
+                          <span>Про пасіку</span>
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-50" />
+                        </Link>
+                        <Link
+                          to="/about#story"
+                          onClick={() => setActiveDropdown(null)}
+                          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
+                        >
+                          <span>Наша історія</span>
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-50" />
                         </Link>
                         <Link
                           to="/delivery"
                           onClick={() => setActiveDropdown(null)}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-ink/80 hover:text-honey hover:bg-cream/70 transition-colors"
+                          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
                         >
                           <span>Доставка та оплата</span>
-                          <IconChevronRight className="w-3.5 h-3.5 opacity-40" />
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-50" />
                         </Link>
                         <Link
                           to="/contacts"
                           onClick={() => setActiveDropdown(null)}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-ink/80 hover:text-honey hover:bg-cream/70 transition-colors"
+                          className="flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
                         >
-                          <span>Контакти та локація</span>
-                          <IconChevronRight className="w-3.5 h-3.5 opacity-40" />
+                          <span>Контакти</span>
+                          <IconChevronRight className="w-3.5 h-3.5 opacity-50" />
                         </Link>
                       </div>
                     </div>
@@ -376,14 +414,10 @@ export default function Header() {
                   key={n.to}
                   to={n.to}
                   className={({ isActive }) =>
-                    `relative py-1.5 transition-colors duration-200 ${
+                    `relative py-1.5 transition-colors duration-150 ${
                       isActive
-                        ? isTransparent
-                          ? "text-accent font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-accent after:rounded-full"
-                          : "text-honey font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey after:rounded-full"
-                        : isTransparent
-                        ? "text-white/90 hover:text-white"
-                        : "text-ink/75 hover:text-honey"
+                        ? "text-honey font-semibold after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-honey after:rounded-full"
+                        : "text-[#292821]/80 hover:text-honey"
                     }`
                   }
                 >
@@ -393,81 +427,81 @@ export default function Header() {
             })}
           </nav>
 
-          {/* 3. Desktop Right Controls: [Відстежити] | [Зв'язок / Телефон ▾] | [Кошик] */}
-          <div className="hidden lg:flex items-center gap-3 xl:gap-3.5 shrink-0">
+          {/* 3. DESKTOP RIGHT CONTROLS: [Відстежити] | [Телефон / Месенджери ▾] | [Кошик] */}
+          <div className="hidden lg:flex items-center gap-4 xl:gap-5 shrink-0">
             
-            {/* 3.1 — Distinct Utility: Track Order Button */}
+            {/* 3.1 — Clean Track Order Button */}
             <NavLink
               to="/track-order"
               className={({ isActive }) =>
-                `inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 active:scale-95 shrink-0 ${
+                `inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-150 active:scale-95 shrink-0 ${
                   isActive
-                    ? isTransparent
-                      ? "bg-accent text-stone-900 font-bold shadow-md ring-2 ring-accent/50"
-                      : "bg-honey text-white font-bold shadow-sm"
-                    : isTransparent
-                    ? "bg-white/15 hover:bg-white/25 text-white border border-white/30 backdrop-blur-md shadow-xs hover:border-white/50"
-                    : "bg-amber-500/10 hover:bg-amber-500/20 text-ink/80 hover:text-ink border border-amber-900/15 shadow-2xs"
+                    ? "bg-honey text-white font-bold shadow-sm"
+                    : "text-[#292821]/85 hover:text-honey border border-[#DECDB3] bg-[#FAF5EB] shadow-2xs hover:border-honey/60"
                 }`
               }
               title="Перевірити статус замовлення"
             >
-              <IconTruck className="w-3.5 h-3.5 shrink-0 opacity-80" />
+              <IconTruck className="w-3.5 h-3.5 shrink-0 opacity-85" />
               <span>Відстежити</span>
             </NavLink>
 
-            {/* 3.2 — Compact "Зв'язок" Dropdown (Real Admin Channels Only) */}
+            {/* 3.2 — Phone & Messengers Popover (Solid Warm Ivory Dropdown) */}
             <div
               className="relative py-2"
-              onMouseEnter={() => setActiveDropdown("contact")}
-              onMouseLeave={() => setActiveDropdown(null)}
+              onMouseEnter={() => handleMouseEnter("contact")}
+              onMouseLeave={handleMouseLeave}
             >
               <a
                 href={`tel:${phone.replace(/\s+/g, "")}`}
-                className={`inline-flex items-center gap-2 text-xs xl:text-sm font-semibold py-1.5 px-3 rounded-full transition-all border ${
-                  isTransparent
-                    ? "text-white/95 hover:text-white bg-white/10 hover:bg-white/20 border-white/20 backdrop-blur-md shadow-xs"
-                    : "text-ink/85 hover:text-honey bg-cream/50 hover:bg-cream/80 border-amber-900/10 shadow-2xs"
-                }`}
+                className="inline-flex items-center gap-1.5 text-xs xl:text-sm font-semibold py-1.5 text-[#292821]/85 hover:text-honey transition-colors"
                 title="Зателефонувати або обрати месенджер"
               >
-                <IconPhone className={`w-3.5 h-3.5 ${isTransparent ? "text-accent" : "text-honey"} shrink-0`} />
+                <IconPhone className="w-3.5 h-3.5 text-honey shrink-0" />
                 <span className="whitespace-nowrap">{phone}</span>
                 {configuredSocials.length > 0 && (
                   <IconChevronDown
                     className={`w-3 h-3 opacity-60 transition-transform duration-200 ${
-                      activeDropdown === "contact" ? "rotate-180" : ""
+                      activeDropdown === "contact" ? "rotate-180 text-honey" : ""
                     }`}
                   />
                 )}
               </a>
 
-              {/* Contact Dropdown Popover */}
+              {/* Contact Dropdown Popover: 100% Opaque Solid Warm Ivory Card */}
               {configuredSocials.length > 0 && (
                 <div
-                  className={`absolute right-0 top-full pt-2 transition-all duration-200 z-50 ${
+                  className={`absolute right-0 top-full pt-2 transition-all duration-150 z-50 ${
                     activeDropdown === "contact"
                       ? "opacity-100 visible translate-y-0 pointer-events-auto"
                       : "opacity-0 invisible translate-y-1 pointer-events-none"
                   }`}
                 >
-                  <div className="bg-[#FFFDF8]/98 backdrop-blur-2xl border border-amber-900/10 rounded-2xl p-2.5 shadow-2xl min-w-[210px] text-ink space-y-1">
-                    <div className="text-[10px] uppercase tracking-wider font-bold text-ink/40 px-2.5 pt-1 pb-0.5">
+                  <div
+                    className="bg-[#FFFDF8] site-dropdown-solid border border-[#E2D6C0] rounded-2xl p-2.5 shadow-[0_18px_45px_rgba(41,40,33,0.16)] min-w-[210px] text-[#292821] space-y-1"
+                    style={{
+                      backgroundColor: "#FFFDF8",
+                      opacity: 1,
+                      backdropFilter: "none",
+                      WebkitBackdropFilter: "none",
+                    }}
+                  >
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-[#8C6D46] px-2.5 pt-1 pb-0.5">
                       Швидкий зв'язок
                     </div>
                     <a
                       href={`tel:${phone.replace(/\s+/g, "")}`}
-                      className="flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold rounded-xl text-ink hover:text-honey hover:bg-cream/70 transition-colors"
+                      className="flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold rounded-xl text-[#292821] hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
                     >
-                      <div className="w-6 h-6 rounded-lg bg-honey/15 flex items-center justify-center text-honey shrink-0">
+                      <div className="w-6 h-6 rounded-lg bg-[#F6EBD3] flex items-center justify-center text-honey shrink-0">
                         <IconPhone className="w-3.5 h-3.5" />
                       </div>
                       <span>{phone}</span>
                     </a>
 
-                    <div className="h-px bg-amber-900/10 my-1" />
+                    <div className="h-px bg-[#E8DEC8] my-1" />
 
-                    <div className="text-[10px] uppercase tracking-wider font-bold text-ink/40 px-2.5 pt-0.5 pb-0.5">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-[#8C6D46] px-2.5 pt-0.5 pb-0.5">
                       Месенджери та соцмережі
                     </div>
                     {configuredSocials.map((item) => (
@@ -476,9 +510,9 @@ export default function Header() {
                         href={item.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-xl text-ink/75 hover:text-honey hover:bg-cream/70 transition-colors"
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-xl text-[#292821]/80 hover:text-[#B87A10] hover:bg-[#F7F1E5] transition-colors"
                       >
-                        <div className="w-6 h-6 rounded-lg bg-amber-900/5 flex items-center justify-center shrink-0">
+                        <div className="w-6 h-6 rounded-lg bg-[#F2E8D5] flex items-center justify-center shrink-0">
                           {item.icon}
                         </div>
                         <span>{item.label}</span>
@@ -489,67 +523,50 @@ export default function Header() {
               )}
             </div>
 
-            {/* 3.3 — Dynamic Shopping Cart Button */}
+            {/* 3.3 — Shopping Cart Link (Clean & Direct) */}
             <Link
               to="/cart"
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 active:scale-95 shrink-0 shadow-2xs ${
-                isTransparent
-                  ? "text-white hover:text-accent bg-white/15 hover:bg-white/25 border border-white/30 backdrop-blur-md"
-                  : "text-ink hover:text-honey bg-amber-500/10 hover:bg-amber-500/15 border border-amber-900/15"
-              }`}
+              className="inline-flex items-center gap-2 text-[#292821] hover:text-honey transition-colors duration-150 active:scale-95 shrink-0"
               aria-label={`Кошик покупок: ${count} товарів на суму ${subtotal} грн`}
             >
-              <div className="relative flex items-center justify-center">
-                <IconCart className="w-5 h-5" />
+              <div className="relative flex items-center justify-center p-1">
+                <IconCart className="w-5 h-5 shrink-0" />
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-gradient-to-r from-honey to-accent text-ink font-bold text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center shadow-xs border border-clean">
+                  <span className="absolute -top-1 -right-2 bg-gradient-to-r from-honey to-accent text-[#292821] font-bold text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center shadow-xs">
                     {count}
                   </span>
                 )}
               </div>
               {count > 0 && (
-                <span className="text-xs font-bold whitespace-nowrap hidden sm:inline ml-0.5">
+                <span className="text-xs font-semibold whitespace-nowrap hidden xl:inline ml-0.5">
                   {subtotal} грн
                 </span>
               )}
             </Link>
           </div>
 
-          {/* 4. Mobile Right Controls: Dynamic Cart & Hamburger */}
-          <div className="flex items-center gap-2 sm:gap-2.5 lg:hidden">
+          {/* 4. MOBILE RIGHT CONTROLS: Only Cart & Hamburger (Clean Solid Bar) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 lg:hidden">
             {/* Dynamic Mobile Cart */}
             <Link
               to="/cart"
-              className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl transition-all active:scale-95 ${
-                isTransparent
-                  ? "text-white bg-white/15 border border-white/25 backdrop-blur-md shadow-xs"
-                  : "text-ink hover:bg-cream/60 border border-amber-900/10"
-              }`}
+              className="p-2 text-[#292821] hover:text-honey transition-colors active:scale-95"
               aria-label={`Кошик покупок (${count})`}
             >
-              <div className="relative flex items-center">
+              <div className="relative flex items-center justify-center">
                 <IconCart className="w-5 h-5" />
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-honey to-accent text-ink font-bold text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center shadow-xs border border-clean">
+                  <span className="absolute -top-1.5 -right-2 bg-gradient-to-r from-honey to-accent text-[#292821] font-bold text-[10px] rounded-full min-w-4 h-4 px-1 flex items-center justify-center shadow-xs">
                     {count}
                   </span>
                 )}
               </div>
-              {count > 0 && (
-                <span className="text-xs font-bold whitespace-nowrap hidden sm:inline">
-                  {subtotal} грн
-                </span>
-              )}
             </Link>
 
             {/* Mobile Menu Hamburger Button */}
             <button
               type="button"
-              className={`p-2 sm:p-2.5 rounded-xl transition-colors active:scale-95 ${
-                isTransparent
-                  ? "text-white bg-white/15 border border-white/25 backdrop-blur-md shadow-xs"
-                  : "text-ink hover:bg-cream/60 border border-amber-900/10"
-              }`}
+              className="p-2 text-[#292821] hover:text-honey transition-colors active:scale-95"
               onClick={() => setOpen((prev) => !prev)}
               aria-label={open ? "Закрити меню" : "Відкрити меню навігації"}
               aria-expanded={open}
@@ -560,33 +577,48 @@ export default function Header() {
         </div>
       </header>
 
-      {/* 5. MOBILE NAVIGATION DRAWER & ACCORDIONS */}
+      {/* ==============================================================
+          5. MOBILE NAVIGATION DRAWER
+          - Fully opaque warm cream (#FAF5EB) background so hero photo
+            does NOT bleed through and all text is 100% readable.
+          - Accordions for Каталог, Подарункові бокси, and Про пасіку.
+          - Direct access to Tracking, Phone, and Admin-Configured Socials.
+          - High touch target convenience (min 48px height).
+          ============================================================== */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden animate-fade-in">
-          {/* Backdrop Blur Overlay */}
+          {/* Backdrop Overlay (Clean dim, no blur) */}
           <div
-            className="fixed inset-0 bg-ink/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-[#17120A]/55 transition-opacity"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Slide-in Sheet from Right with iPhone-inspired Frosted Glass */}
-          <div className="fixed inset-y-0 right-0 max-w-sm w-full bg-[#FFFDF8]/98 backdrop-blur-2xl shadow-2xl border-l border-amber-900/10 flex flex-col z-50 overflow-y-auto">
+          {/* Slide-in Sheet: Solid Warm Natural Beige (100% Opaque) */}
+          <div
+            className="fixed inset-y-0 right-0 max-w-sm w-full bg-[#FAF5EB] shadow-2xl border-l border-[#E2D6C0] flex flex-col z-50 overflow-y-auto"
+            style={{
+              backgroundColor: "#FAF5EB",
+              opacity: 1,
+              backdropFilter: "none",
+              WebkitBackdropFilter: "none",
+            }}
+          >
             
             {/* Drawer Header */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-amber-900/10">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2D6C0] bg-[#FAF5EB]">
               <div className="flex flex-col">
-                <span className="font-serif text-lg font-bold text-ink">
+                <span className="font-serif text-xl font-bold text-[#292821]">
                   Honey Pasika
                 </span>
-                <span className="text-[9px] tracking-wider uppercase font-semibold text-ink/40">
+                <span className="text-[9px] tracking-[0.2em] uppercase font-semibold text-[#8C6D46] mt-0.5">
                   Сімейна пасіка
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-ink/60 hover:text-ink hover:bg-cream/60 transition-colors"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-[#292821]/70 hover:text-[#292821] hover:bg-[#EFE5D2] transition-colors"
                 aria-label="Закрити меню"
               >
                 <IconClose className="w-5 h-5" />
@@ -601,10 +633,10 @@ export default function Header() {
                 to="/"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center justify-between py-3.5 px-4 rounded-xl text-base font-semibold transition-all ${
+                  `flex items-center justify-between min-h-12 px-3.5 rounded-xl text-base font-semibold transition-all ${
                     isActive
-                      ? "bg-amber-100/60 text-honey font-bold shadow-2xs"
-                      : "text-ink/80 hover:bg-cream/50 hover:text-ink"
+                      ? "bg-[#EFE5D2] text-[#B87A10] font-bold"
+                      : "text-[#292821]/85 hover:bg-[#EFE5D2] hover:text-[#292821]"
                   }`
                 }
               >
@@ -614,13 +646,13 @@ export default function Header() {
 
               {/* Catalog Accordion */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between rounded-xl hover:bg-cream/50 transition-colors">
+                <div className="flex items-center justify-between rounded-xl hover:bg-[#EFE5D2] transition-colors min-h-12">
                   <NavLink
                     to="/catalog"
                     onClick={() => setOpen(false)}
                     className={({ isActive }) =>
-                      `flex-1 py-3.5 px-4 text-base font-semibold transition-all ${
-                        isActive ? "text-honey font-bold" : "text-ink/80"
+                      `flex-1 py-3 px-3.5 text-base font-semibold transition-all ${
+                        isActive ? "text-[#B87A10] font-bold" : "text-[#292821]/85"
                       }`
                     }
                   >
@@ -629,23 +661,23 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={() => toggleMobileGroup("catalog")}
-                    className="p-3.5 text-ink/50 hover:text-ink"
+                    className="p-3 text-[#292821]/60 hover:text-[#292821] min-w-12 flex items-center justify-center"
                     aria-label="Розгорнути категорії каталогу"
                   >
                     <IconChevronDown
                       className={`w-4 h-4 transition-transform duration-200 ${
-                        expandedMobile === "catalog" ? "rotate-180" : ""
+                        expandedMobile === "catalog" ? "rotate-180 text-honey" : ""
                       }`}
                     />
                   </button>
                 </div>
 
                 {expandedMobile === "catalog" && (
-                  <div className="pl-4 pr-2 py-1 space-y-1 bg-cream/30 rounded-xl mb-1">
+                  <div className="pl-3 pr-2 py-1 space-y-1 bg-[#F2E8D5] rounded-xl mb-1.5">
                     <Link
                       to="/catalog"
                       onClick={() => setOpen(false)}
-                      className="block py-2 px-3 text-xs font-bold text-honey rounded-lg hover:bg-white/80"
+                      className="block py-2.5 px-3 text-xs font-bold text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                     >
                       Всі товари каталогу
                     </Link>
@@ -657,7 +689,7 @@ export default function Header() {
                           key={cat.slug}
                           to={targetUrl}
                           onClick={() => setOpen(false)}
-                          className="block py-2 px-3 text-xs font-medium text-ink/75 hover:text-honey rounded-lg hover:bg-white/80 transition-colors"
+                          className="block py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                         >
                           {cat.name}
                         </Link>
@@ -669,13 +701,13 @@ export default function Header() {
 
               {/* Gift Boxes Accordion */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between rounded-xl hover:bg-cream/50 transition-colors">
+                <div className="flex items-center justify-between rounded-xl hover:bg-[#EFE5D2] transition-colors min-h-12">
                   <NavLink
                     to="/gift-boxes"
                     onClick={() => setOpen(false)}
                     className={({ isActive }) =>
-                      `flex-1 py-3.5 px-4 text-base font-semibold transition-all ${
-                        isActive ? "text-honey font-bold" : "text-ink/80"
+                      `flex-1 py-3 px-3.5 text-base font-semibold transition-all ${
+                        isActive ? "text-[#B87A10] font-bold" : "text-[#292821]/85"
                       }`
                     }
                   >
@@ -684,23 +716,23 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={() => toggleMobileGroup("gift-boxes")}
-                    className="p-3.5 text-ink/50 hover:text-ink"
+                    className="p-3 text-[#292821]/60 hover:text-[#292821] min-w-12 flex items-center justify-center"
                     aria-label="Розгорнути подарункові бокси"
                   >
                     <IconChevronDown
                       className={`w-4 h-4 transition-transform duration-200 ${
-                        expandedMobile === "gift-boxes" ? "rotate-180" : ""
+                        expandedMobile === "gift-boxes" ? "rotate-180 text-honey" : ""
                       }`}
                     />
                   </button>
                 </div>
 
                 {expandedMobile === "gift-boxes" && (
-                  <div className="pl-4 pr-2 py-1 space-y-1 bg-cream/30 rounded-xl mb-1">
+                  <div className="pl-3 pr-2 py-1 space-y-1 bg-[#F2E8D5] rounded-xl mb-1.5">
                     <Link
                       to="/gift-boxes"
                       onClick={() => setOpen(false)}
-                      className="block py-2 px-3 text-xs font-bold text-honey rounded-lg hover:bg-white/80"
+                      className="block py-2.5 px-3 text-xs font-bold text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                     >
                       Всі подарункові бокси
                     </Link>
@@ -709,10 +741,10 @@ export default function Header() {
                         key={box.id || box.slug}
                         to={`/product/${box.slug}`}
                         onClick={() => setOpen(false)}
-                        className="flex items-center justify-between py-2 px-3 text-xs font-medium text-ink/75 hover:text-honey rounded-lg hover:bg-white/80 transition-colors"
+                        className="flex items-center justify-between py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                       >
                         <span className="truncate pr-2">{box.name}</span>
-                        <span className="text-[11px] font-bold text-ink/50">{box.price} грн</span>
+                        <span className="text-[11px] font-bold text-[#292821]/60">{box.price} грн</span>
                       </Link>
                     ))}
                   </div>
@@ -721,13 +753,13 @@ export default function Header() {
 
               {/* About Accordion */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between rounded-xl hover:bg-cream/50 transition-colors">
+                <div className="flex items-center justify-between rounded-xl hover:bg-[#EFE5D2] transition-colors min-h-12">
                   <NavLink
                     to="/about"
                     onClick={() => setOpen(false)}
                     className={({ isActive }) =>
-                      `flex-1 py-3.5 px-4 text-base font-semibold transition-all ${
-                        isActive ? "text-honey font-bold" : "text-ink/80"
+                      `flex-1 py-3 px-3.5 text-base font-semibold transition-all ${
+                        isActive ? "text-[#B87A10] font-bold" : "text-[#292821]/85"
                       }`
                     }
                   >
@@ -736,53 +768,60 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={() => toggleMobileGroup("about")}
-                    className="p-3.5 text-ink/50 hover:text-ink"
+                    className="p-3 text-[#292821]/60 hover:text-[#292821] min-w-12 flex items-center justify-center"
                     aria-label="Розгорнути сторінки про пасіку"
                   >
                     <IconChevronDown
                       className={`w-4 h-4 transition-transform duration-200 ${
-                        expandedMobile === "about" ? "rotate-180" : ""
+                        expandedMobile === "about" ? "rotate-180 text-honey" : ""
                       }`}
                     />
                   </button>
                 </div>
 
                 {expandedMobile === "about" && (
-                  <div className="pl-4 pr-2 py-1 space-y-1 bg-cream/30 rounded-xl mb-1">
+                  <div className="pl-3 pr-2 py-1 space-y-1 bg-[#F2E8D5] rounded-xl mb-1.5">
                     <Link
                       to="/about"
                       onClick={() => setOpen(false)}
-                      className="block py-2 px-3 text-xs font-medium text-ink/75 hover:text-honey rounded-lg hover:bg-white/80 transition-colors"
+                      className="block py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                     >
-                      Історія пасіки та родина
+                      Про пасіку
+                    </Link>
+                    <Link
+                      to="/about#story"
+                      onClick={() => setOpen(false)}
+                      className="block py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
+                    >
+                      Наша історія
                     </Link>
                     <Link
                       to="/delivery"
                       onClick={() => setOpen(false)}
-                      className="block py-2 px-3 text-xs font-medium text-ink/75 hover:text-honey rounded-lg hover:bg-white/80 transition-colors"
+                      className="block py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                     >
                       Доставка та оплата
                     </Link>
                     <Link
                       to="/contacts"
                       onClick={() => setOpen(false)}
-                      className="block py-2 px-3 text-xs font-medium text-ink/75 hover:text-honey rounded-lg hover:bg-white/80 transition-colors"
+                      className="block py-2.5 px-3 text-xs font-medium text-[#292821]/85 hover:text-[#B87A10] rounded-lg hover:bg-[#EAE0CB] transition-colors"
                     >
-                      Контакти та локація
+                      Контакти
                     </Link>
                   </div>
                 )}
               </div>
 
-              {/* Dedicated Utility Track Link */}
+              {/* Utility Track Link */}
               <NavLink
                 to="/track-order"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center justify-between py-3.5 px-4 rounded-xl text-sm font-semibold transition-all mt-3 border ${
+                  `flex items-center justify-between min-h-12 px-3.5 rounded-xl text-sm font-semibold transition-all mt-3 border ${
                     isActive
-                      ? "bg-honey/15 text-honey border-honey/40 font-bold"
-                      : "text-ink/80 border-amber-900/15 bg-amber-500/5 hover:bg-cream/50"
+                      ? "bg-[#F7EACD] text-[#B87A10] border-[#D99A19]/40 font-bold"
+                      : "text-[#292821]/85 border-[#DECDB3] bg-[#F4EBD8] hover:bg-[#EFE5D2]"
                   }`
                 }
               >
@@ -790,22 +829,22 @@ export default function Header() {
                   <IconTruck className="w-4 h-4 text-honey" />
                   <span>Відстежити замовлення</span>
                 </span>
-                <IconChevronRight className="w-4 h-4 opacity-40" />
+                <IconChevronRight className="w-4 h-4 opacity-50" />
               </NavLink>
             </nav>
 
             {/* Mobile Drawer Footer: Phone + Admin-Configured Social Channels */}
-            <div className="p-4 sm:p-5 border-t border-amber-900/10 bg-cream/30 space-y-3.5">
+            <div className="p-4 sm:p-5 border-t border-[#E2D6C0] bg-[#F5EDDE] space-y-3.5">
               {phone && (
                 <a
                   href={`tel:${phone.replace(/\s+/g, "")}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/90 border border-amber-900/10 text-sm font-bold text-ink shadow-2xs hover:border-honey/40 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[#FFFDF8] border border-[#E2D6C0] text-sm font-bold text-[#292821] shadow-2xs hover:border-honey/40 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-honey/15 flex items-center justify-center text-honey shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-[#F6EBD3] flex items-center justify-center text-honey shrink-0">
                     <IconPhone className="w-4 h-4" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-medium text-ink/50 uppercase tracking-wider">
+                    <span className="text-[10px] font-medium text-[#8C6D46] uppercase tracking-wider">
                       Зв'язок з пасікою
                     </span>
                     <span>{phone}</span>
@@ -815,7 +854,7 @@ export default function Header() {
 
               {configuredSocials.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-ink/50 uppercase tracking-wider mb-2">
+                  <div className="text-[11px] font-bold text-[#8C6D46] uppercase tracking-wider mb-2">
                     Ми у соцмережах та месенджерах:
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -825,7 +864,7 @@ export default function Header() {
                         href={item.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-amber-900/10 text-xs font-medium text-ink/80 hover:text-honey hover:border-honey/40 transition-colors shadow-2xs"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FFFDF8] border border-[#E2D6C0] text-xs font-semibold text-[#292821]/85 hover:text-honey hover:border-honey/40 transition-colors shadow-2xs"
                       >
                         {item.icon}
                         <span>{item.label}</span>
