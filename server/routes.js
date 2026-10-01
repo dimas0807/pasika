@@ -11,14 +11,24 @@ import {
   getBranchesUkrposhta,
   searchCitiesNovaPoshta,
   searchCitiesUkrposhta,
+  checkDeliveryApi,
+  getDeliveryAccounts,
+  createDeliveryAccount,
+  updateDeliveryAccount,
+  deleteDeliveryAccount,
+  createOrderShipment,
+  cancelOrderShipment,
+  getShipmentTracking,
 } from "./delivery.js";
 import {
   createOrder,
   getAdminOrders,
   getFullOrder,
   getPublicOrder,
+  getPublicOrderTrack,
   updateOrderStatus,
   updateOrderTracking,
+  confirmOrderPayment,
   softDeleteOrder,
   restoreOrder,
 } from "./orders.js";
@@ -40,6 +50,7 @@ import {
   saveProduct,
   saveCategory,
   deleteCategory,
+  validateCartStock,
 } from "./products.js";
 import { getAdminSettings, getPublicSettings, getTelegramLogs, updateSettings } from "./settings.js";
 import {
@@ -75,6 +86,7 @@ router.get("/auth/me", meHandler);
 
 // Products & Categories
 router.get("/products", getAllProducts);
+router.post("/products/validate-stock", validateCartStock);
 router.get("/products/id/:id", getProductById);
 router.get("/products/:slug", getProductBySlug);
 router.get("/categories", getCategories);
@@ -135,6 +147,7 @@ router.get("/uploads/receipts/:filename", serveReceiptFile);
 
 // Orders
 router.post("/orders", createOrder);
+router.get("/orders/track/:query", getPublicOrderTrack);
 router.get("/orders/:id", getPublicOrder);
 
 // Telegram Webhook (Public Bot API updates)
@@ -157,8 +170,83 @@ router.get("/admin/orders/:id", (req, res) => {
 });
 router.patch("/admin/orders/:id/status", updateOrderStatus);
 router.patch("/admin/orders/:id/tracking", updateOrderTracking);
+router.post("/admin/orders/:id/confirm-payment", confirmOrderPayment);
 router.delete("/admin/orders/:id", softDeleteOrder);
 router.post("/admin/orders/:id/restore", restoreOrder);
+
+// Delivery & Shipments Admin
+router.post("/admin/delivery/check", async (req, res) => {
+  const { provider, apiKey } = req.body || {};
+  try {
+    const result = await checkDeliveryApi(provider || "np", apiKey);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.get("/admin/delivery/accounts", (req, res) => {
+  try {
+    const accounts = getDeliveryAccounts(req.query?.provider);
+    return res.json(accounts);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/admin/delivery/accounts", (req, res) => {
+  try {
+    const account = createDeliveryAccount(req.body || {});
+    return res.status(201).json(account);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.put("/admin/delivery/accounts/:id", (req, res) => {
+  try {
+    const account = updateDeliveryAccount(req.params.id, req.body || {});
+    return res.json(account);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete("/admin/delivery/accounts/:id", (req, res) => {
+  try {
+    const success = deleteDeliveryAccount(req.params.id);
+    return res.json({ success });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/admin/delivery/orders/:id/ttn", async (req, res) => {
+  try {
+    const result = await createOrderShipment(req.params.id, req.body || {});
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete("/admin/delivery/orders/:id/ttn", async (req, res) => {
+  try {
+    const result = await cancelOrderShipment(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/admin/delivery/orders/:id/tracking", async (req, res) => {
+  try {
+    const result = await getShipmentTracking(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
 
 // Customers History
 router.get("/admin/customers", getAdminCustomers);

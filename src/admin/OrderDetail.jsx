@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Orders, resolveReceiptUrl } from "../data/db";
+import { Orders, resolveReceiptUrl, DeliveryAccounts } from "../data/db";
 
 const STATUSES = [
   { key: "NEW", label: "Нове" },
   { key: "PROCESSING", label: "В обробці" },
+  { key: "AWAITING_PAYMENT", label: "Очікує оплати" },
+  { key: "PAID", label: "Оплачено" },
   { key: "PACKED", label: "Запаковано" },
+  { key: "SHIPMENT_CREATED", label: "Створено ТТН" },
   { key: "SHIPPED", label: "Відправлено" },
+  { key: "DELIVERED", label: "Доставлено" },
   { key: "COMPLETED", label: "Виконано" },
   { key: "CANCELLED", label: "Скасовано" },
 ];
@@ -14,8 +18,12 @@ const STATUSES = [
 const STATUS_LABELS = {
   NEW: "Нове",
   PROCESSING: "В обробці",
+  AWAITING_PAYMENT: "Очікує оплати",
+  PAID: "Оплачено",
   PACKED: "Запаковано",
+  SHIPMENT_CREATED: "Створено ТТН",
   SHIPPED: "Відправлено",
+  DELIVERED: "Доставлено",
   COMPLETED: "Виконано",
   CANCELLED: "Скасовано",
 };
@@ -33,6 +41,23 @@ export default function OrderDetail() {
   const [deliveryServiceInput, setDeliveryServiceInput] = useState("Нова пошта");
   const [savingTracking, setSavingTracking] = useState(false);
   const [copiedTtn, setCopiedTtn] = useState(false);
+
+  // Nova Poshta TTN automation states
+  const [ttnModalOpen, setTtnModalOpen] = useState(false);
+  const [ttnSubmitting, setTtnSubmitting] = useState(false);
+  const [ttnAccounts, setTtnAccounts] = useState([]);
+  const [ttnForm, setTtnForm] = useState({
+    accountId: "",
+    weight: "1.0",
+    cost: "",
+    description: "",
+  });
+  const [trackingLiveStatus, setTrackingLiveStatus] = useState(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [ttnCancelling, setTtnCancelling] = useState(false);
+
+  // Payment confirmation state
+  const [paymentConfirming, setPaymentConfirming] = useState(false);
 
   // Soft delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -164,6 +189,80 @@ export default function OrderDetail() {
     }
   };
 
+  const handleConfirmPayment = async () => {
+    setPaymentConfirming(true);
+    try {
+      await Orders.confirmPayment(id);
+      showNotification("Оплату перевірено та підтверджено! Статус: PAID");
+      loadOrder();
+    } catch (err) {
+      showNotification(err.message, true);
+    } finally {
+      setPaymentConfirming(false);
+    }
+  };
+
+  const openTtnModal = async () => {
+    try {
+      const accounts = await DeliveryAccounts.getAll("np");
+      if (Array.isArray(accounts)) {
+        setTtnAccounts(accounts);
+        const def = accounts.find((a) => a.isDefault) || accounts[0];
+        setTtnForm({
+          accountId: def?.id || "",
+          weight: "1.0",
+          cost: String(order.total || 0),
+          description: `Мед та продукти бджільництва (${order.orderCode || `PAS-${order.number}`})`,
+        });
+      }
+    } catch {
+      // ignore
+    }
+    setTtnModalOpen(true);
+  };
+
+  const handleCreateTtn = async (e) => {
+    e.preventDefault();
+    setTtnSubmitting(true);
+    try {
+      const data = await DeliveryAccounts.createOrderTtn(id, ttnForm);
+      showNotification(`ТТН Нової пошти створено: ${data.trackingNumber}`);
+      setTtnModalOpen(false);
+      loadOrder();
+    } catch (err) {
+      showNotification(err.message, true);
+    } finally {
+      setTtnSubmitting(false);
+    }
+  };
+
+  const handleCancelTtn = async () => {
+    if (!window.confirm("Скасувати діючу ТТН для цього замовлення?")) return;
+    setTtnCancelling(true);
+    try {
+      await DeliveryAccounts.cancelOrderTtn(id);
+      showNotification("ТТН успішно скасовано");
+      loadOrder();
+    } catch (err) {
+      showNotification(err.message, true);
+    } finally {
+      setTtnCancelling(false);
+    }
+  };
+
+  const handleFetchLiveTracking = async () => {
+    setTrackingLoading(true);
+    setTrackingLiveStatus(null);
+    try {
+      const data = await DeliveryAccounts.getOrderTracking(id);
+      setTrackingLiveStatus(data);
+    } catch (err) {
+      showNotification(err.message, true);
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
+
   const handleSoftDelete = async () => {
     setDeleteActionLoading(true);
     try {
@@ -277,6 +376,125 @@ export default function OrderDetail() {
         </div>
       )}
 
+      {/* Nova Poshta TTN Creation Modal */}
+      {ttnModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-ink/10 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-ink/10">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📦</span>
+                <h3 className="font-serif font-bold text-lg text-ink">
+                  Створення ТТН Нової пошти
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTtnModalOpen(false)}
+                className="text-ink/40 hover:text-ink text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTtn} className="space-y-3.5 text-xs">
+              <div className="bg-[#FAF7F2] p-3.5 rounded-2xl border border-ink/5 space-y-1">
+                <div className="font-semibold text-ink">Отримувач:</div>
+                <div className="text-ink/75">
+                  {order.customer?.firstName} {order.customer?.lastName} • {order.customer?.phone}
+                </div>
+                <div className="text-ink/75">
+                  📍 {order.delivery?.city || "Місто не вказано"}
+                </div>
+                <div className="text-ink/75">
+                  🏤 {order.delivery?.branch || "Відділення не вказано"}
+                </div>
+              </div>
+
+              {ttnAccounts.length > 0 && (
+                <div>
+                  <label className="block text-ink/70 font-semibold mb-1">
+                    Акаунт відправника:
+                  </label>
+                  <select
+                    value={ttnForm.accountId}
+                    onChange={(e) => setTtnForm({ ...ttnForm, accountId: e.target.value })}
+                    className="input text-xs"
+                  >
+                    {ttnAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} {acc.senderName ? `(${acc.senderName})` : ""} {acc.cityName ? `— ${acc.cityName}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-ink/70 font-semibold mb-1">Вага посилки (кг):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={ttnForm.weight}
+                    onChange={(e) => setTtnForm({ ...ttnForm, weight: e.target.value })}
+                    className="input text-xs"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-ink/70 font-semibold mb-1">Оголошена вартість (грн):</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={ttnForm.cost}
+                    onChange={(e) => setTtnForm({ ...ttnForm, cost: e.target.value })}
+                    className="input text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-ink/70 font-semibold mb-1">Опис відправлення:</label>
+                <input
+                  type="text"
+                  value={ttnForm.description}
+                  onChange={(e) => setTtnForm({ ...ttnForm, description: e.target.value })}
+                  className="input text-xs"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-ink/10">
+                <button
+                  type="button"
+                  disabled={ttnSubmitting}
+                  onClick={() => setTtnModalOpen(false)}
+                  className="btn-secondary text-xs py-2 px-4 rounded-xl"
+                >
+                  Скасувати
+                </button>
+                <button
+                  type="submit"
+                  disabled={ttnSubmitting}
+                  className="btn-primary text-xs py-2 px-4 rounded-xl font-semibold shadow-xs flex items-center gap-1.5"
+                >
+                  {ttnSubmitting ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Створення в API...
+                    </>
+                  ) : (
+                    "⚡ Створити ТТН"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb & Navigation */}
       <div className="flex items-center justify-between">
         <Link
@@ -318,8 +536,11 @@ export default function OrderDetail() {
       <div className="card p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="font-serif text-2xl md:text-3xl font-bold text-ink">
-              Замовлення #{order.number}
+            <h1 className="font-serif text-2xl md:text-3xl font-bold text-ink flex items-center gap-2">
+              <span>Замовлення</span>
+              <span className="font-mono text-xl sm:text-2xl text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-xl border border-amber-200">
+                {order.orderCode || order.order_code || `PAS-${order.number}`}
+              </span>
             </h1>
             <span
               className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -510,40 +731,85 @@ export default function OrderDetail() {
               <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2">
                 <span className="text-xs text-indigo-900 font-semibold block">Номер накладної (ТТН):</span>
                 {trackingNumber ? (
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="font-mono text-base font-bold text-indigo-950 tracking-wider">
-                      {trackingNumber}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyTtn(trackingNumber)}
-                        className="btn-secondary text-xs py-1 px-2.5 rounded-lg border-indigo-200 text-indigo-900 bg-white hover:bg-indigo-50"
-                      >
-                        {copiedTtn ? "✓ Скопійовано" : "📋 Скопіювати"}
-                      </button>
-                      {trackingUrl && (
-                        <a
-                          href={trackingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn-primary text-xs py-1 px-2.5 rounded-lg shadow-2xs inline-flex items-center gap-1"
+                  <div>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-mono text-base font-bold text-indigo-950 tracking-wider">
+                        {trackingNumber}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyTtn(trackingNumber)}
+                          className="btn-secondary text-xs py-1 px-2 rounded-lg border-indigo-200 text-indigo-900 bg-white hover:bg-indigo-50"
                         >
-                          Відстежити ↗
-                        </a>
-                      )}
+                          {copiedTtn ? "✓ Скопійовано" : "📋 Скопіювати"}
+                        </button>
+                        {trackingUrl && (
+                          <a
+                            href={trackingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-primary text-xs py-1 px-2 rounded-lg shadow-2xs inline-flex items-center gap-1"
+                          >
+                            Відстежити ↗
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleFetchLiveTracking}
+                          disabled={trackingLoading}
+                          className="btn-secondary text-xs py-1 px-2 rounded-lg border-indigo-200 text-indigo-900 bg-white hover:bg-indigo-50"
+                        >
+                          {trackingLoading ? "..." : "🔄 Статус"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelTtn}
+                          disabled={ttnCancelling}
+                          className="text-xs text-red-600 hover:text-red-800 underline ml-1"
+                        >
+                          {ttnCancelling ? "..." : "Скасувати"}
+                        </button>
+                      </div>
                     </div>
+
+                    {trackingLiveStatus && (
+                      <div className="mt-2.5 p-2.5 rounded-lg bg-white border border-indigo-200 text-xs text-indigo-950 space-y-1">
+                        <div className="font-semibold flex items-center justify-between">
+                          <span>Статус Нової пошти:</span>
+                          <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                            Код {trackingLiveStatus.statusCode}
+                          </span>
+                        </div>
+                        <div className="text-ink/80">{trackingLiveStatus.statusDescription}</div>
+                        {trackingLiveStatus.scheduledDeliveryDate && (
+                          <div className="text-[11px] text-ink/60">
+                            Орієнтовна доставка: {trackingLiveStatus.scheduledDeliveryDate}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-xs text-indigo-700/70 italic flex items-center justify-between">
-                    <span>ТТН ще не додано.</span>
-                    <button
-                      type="button"
-                      onClick={() => setEditingTracking(true)}
-                      className="text-honey font-semibold underline not-italic"
-                    >
-                      Додати зараз
-                    </button>
+                  <div className="text-xs text-indigo-700/70 space-y-2">
+                    <div className="italic">ТТН ще не додано.</div>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={openTtnModal}
+                        className="btn-primary text-xs py-1.5 px-3 rounded-xl shadow-2xs font-semibold inline-flex items-center gap-1.5"
+                      >
+                        <span>⚡</span>
+                        <span>Створити ТТН через Нову Пошту</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTracking(true)}
+                        className="btn-secondary text-xs py-1.5 px-3 rounded-xl font-medium"
+                      >
+                        Ввести вручну
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -580,16 +846,40 @@ export default function OrderDetail() {
 
             <div className="flex justify-between items-baseline border-b border-ink/5 pb-2">
               <span className="text-ink/60">Статус оплати:</span>
-              {isCard ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
-                  Чек на перевірці
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  Очікує оплати при отриманні
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {order.status === "PAID" || order.payment?.status === "PAID" ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    ✓ Оплачено
+                  </span>
+                ) : isCard ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
+                    Очікує підтвердження
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    Очікує оплати при отриманні
+                  </span>
+                )}
+              </div>
             </div>
+
+            {/* Confirm Payment action for admin */}
+            {(order.status === "AWAITING_PAYMENT" || (isCard && order.status !== "PAID" && order.status !== "COMPLETED")) && (
+              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs text-emerald-900">
+                  <span className="font-bold block">Перевірили надходження коштів?</span>
+                  <span className="text-emerald-700">Підтвердіть для переведення в статус PAID.</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={paymentConfirming}
+                  onClick={handleConfirmPayment}
+                  className="btn-primary bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-2 px-3.5 rounded-xl shadow-xs font-semibold whitespace-nowrap self-start sm:self-auto"
+                >
+                  {paymentConfirming ? "Підтвердження..." : "✓ Підтвердити оплату"}
+                </button>
+              </div>
+            )}
 
             {/* Receipt section */}
             <div>

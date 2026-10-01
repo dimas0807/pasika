@@ -65,7 +65,7 @@ export function getSession(token) {
   if (!token) return null;
   const now = Date.now();
   const session = db.prepare(`
-    SELECT s.token, s.admin_id, s.expires_at, u.username
+    SELECT s.token, s.admin_id, s.expires_at, u.username, COALESCE(u.role, 'ADMIN') AS role
     FROM admin_sessions s
     JOIN admin_users u ON s.admin_id = u.id
     WHERE s.token = ? AND s.expires_at > ?
@@ -117,6 +117,18 @@ export function requireAdminAuth(req, res, next) {
   next();
 }
 
+export function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    requireAdminAuth(req, res, () => {
+      const role = req.admin?.role || "ADMIN";
+      if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+        return res.status(403).json({ error: "Недостатньо прав для виконання цієї дії" });
+      }
+      next();
+    });
+  };
+}
+
 export async function loginHandler(req, res) {
   const ip = req.ip || req.socket?.remoteAddress || "default";
   if (!checkRateLimit(ip)) {
@@ -141,6 +153,7 @@ export async function loginHandler(req, res) {
   return res.json({
     success: true,
     username: user.username,
+    role: user.role || "ADMIN",
   });
 }
 
@@ -167,6 +180,7 @@ export async function meHandler(req, res) {
   return res.json({
     authenticated: true,
     username: session.username,
+    role: session.role || "ADMIN",
   });
 }
 

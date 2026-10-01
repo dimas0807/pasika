@@ -121,6 +121,21 @@ let memoryProducts = [...SEED_PRODUCTS];
 let memoryCategories = [...SEED_CATEGORIES];
 let memoryTelegramRecipients = [];
 let memoryTelegramInteractions = [];
+let memoryDeliveryAccounts = [
+  {
+    id: "da_default_np",
+    name: "Нова Пошта (Основний акаунт)",
+    provider: "np",
+    apiKey: "",
+    senderName: "Пасіка Honey",
+    phone: "+380678352311",
+    cityName: "Новоселиця",
+    warehouseName: "Відділення №1",
+    isDefault: true,
+    isActive: true,
+    createdAt: Date.now(),
+  },
+];
 const memoryProductImages = new Map();
 const memoryReceipts = new Map();
 
@@ -384,6 +399,38 @@ export async function onRequest(context) {
   if (path === "/products" && method === "GET") {
     return jsonResponse(memoryProducts);
   }
+  if (path === "/products/validate-stock" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const items = Array.isArray(body.items) ? body.items : [];
+    let valid = true;
+    const errors = [];
+    const adjustments = [];
+
+    for (const item of items) {
+      const prod = memoryProducts.find((p) => p.id === (item.productId || item.id) || p.slug === item.slug);
+      if (!prod) {
+        valid = false;
+        errors.push({ productId: item.productId || item.id, message: `Товар "${item.name}" не знайдено` });
+        continue;
+      }
+      const available = Math.max(0, (prod.stock || 0) - (prod.reserved_stock || 0));
+      if (item.quantity > available) {
+        valid = false;
+        errors.push({
+          productId: prod.id,
+          name: prod.name,
+          requested: item.quantity,
+          available,
+          message: `Недостатньо залишку для "${prod.name}". Доступно: ${available} шт.`,
+        });
+        adjustments.push({
+          productId: prod.id,
+          maxAllowed: available,
+        });
+      }
+    }
+    return jsonResponse({ valid, errors, adjustments });
+  }
   if (path.startsWith("/products/id/") && method === "GET") {
     const id = path.replace("/products/id/", "");
     const prod = memoryProducts.find((p) => p.id === id);
@@ -528,12 +575,15 @@ export async function onRequest(context) {
       }
 
       const orderNumber = 1000 + memoryOrders.length + 1;
+      const orderCode = `PAS-${orderNumber}`;
       const orderId = "ord_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 7);
       const customerToken = "ctk_" + Math.random().toString(36).substring(2, 14);
 
       const newOrder = {
         id: orderId,
         number: orderNumber,
+        orderCode,
+        order_code: orderCode,
         status: "NEW",
         total: calculatedTotal,
         createdAt: Date.now(),
@@ -577,6 +627,40 @@ export async function onRequest(context) {
     } catch (err) {
       return jsonResponse({ error: err.message || "Помилка створення замовлення" }, 500);
     }
+  }
+
+  // Public Order Tracking
+  if (path.startsWith("/orders/track/") && method === "GET") {
+    const rawQuery = decodeURIComponent(path.replace("/orders/track/", "")).trim();
+    const cleanNum = Number(rawQuery.replace(/^PAS-/i, ""));
+    const order = memoryOrders.find(
+      (o) =>
+        String(o.id) === rawQuery ||
+        (cleanNum && o.number === cleanNum) ||
+        (o.orderCode && o.orderCode.toLowerCase() === rawQuery.toLowerCase()) ||
+        (o.order_code && o.order_code.toLowerCase() === rawQuery.toLowerCase()) ||
+        (o.delivery?.trackingNumber && o.delivery.trackingNumber === rawQuery) ||
+        (o.tracking_number && o.tracking_number === rawQuery)
+    );
+    if (!order) {
+      return jsonResponse({ found: false, error: "Замовлення з таким номером або ТТН не знайдено" }, 404);
+    }
+    return jsonResponse({
+      found: true,
+      order: {
+        id: order.id,
+        number: order.number,
+        orderCode: order.orderCode || `PAS-${order.number}`,
+        status: order.status,
+        createdAt: order.createdAt,
+        total: order.total,
+        deliveryService: order.delivery?.deliveryService || order.delivery?.provider || "Нова пошта",
+        trackingNumber: order.delivery?.trackingNumber || order.tracking_number || null,
+        trackingUrl: order.delivery?.trackingUrl || null,
+        customerFirstName: order.customer?.firstName ? `${order.customer.firstName[0]}***` : "",
+        city: order.delivery?.city || "",
+      },
+    });
   }
 
   // Public Order Lookup
@@ -876,19 +960,49 @@ export async function onRequest(context) {
 
     // Admin Dashboard
     if (path === "/admin/dashboard" && method === "GET") {
-      const totalRevenue = memoryOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const totalOrders = memoryOrders.length;
+      const totalRevenue = memoryOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
       const ordersToday = memoryOrders.length;
+      const ordersThisWeek = memoryOrders.length;
+      const ordersThisMonth = memoryOrders.length;
       const newOrders = memoryOrders.filter((o) => o.status === "NEW").length;
       const processingOrders = memoryOrders.filter((o) => o.status === "PROCESSING").length;
+      const packedOrders = memoryOrders.filter((o) => o.status === "PACKED").length;
+      const shippedOrders = memoryOrders.filter((o) => o.status === "SHIPPED").length;
       const completedOrders = memoryOrders.filter((o) => o.status === "COMPLETED").length;
+      const cancelledOrders = memoryOrders.filter((o) => o.status === "CANCELLED").length;
+      const completedRevenue = memoryOrders
+        .filter((o) => o.status === "COMPLETED")
+        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const activeOrdersCount = Math.max(totalOrders - cancelledOrders, 0);
+      const averageCheck = activeOrdersCount > 0 ? Math.round(totalRevenue / activeOrdersCount) : 0;
+
+      const customerPhones = new Set();
+      memoryOrders.forEach((o) => {
+        if (o.customer?.phone) customerPhones.add(o.customer.phone);
+      });
+      const totalCustomers = customerPhones.size;
+      const newCustomers = customerPhones.size > 0 ? 1 : 0;
+      const repeatCustomers = Math.max(0, totalCustomers - newCustomers);
 
       return jsonResponse({
         kpis: {
+          totalOrders,
           ordersToday,
+          ordersThisWeek,
+          ordersThisMonth,
           newOrders,
           processingOrders,
+          packedOrders,
+          shippedOrders,
           completedOrders,
+          cancelledOrders,
           totalRevenue,
+          completedRevenue,
+          averageCheck,
+          totalCustomers,
+          newCustomers,
+          repeatCustomers,
         },
         recentOrders: memoryOrders.slice(0, 10),
         topProducts: memoryProducts.slice(0, 5).map((p) => ({ name: p.name, qty: p.stock })),
@@ -968,11 +1082,125 @@ export async function onRequest(context) {
       }
       return jsonResponse({ error: "Замовлення не знайдено" }, 404);
     }
+    if (path.startsWith("/admin/orders/") && path.endsWith("/confirm-payment") && method === "POST") {
+      const id = path.replace("/admin/orders/", "").replace("/confirm-payment", "");
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+      memoryOrders[idx].status = "PAID";
+      memoryOrders[idx].updatedAt = Date.now();
+      if (!memoryOrders[idx].statusHistory) memoryOrders[idx].statusHistory = [];
+      memoryOrders[idx].statusHistory.push({
+        fromStatus: memoryOrders[idx].status,
+        toStatus: "PAID",
+        comment: "Оплату підтверджено адміністратором",
+        changedBy: "admin",
+        createdAt: Date.now(),
+      });
+      return jsonResponse({ success: true, order: memoryOrders[idx] });
+    }
+
     if (path.startsWith("/admin/orders/") && method === "GET") {
       const id = path.replace("/admin/orders/", "");
       const order = memoryOrders.find((o) => o.id === id);
       if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       return jsonResponse(order);
+    }
+
+    // Delivery & Accounts
+    if (path === "/admin/delivery/accounts" && method === "GET") {
+      const provider = url.searchParams.get("provider");
+      let list = memoryDeliveryAccounts;
+      if (provider) {
+        list = list.filter((a) => a.provider === provider);
+      }
+      return jsonResponse(list);
+    }
+    if (path === "/admin/delivery/accounts" && method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const newAcc = {
+        id: `da_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        name: body.name || "Акаунт доставки",
+        provider: body.provider || "np",
+        apiKey: body.apiKey || "",
+        senderName: body.senderName || "",
+        phone: body.phone || "",
+        cityName: body.cityName || "",
+        warehouseName: body.warehouseName || "",
+        isDefault: Boolean(body.isDefault),
+        isActive: body.isActive !== false,
+        createdAt: Date.now(),
+      };
+      if (newAcc.isDefault) {
+        memoryDeliveryAccounts.forEach((a) => {
+          if (a.provider === newAcc.provider) a.isDefault = false;
+        });
+      }
+      memoryDeliveryAccounts.push(newAcc);
+      return jsonResponse(newAcc, 201);
+    }
+    if (path.startsWith("/admin/delivery/accounts/") && method === "PUT") {
+      const id = path.replace("/admin/delivery/accounts/", "");
+      const body = await request.json().catch(() => ({}));
+      const idx = memoryDeliveryAccounts.findIndex((a) => a.id === id);
+      if (idx < 0) return jsonResponse({ error: "Акаунт не знайдено" }, 404);
+      Object.assign(memoryDeliveryAccounts[idx], body);
+      return jsonResponse(memoryDeliveryAccounts[idx]);
+    }
+    if (path.startsWith("/admin/delivery/accounts/") && method === "DELETE") {
+      const id = path.replace("/admin/delivery/accounts/", "");
+      memoryDeliveryAccounts = memoryDeliveryAccounts.filter((a) => a.id !== id);
+      return jsonResponse({ success: true });
+    }
+    if (path === "/admin/delivery/check" && method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const { provider, apiKey } = body;
+      if (!apiKey || !apiKey.trim()) {
+        return jsonResponse({
+          ok: false,
+          status: "not_configured",
+          message: "API-ключ не налаштовано",
+        });
+      }
+      return jsonResponse({
+        ok: true,
+        status: "active",
+        provider: provider || "np",
+        message: "Підключення успішне",
+      });
+    }
+    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/ttn") && method === "POST") {
+      const id = path.replace("/admin/delivery/orders/", "").replace("/ttn", "");
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+      const fakeTtn = "20450" + Math.floor(10000000 + Math.random() * 90000000);
+      memoryOrders[idx].tracking_number = fakeTtn;
+      memoryOrders[idx].status = "SHIPMENT_CREATED";
+      if (!memoryOrders[idx].delivery) memoryOrders[idx].delivery = {};
+      memoryOrders[idx].delivery.trackingNumber = fakeTtn;
+      memoryOrders[idx].delivery.trackingUrl = `https://novaposhta.ua/tracking/?cargo_number=${fakeTtn}`;
+      return jsonResponse({ success: true, trackingNumber: fakeTtn, order: memoryOrders[idx] });
+    }
+    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/ttn") && method === "DELETE") {
+      const id = path.replace("/admin/delivery/orders/", "").replace("/ttn", "");
+      const idx = memoryOrders.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        memoryOrders[idx].tracking_number = "";
+        if (memoryOrders[idx].delivery) {
+          memoryOrders[idx].delivery.trackingNumber = null;
+          memoryOrders[idx].delivery.trackingUrl = null;
+        }
+      }
+      return jsonResponse({ success: true });
+    }
+    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/tracking") && method === "GET") {
+      const id = path.replace("/admin/delivery/orders/", "").replace("/tracking", "");
+      const order = memoryOrders.find((o) => o.id === id);
+      return jsonResponse({
+        status: "В дорозі до відділення",
+        statusCode: "7",
+        trackingNumber: order?.delivery?.trackingNumber || "—",
+        updatedAt: Date.now(),
+      });
     }
 
     // Admin Customers
@@ -1127,6 +1355,9 @@ export async function onRequest(context) {
     }
 
     // Admin Categories
+    if (path === "/admin/categories" && method === "GET") {
+      return jsonResponse(memoryCategories);
+    }
     if (path === "/admin/categories" && method === "POST") {
       const body = await request.json().catch(() => ({}));
       const name = (body.name || "").trim();

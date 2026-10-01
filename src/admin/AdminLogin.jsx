@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Auth } from "../data/db";
 
@@ -8,6 +8,18 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (Auth.isAuthed()) {
+      navigate("/admin", { replace: true });
+    } else {
+      Auth.checkSession()
+        .then((isAuth) => {
+          if (isAuth) navigate("/admin", { replace: true });
+        })
+        .catch(() => {});
+    }
+  }, [navigate]);
 
   const submit = async (e) => {
     e.preventDefault();

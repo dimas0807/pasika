@@ -18,6 +18,11 @@ export default {
       },
       boxShadow: {
         soft: "0 10px 30px -12px rgba(41,40,33,0.18)",
+        "2xs": "0 1px 2px rgba(41,40,33,0.04)",
+        xs: "0 1px 3px rgba(41,40,33,0.06)",
+      },
+      backdropBlur: {
+        xs: "2px",
       },
     },
   },

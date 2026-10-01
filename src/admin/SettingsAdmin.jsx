@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Auth, Settings, Telegram, Backups } from "../data/db";
+import { Auth, Settings, Telegram, Backups, DeliveryAccounts } from "../data/db";
 
 const TABS = [
   { id: "store", label: "Магазин", icon: "🏪" },
@@ -40,6 +40,38 @@ export default function SettingsAdmin() {
   const [recipientActionLoading, setRecipientActionLoading] = useState("");
   const [recipientToast, setRecipientToast] = useState(null);
 
+  // Delivery Accounts & API check states
+  const [deliveryAccounts, setDeliveryAccounts] = useState([]);
+  const [deliveryAccountsLoading, setDeliveryAccountsLoading] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState(null);
+  const [accountForm, setAccountForm] = useState({
+    name: "",
+    provider: "np",
+    apiKey: "",
+    senderName: "",
+    phone: "",
+    cityName: "",
+    warehouseName: "",
+    isDefault: false,
+    isActive: true,
+  });
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [npCheckLoading, setNpCheckLoading] = useState(false);
+  const [npCheckResult, setNpCheckResult] = useState(null);
+  const [upCheckLoading, setUpCheckLoading] = useState(false);
+  const [upCheckResult, setUpCheckResult] = useState(null);
+
+  const loadDeliveryAccounts = () => {
+    setDeliveryAccountsLoading(true);
+    DeliveryAccounts.getAll()
+      .then((data) => {
+        if (Array.isArray(data)) setDeliveryAccounts(data);
+      })
+      .catch((err) => console.error("Error loading delivery accounts:", err))
+      .finally(() => setDeliveryAccountsLoading(false));
+  };
+
   const loadRecipientsData = () => {
     setRecipientsLoading(true);
     Promise.allSettled([
@@ -61,6 +93,9 @@ export default function SettingsAdmin() {
   useEffect(() => {
     if (activeTab === "telegram") {
       loadRecipientsData();
+    }
+    if (activeTab === "delivery") {
+      loadDeliveryAccounts();
     }
   }, [activeTab]);
 
@@ -158,6 +193,99 @@ export default function SettingsAdmin() {
       showRecipientToast(err.message || "Помилка надсилання тестового сповіщення", true);
     } finally {
       setRecipientActionLoading("");
+    }
+  };
+
+  const handleCheckNpApi = async () => {
+    setNpCheckLoading(true);
+    setNpCheckResult(null);
+    try {
+      const data = await DeliveryAccounts.checkApi("np", settings?.delivery?.novaPoshtaApiKey);
+      setNpCheckResult(data);
+    } catch (err) {
+      setNpCheckResult({ ok: false, message: err.message, status: "error" });
+    } finally {
+      setNpCheckLoading(false);
+    }
+  };
+
+  const handleCheckUpApi = async () => {
+    setUpCheckLoading(true);
+    setUpCheckResult(null);
+    try {
+      const data = await DeliveryAccounts.checkApi("up", settings?.delivery?.ukrposhtaApiKey);
+      setUpCheckResult(data);
+    } catch (err) {
+      setUpCheckResult({ ok: false, message: err.message, status: "error" });
+    } finally {
+      setUpCheckLoading(false);
+    }
+  };
+
+  const handleOpenAddAccount = () => {
+    setEditingAccount(null);
+    setAccountForm({
+      name: "",
+      provider: "np",
+      apiKey: "",
+      senderName: "",
+      phone: "",
+      cityName: "",
+      warehouseName: "",
+      isDefault: false,
+      isActive: true,
+    });
+    setAccountModalOpen(true);
+  };
+
+  const handleOpenEditAccount = (acc) => {
+    setEditingAccount(acc);
+    setAccountForm({
+      name: acc.name || "",
+      provider: acc.provider || "np",
+      apiKey: acc.apiKeyMasked || "",
+      senderName: acc.senderName || "",
+      phone: acc.phone || "",
+      cityName: acc.cityName || "",
+      warehouseName: acc.warehouseName || "",
+      isDefault: acc.isDefault || false,
+      isActive: acc.isActive !== false,
+    });
+    setAccountModalOpen(true);
+  };
+
+  const handleSaveAccountModal = async (e) => {
+    if (e) e.preventDefault();
+    if (!accountForm.name.trim()) {
+      showRecipientToast("Вкажіть назву акаунта", true);
+      return;
+    }
+    setAccountSaving(true);
+    try {
+      const isEdit = Boolean(editingAccount?.id);
+      if (isEdit) {
+        await DeliveryAccounts.update(editingAccount.id, accountForm);
+      } else {
+        await DeliveryAccounts.create(accountForm);
+      }
+      showRecipientToast(isEdit ? "Акаунт оновлено" : "Акаунт успішно додано");
+      setAccountModalOpen(false);
+      loadDeliveryAccounts();
+    } catch (err) {
+      showRecipientToast(err.message, true);
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async (id, name) => {
+    if (!window.confirm(`Видалити акаунт доставки «${name}»?`)) return;
+    try {
+      await DeliveryAccounts.remove(id);
+      showRecipientToast(`Акаунт «${name}» видалено`);
+      loadDeliveryAccounts();
+    } catch (err) {
+      showRecipientToast(err.message, true);
     }
   };
 
@@ -457,43 +585,301 @@ export default function SettingsAdmin() {
 
           {/* TAB 3: DELIVERY */}
           {activeTab === "delivery" && (
-            <section className="card p-5 sm:p-6 space-y-5 animate-fade-in">
-              <div className="flex items-center gap-2 pb-3 border-b border-ink/5">
-                <span className="text-2xl">🚚</span>
-                <div>
-                  <h2 className="font-serif text-lg font-bold text-ink">Доставка</h2>
-                  <p className="text-xs text-ink/50">
-                    Умови та налаштування доставки через Нову пошту, Укрпошту та Самовивіз
-                  </p>
+            <section className="space-y-6 animate-fade-in">
+              {/* 1. NOVA POSHTA API CONFIG */}
+              <div className="card p-5 sm:p-6 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-ink/5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🔴</span>
+                    <div>
+                      <h2 className="font-serif text-lg font-bold text-ink">Нова Пошта — API Інтеграція</h2>
+                      <p className="text-xs text-ink/50">
+                        Автоматичний пошук відділень, розрахунок та створення експрес-накладних (ТТН)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {npCheckResult ? (
+                      npCheckResult.ok ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-leaf/15 text-leaf border border-leaf/30">
+                          <span className="w-2 h-2 rounded-full bg-leaf" />
+                          🟢 API працює
+                        </span>
+                      ) : npCheckResult.status === "invalid_key" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          🔴 API key недійсний
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-ink/5 text-ink/60 border border-ink/10">
+                          <span className="w-2 h-2 rounded-full bg-ink/30" />
+                          ⚪ API key не налаштований
+                        </span>
+                      )
+                    ) : settings?.delivery?.novaPoshtaApiKey ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                        🟡 Ключ збережено
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-ink/5 text-ink/60 border border-ink/10">
+                        ⚪ API key не налаштований
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="label text-xs sm:text-sm font-semibold">
+                      API Ключ Нової пошти (Основний)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="password"
+                        value={settings?.delivery?.novaPoshtaApiKey || ""}
+                        onChange={setPath("delivery.novaPoshtaApiKey")}
+                        placeholder="Введіть 32-значний ключ API Нової пошти..."
+                        className="input font-mono text-base sm:text-xs min-h-[44px] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckNpApi}
+                        disabled={npCheckLoading}
+                        className="btn-secondary text-xs py-2 px-4 rounded-xl min-h-[44px] font-semibold whitespace-nowrap"
+                      >
+                        {npCheckLoading ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3.5 h-3.5 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                            Перевірка...
+                          </span>
+                        ) : (
+                          "Перевірити API"
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-ink/50 mt-1">
+                      🔒 Ключ зберігається виключно на сервері, клієнту не передається. Отримайте його в бізнес-кабінеті Нової пошти.
+                    </p>
+                  </div>
+
+                  {npCheckResult && (
+                    <div
+                      className={`p-3 rounded-xl text-xs flex items-center gap-2 animate-fade-in ${
+                        npCheckResult.ok
+                          ? "bg-leaf/10 border border-leaf/20 text-leaf"
+                          : "bg-red-50 border border-red-200 text-red-700"
+                      }`}
+                    >
+                      <span>{npCheckResult.ok ? "✓" : "⚠️"}</span>
+                      <span>{npCheckResult.message}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-leaf/10 border border-leaf/20 text-xs text-ink/80 leading-relaxed">
-                ✓ <strong>Зручна доставка:</strong> покупець обирає перевізника, вводить місто та відділення без жодних блокуючих API-перевірок.
+              {/* 2. NOVA POSHTA MULTI-ACCOUNT ACCOUNTS */}
+              <div className="card p-5 sm:p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-ink/5">
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-ink">
+                      Акаунти відправників (Nova Poshta Multi-Account)
+                    </h3>
+                    <p className="text-xs text-ink/50">
+                      Можливість додавати кілька кабінетів для розділення відправлень
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddAccount}
+                    className="btn-primary text-xs py-2 px-3.5 rounded-xl font-semibold shadow-2xs inline-flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <span>+</span>
+                    <span>Додати акаунт</span>
+                  </button>
+                </div>
+
+                {deliveryAccountsLoading ? (
+                  <div className="p-6 text-center text-xs text-ink/40">
+                    <span className="inline-block animate-spin mr-2">⏳</span> Завантаження акаунтів...
+                  </div>
+                ) : deliveryAccounts.length === 0 ? (
+                  <div className="p-5 text-center text-xs text-ink/50 bg-[#FAF7F2] rounded-2xl border border-ink/5 space-y-1">
+                    <p>Додаткові акаунти відправників ще не створені.</p>
+                    <p className="text-[11px] text-ink/40">Система використовує основний API-ключ вище.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {deliveryAccounts.map((acc) => (
+                      <div
+                        key={acc.id}
+                        className="p-3.5 rounded-2xl bg-[#FAF7F2] border border-ink/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-ink text-sm">{acc.name}</span>
+                            {acc.isDefault && (
+                              <span className="badge bg-amber-100 text-amber-900 font-semibold text-[10px]">
+                                За замовчуванням
+                              </span>
+                            )}
+                            <span
+                              className={`badge text-[10px] ${
+                                acc.isActive ? "bg-leaf/15 text-leaf" : "bg-ink/10 text-ink/50"
+                              }`}
+                            >
+                              {acc.isActive ? "Активний" : "Вимкнений"}
+                            </span>
+                          </div>
+                          <div className="text-ink/65 flex items-center gap-2 flex-wrap">
+                            {acc.senderName && <span>Відправник: {acc.senderName}</span>}
+                            {acc.phone && <span>• Тел: {acc.phone}</span>}
+                            {acc.cityName && <span>• Місто: {acc.cityName}</span>}
+                            {acc.warehouseName && <span>• {acc.warehouseName}</span>}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditAccount(acc)}
+                            className="px-2.5 py-1.5 rounded-lg border border-ink/10 hover:bg-cream text-ink/80 transition-colors font-medium text-xs"
+                          >
+                            Редагувати
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAccount(acc.id, acc.name)}
+                            className="px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 text-red-600 transition-colors font-medium text-xs"
+                          >
+                            Видалити
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-4">
-                <Field
-                  label="Термін відправлення"
-                  value={settings?.delivery?.dispatchTime || "Відправка щодня з понеділка по суботу"}
-                  onChange={setPath("delivery.dispatchTime")}
-                  placeholder="Відправка протягом 24 годин"
-                />
-                <Field
-                  label="Умови безкоштовної доставки (за бажанням)"
-                  value={settings?.delivery?.freeShippingNote || "Безкоштовна доставка для замовлень від 1500 грн"}
-                  onChange={setPath("delivery.freeShippingNote")}
-                  placeholder="Безкоштовна доставка від..."
-                />
-                <div>
-                  <label className="label text-xs sm:text-sm font-semibold">Інформаційний текст для сторінки доставки</label>
-                  <textarea
-                    rows={4}
-                    value={settings?.delivery?.notes || ""}
-                    onChange={setPath("delivery.notes")}
-                    placeholder="Надійно упаковуємо скляні банки у захисний повітряний матеріал та картонні бокси..."
-                    className="input text-base sm:text-sm min-h-[44px]"
+              {/* 3. UKRPOSHTA API CONFIG */}
+              <div className="card p-5 sm:p-6 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-ink/5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🟡</span>
+                    <div>
+                      <h2 className="font-serif text-lg font-bold text-ink">Укрпошта — API Інтеграція</h2>
+                      <p className="text-xs text-ink/50">
+                        Підключення API класифікатора адрес та відстеження посилок Укрпошти
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {upCheckResult ? (
+                      upCheckResult.ok ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-leaf/15 text-leaf border border-leaf/30">
+                          <span className="w-2 h-2 rounded-full bg-leaf" />
+                          🟢 API працює
+                        </span>
+                      ) : upCheckResult.status === "invalid_key" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          🔴 API key недійсний
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-ink/5 text-ink/60 border border-ink/10">
+                          <span className="w-2 h-2 rounded-full bg-ink/30" />
+                          ⚪ API не підключено
+                        </span>
+                      )
+                    ) : settings?.delivery?.ukrposhtaApiKey ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                        🟡 Ключ збережено
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-ink/5 text-ink/60 border border-ink/10">
+                        ⚪ API не підключено
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="label text-xs sm:text-sm font-semibold">
+                      API Bearer Token / Counterparty Token Укрпошти
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="password"
+                        value={settings?.delivery?.ukrposhtaApiKey || ""}
+                        onChange={setPath("delivery.ukrposhtaApiKey")}
+                        placeholder="Введіть токен Укрпошти..."
+                        className="input font-mono text-base sm:text-xs min-h-[44px] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckUpApi}
+                        disabled={upCheckLoading}
+                        className="btn-secondary text-xs py-2 px-4 rounded-xl min-h-[44px] font-semibold whitespace-nowrap"
+                      >
+                        {upCheckLoading ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3.5 h-3.5 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                            Перевірка...
+                          </span>
+                        ) : (
+                          "Перевірити API"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {upCheckResult && (
+                    <div
+                      className={`p-3 rounded-xl text-xs flex items-center gap-2 animate-fade-in ${
+                        upCheckResult.ok
+                          ? "bg-leaf/10 border border-leaf/20 text-leaf"
+                          : "bg-red-50 border border-red-200 text-red-700"
+                      }`}
+                    >
+                      <span>{upCheckResult.ok ? "✓" : "⚠️"}</span>
+                      <span>{upCheckResult.message}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. GENERAL DELIVERY SETTINGS */}
+              <div className="card p-5 sm:p-6 space-y-4">
+                <h3 className="font-serif text-lg font-bold text-ink pb-2 border-b border-ink/5">
+                  Умови та терміни доставки
+                </h3>
+                <div className="space-y-4">
+                  <Field
+                    label="Термін відправлення"
+                    value={settings?.delivery?.dispatchTime || "Відправка щодня з понеділка по суботу"}
+                    onChange={setPath("delivery.dispatchTime")}
+                    placeholder="Відправка протягом 24 годин"
                   />
+                  <Field
+                    label="Умови безкоштовної доставки (за бажанням)"
+                    value={settings?.delivery?.freeShippingNote || "Безкоштовна доставка для замовлень від 1500 грн"}
+                    onChange={setPath("delivery.freeShippingNote")}
+                    placeholder="Безкоштовна доставка від..."
+                  />
+                  <div>
+                    <label className="label text-xs sm:text-sm font-semibold">
+                      Інформаційний текст для сторінки доставки
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={settings?.delivery?.notes || ""}
+                      onChange={setPath("delivery.notes")}
+                      placeholder="Надійно упаковуємо скляні банки у захисний повітряний матеріал та картонні бокси..."
+                      className="input text-base sm:text-sm min-h-[44px]"
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -1409,7 +1795,172 @@ export default function SettingsAdmin() {
         </div>
       )}
 
-      {/* RECIPIENT TOAST FEEDBACK */}
+      {/* ADD / EDIT DELIVERY ACCOUNT MODAL */}
+      {accountModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-xs animate-fade-in">
+          <div className="card max-w-lg w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto bg-white border border-ink/15 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-ink/10">
+              <h3 className="font-serif font-bold text-lg text-ink">
+                {editingAccount ? "Редагувати акаунт відправника" : "Додати акаунт відправника"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAccountModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-cream text-ink/50 hover:text-ink flex items-center justify-center text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAccountModal} className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Назва акаунта <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={accountForm.name}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Напр. Nova Poshta — Склад 1"
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Служба доставки
+                  </label>
+                  <select
+                    value={accountForm.provider}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, provider: e.target.value }))}
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  >
+                    <option value="np">📦 Нова Пошта</option>
+                    <option value="up">📬 Укрпошта</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label text-xs sm:text-sm font-semibold">
+                  API Ключ
+                </label>
+                <input
+                  type="text"
+                  value={accountForm.apiKey}
+                  onChange={(e) => setAccountForm((f) => ({ ...f, apiKey: e.target.value }))}
+                  placeholder="Введіть API ключ (або залиште існуючий)"
+                  className="input font-mono text-base sm:text-xs min-h-[44px]"
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Відправник (ПІБ)
+                  </label>
+                  <input
+                    type="text"
+                    value={accountForm.senderName}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, senderName: e.target.value }))}
+                    placeholder="Пасічник Тарас"
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Телефон відправника
+                  </label>
+                  <input
+                    type="text"
+                    value={accountForm.phone}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="+380991234567"
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Місто відправника
+                  </label>
+                  <input
+                    type="text"
+                    value={accountForm.cityName}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, cityName: e.target.value }))}
+                    placeholder="м. Вінниця"
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="label text-xs sm:text-sm font-semibold">
+                    Відділення / Склад відправника
+                  </label>
+                  <input
+                    type="text"
+                    value={accountForm.warehouseName}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, warehouseName: e.target.value }))}
+                    placeholder="Відділення №1"
+                    className="input text-base sm:text-sm min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1 border-t border-ink/5">
+                <div className="flex items-center gap-3 min-h-[36px]">
+                  <input
+                    type="checkbox"
+                    id="account_default_checkbox"
+                    checked={accountForm.isDefault}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, isDefault: e.target.checked }))}
+                    className="w-4 h-4 text-honey rounded cursor-pointer"
+                  />
+                  <label htmlFor="account_default_checkbox" className="text-xs sm:text-sm font-medium text-ink cursor-pointer">
+                    Основний акаунт (використовувати за замовчуванням для ТТН)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 min-h-[36px]">
+                  <input
+                    type="checkbox"
+                    id="account_active_checkbox"
+                    checked={accountForm.isActive}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, isActive: e.target.checked }))}
+                    className="w-4 h-4 text-honey rounded cursor-pointer"
+                  />
+                  <label htmlFor="account_active_checkbox" className="text-xs sm:text-sm font-medium text-ink cursor-pointer">
+                    Активний акаунт
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-ink/10">
+                <button
+                  type="button"
+                  onClick={() => setAccountModalOpen(false)}
+                  className="btn-secondary text-xs py-2.5 px-4 min-h-[44px] font-semibold"
+                >
+                  Скасувати
+                </button>
+                <button
+                  type="submit"
+                  disabled={accountSaving}
+                  className="btn-primary text-xs py-2.5 px-5 min-h-[44px] font-bold shadow-2xs disabled:opacity-50"
+                >
+                  {accountSaving ? "Збереження..." : "Зберегти акаунт"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {recipientToast && (
         <div
           className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-xl text-xs sm:text-sm font-semibold transition-all border animate-fade-in ${

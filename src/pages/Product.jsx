@@ -4,6 +4,7 @@ import ProductCard from "../components/ProductCard";
 import ProductImage from "../components/ProductImage";
 import { useCart } from "../context/CartContext";
 import { Products } from "../data/db";
+import { IconHoneyJar, IconSparkles, IconTruck, IconShieldCheck } from "../components/Icons";
 
 export default function Product() {
   const { slug } = useParams();
@@ -27,7 +28,9 @@ export default function Product() {
   if (loading && !product) {
     return (
       <div className="container-p py-24 text-center">
-        <div className="inline-block animate-spin text-3xl mb-3">🐝</div>
+        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-3 animate-spin">
+          <IconHoneyJar className="w-6 h-6" />
+        </div>
         <p className="text-ink/60 font-medium">Завантаження товару...</p>
       </div>
     );
@@ -35,8 +38,10 @@ export default function Product() {
 
   if (!product) {
     return (
-      <div className="container-p py-24 text-center">
-        <div className="text-4xl mb-3">🍯</div>
+      <div className="container-p py-24 text-center max-w-sm mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-4 shadow-xs">
+          <IconHoneyJar className="w-8 h-8" />
+        </div>
         <h2 className="font-serif text-2xl font-bold text-ink mb-2">Товар не знайдено</h2>
         <p className="text-ink/60 text-sm">Можливо, він був розпроданий або переміщений.</p>
         <Link to="/catalog" className="btn-primary mt-6 inline-flex text-sm">
@@ -46,8 +51,15 @@ export default function Product() {
     );
   }
 
+  const availableStock =
+    product.availableStock !== undefined ? product.availableStock : Number(product.stock) || 0;
+  const isAvailable = availableStock > 0;
+
   const handleAddToCart = (andCheckout = false) => {
-    add(product, qty);
+    const res = add(product, qty);
+    if (res && res.success === false) {
+      return;
+    }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
     if (andCheckout) {
@@ -55,7 +67,6 @@ export default function Product() {
     }
   };
 
-  const isAvailable = product.stock > 0;
   const related = Products.byCategory(product.category)
     .filter((p) => p.id !== product.id)
     .slice(0, 4);
@@ -75,16 +86,17 @@ export default function Product() {
       <div className="grid md:grid-cols-12 gap-8 lg:gap-12">
         {/* Left: Product Image */}
         <div className="md:col-span-6 lg:col-span-5">
-          <div className="card p-3 sm:p-4 bg-white border border-ink/10 shadow-sm rounded-3xl sticky top-24">
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-[#FAF6EE]">
+          <div className="glass-card p-3 sm:p-4 rounded-3xl sticky top-24">
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-[#FAF6EE] border border-amber-900/10">
               <ProductImage
                 image={product.image}
                 category={product.category}
                 alt={product.name}
                 className="w-full h-full"
               />
-              <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-ink text-xs font-semibold px-3 py-1 rounded-full shadow-xs border border-ink/5">
-                🌿 100% натурально
+              <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-ink text-xs font-semibold px-3 py-1 rounded-full shadow-xs border border-amber-900/10 flex items-center gap-1.5">
+                <IconSparkles className="w-3.5 h-3.5 text-honey" />
+                <span>100% натурально</span>
               </span>
             </div>
           </div>
@@ -98,7 +110,7 @@ export default function Product() {
                 {product.category === "gift-boxes" ? "Подарунковий набір" : "Продукт пасіки"}
               </span>
               <span className={`badge ${isAvailable ? "bg-leaf/10 text-leaf" : "bg-red-50 text-red-500"}`}>
-                {isAvailable ? `В наявності (${product.stock} шт.)` : "Немає в наявності"}
+                {isAvailable ? `В наявності (${availableStock} шт.)` : "Немає в наявності"}
               </span>
             </div>
 
@@ -115,7 +127,7 @@ export default function Product() {
             </div>
 
             {/* Price section */}
-            <div className="mt-5 p-4 rounded-2xl bg-[#FAF6EE] border border-gold/20 flex items-baseline gap-3">
+            <div className="mt-5 p-4 rounded-2xl glass-card border border-amber-900/10 flex items-baseline gap-3">
               <span className="font-serif font-extrabold text-3xl sm:text-4xl text-ink">
                 {product.price} грн
               </span>
@@ -140,11 +152,12 @@ export default function Product() {
 
             {/* Quantity & Add to Cart */}
             <div className="mt-7 flex flex-wrap items-center gap-4">
-              <div className="flex items-center border border-ink/15 rounded-xl bg-white shadow-2xs overflow-hidden h-12">
+              <div className="flex items-center border border-amber-900/15 rounded-xl bg-white shadow-2xs overflow-hidden h-12">
                 <button
                   type="button"
-                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center"
+                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center disabled:opacity-30"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  disabled={qty <= 1}
                   aria-label="Зменшити кількість"
                 >
                   −
@@ -154,8 +167,9 @@ export default function Product() {
                 </span>
                 <button
                   type="button"
-                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center"
-                  onClick={() => setQty((q) => q + 1)}
+                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center disabled:opacity-30"
+                  onClick={() => setQty((q) => Math.min(availableStock, q + 1))}
+                  disabled={qty >= availableStock}
                   aria-label="Збільшити кількість"
                 >
                   +
@@ -197,20 +211,20 @@ export default function Product() {
             </div>
 
             {/* Trust highlights */}
-            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4 p-4 rounded-2xl bg-white border border-ink/5 text-center">
+            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4 p-4 rounded-2xl glass-card border border-amber-900/10 text-center">
               <div>
-                <div className="text-xl">🚚</div>
-                <div className="text-xs font-bold text-ink mt-1">1–2 дні</div>
+                <IconTruck className="w-5 h-5 mx-auto text-honey" />
+                <div className="text-xs font-bold text-ink mt-1.5">1–2 дні</div>
                 <div className="text-[11px] text-ink/50">Швидка доставка</div>
               </div>
-              <div className="border-x border-ink/5">
-                <div className="text-xl">🌿</div>
-                <div className="text-xs font-bold text-ink mt-1">100% Чистий</div>
+              <div className="border-x border-amber-900/10">
+                <IconShieldCheck className="w-5 h-5 mx-auto text-emerald-600" />
+                <div className="text-xs font-bold text-ink mt-1.5">100% Чистий</div>
                 <div className="text-[11px] text-ink/50">Без домішок</div>
               </div>
               <div>
-                <div className="text-xl">🐝</div>
-                <div className="text-xs font-bold text-ink mt-1">З пасіки</div>
+                <IconHoneyJar className="w-5 h-5 mx-auto text-honey" />
+                <div className="text-xs font-bold text-ink mt-1.5">З пасіки</div>
                 <div className="text-[11px] text-ink/50">Свіжий збір</div>
               </div>
             </div>

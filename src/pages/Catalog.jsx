@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import { Categories, Products, subscribe } from "../data/db";
+import { IconBox, IconHoneyJar } from "../components/Icons";
 
 export default function Catalog() {
   const [params, setParams] = useSearchParams();
@@ -75,8 +76,8 @@ export default function Catalog() {
           onClick={() => setCategory("all")}
           className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
             activeCategory === "all"
-              ? "bg-honey text-ink shadow-sm scale-102"
-              : "bg-white border border-ink/10 text-ink/75 hover:border-honey/50 hover:bg-cream/40"
+              ? "bg-honey text-ink shadow-sm"
+              : "bg-white/80 backdrop-blur-xs border border-ink/10 text-ink/75 hover:border-honey/50 hover:bg-cream/40"
           }`}
         >
           Всі товари ({productsList.filter((p) => p.category !== "gift-boxes").length})
@@ -92,11 +93,10 @@ export default function Catalog() {
               onClick={() => setCategory(c.slug)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                 isActive
-                  ? "bg-honey text-ink shadow-sm scale-102"
-                  : "bg-white border border-ink/10 text-ink/75 hover:border-honey/50 hover:bg-cream/40"
+                  ? "bg-honey text-ink shadow-sm"
+                  : "bg-white/80 backdrop-blur-xs border border-ink/10 text-ink/75 hover:border-honey/50 hover:bg-cream/40"
               }`}
             >
-              <span>{c.icon}</span>
               <span>{c.name}</span>
               {count > 0 && <span className="opacity-60 text-[11px]">({count})</span>}
             </button>
@@ -107,19 +107,21 @@ export default function Catalog() {
           to="/gift-boxes"
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap bg-cream/70 border border-gold/40 text-ink hover:bg-cream transition-colors"
         >
-          <span>🎁</span>
+          <IconBox className="w-3.5 h-3.5 text-amber-800" />
           <span>Подарункові бокси →</span>
         </Link>
       </div>
 
       {/* Products Grid */}
       {filteredProducts.length === 0 ? (
-        <div className="py-24 text-center">
-          <div className="text-4xl mb-3">🍯</div>
-          <p className="text-ink/60 font-medium">У цій категорії наразі немає товарів.</p>
+        <div className="py-20 text-center max-w-sm mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-4 shadow-xs">
+            <IconHoneyJar className="w-8 h-8" />
+          </div>
+          <p className="text-ink/70 font-medium">У цій категорії наразі немає товарів.</p>
           <button
             onClick={() => setCategory("all")}
-            className="btn-secondary mt-4 text-xs py-2 px-4"
+            className="btn-secondary mt-4 text-xs py-2 px-4 font-semibold"
           >
             Скинути фільтр
           </button>

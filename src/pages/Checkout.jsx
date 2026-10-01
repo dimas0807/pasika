@@ -1,13 +1,28 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { Orders, Settings, Storage } from "../data/db";
+import { Orders, Products, Settings, Storage } from "../data/db";
+import {
+  NovaPoshtaLogo,
+  UkrposhtaLogo,
+  IconCreditCard,
+  IconCash,
+  IconBox,
+  IconTruck,
+  IconMapPin,
+  IconCopy,
+  IconCheckCircle,
+  IconCart,
+  IconReceipt,
+  IconClose,
+  IconClock,
+} from "../components/Icons";
 
 const STEPS = ["Дані", "Доставка", "Оплата"];
 
 const DELIVERY_SERVICES = [
-  { key: "np", name: "Нова пошта", icon: "🔴", note: "1–2 дні" },
-  { key: "up", name: "Укрпошта", icon: "🟡", note: "2–4 дні" },
+  { key: "np", name: "Нова Пошта", logo: <NovaPoshtaLogo className="w-7 h-7" />, note: "1–2 дні" },
+  { key: "up", name: "Укрпошта", logo: <UkrposhtaLogo className="w-7 h-7" />, note: "2–4 дні" },
 ];
 
 export default function Checkout() {
@@ -26,6 +41,8 @@ export default function Checkout() {
     deliveryCity: "",
     deliveryRegion: "",
     deliveryBranch: "",
+    cityRef: "",
+    branchRef: "",
     comment: "",
     paymentMethod: "cod",
     receiptFile: null,
@@ -39,12 +56,114 @@ export default function Checkout() {
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // Delivery autocomplete states
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [cityLoading, setCityLoading] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [stockIssue, setStockIssue] = useState(null);
+
   useEffect(() => {
     Settings.fetch().then(setSettings).catch(() => {});
   }, []);
 
+  // Stock pre-check on checkout mount
+  useEffect(() => {
+    if (items.length > 0) {
+      Products.validateStock(items)
+        .then((data) => {
+          if (data && !data.valid && Array.isArray(data.items)) {
+            const prob = data.items.find((i) => !i.isAvailable);
+            if (prob) {
+              setStockIssue(
+                `Товар «${prob.name}» має доступний залишок лише ${prob.availableStock} шт. (у кошику: ${prob.requestedQty} шт.). Будь ласка, скоригуйте кількість у кошику.`
+              );
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [items]);
+
+  // Search cities with debounce
+  useEffect(() => {
+    const q = (form.deliveryCity || "").trim();
+    if (q.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCityLoading(true);
+      try {
+        const res = await fetch(
+          `/api/delivery/cities?provider=${form.providerKey}&query=${encodeURIComponent(q)}`
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setCitySuggestions(data);
+          setShowCityDropdown(true);
+        }
+      } catch {
+        setCitySuggestions([]);
+      } finally {
+        setCityLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [form.deliveryCity, form.providerKey]);
+
+  const loadBranches = async (cId) => {
+    if (!cId) return;
+    setBranchLoading(true);
+    try {
+      const res = await fetch(
+        `/api/delivery/branches?provider=${form.providerKey}&cityId=${encodeURIComponent(cId)}`
+      );
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setBranchOptions(data);
+      }
+    } catch {
+      setBranchOptions([]);
+    } finally {
+      setBranchLoading(false);
+    }
+  };
+
+  const selectCity = (city) => {
+    setForm((f) => ({
+      ...f,
+      deliveryCity: city.name || city.description || "",
+      deliveryRegion: city.region || city.area || f.deliveryRegion,
+      cityRef: city.id || city.ref || "",
+      deliveryBranch: "",
+      branchRef: "",
+    }));
+    setShowCityDropdown(false);
+    if (city.id || city.ref) {
+      loadBranches(city.id || city.ref);
+    }
+  };
+
+  const selectBranch = (branch) => {
+    setForm((f) => ({
+      ...f,
+      deliveryBranch: branch.name || branch.description || "",
+      branchRef: branch.id || branch.ref || "",
+    }));
+  };
+
   const onProviderChange = (key) => {
-    setForm((f) => ({ ...f, providerKey: key }));
+    setForm((f) => ({
+      ...f,
+      providerKey: key,
+      cityRef: "",
+      branchRef: "",
+      deliveryBranch: "",
+    }));
+    setCitySuggestions([]);
+    setBranchOptions([]);
   };
 
   const set = (k) => (e) => {
@@ -151,6 +270,21 @@ export default function Checkout() {
     setSubmitting(true);
 
     try {
+      // Real-time stock verification before order placement
+      try {
+        const stockData = await Products.validateStock(items);
+        if (stockData && !stockData.valid && Array.isArray(stockData.items)) {
+          const prob = stockData.items.find((i) => !i.isAvailable);
+          setErrorMsg(
+            `Неможливо оформити: товару «${prob?.name || ""}» доступно лише ${prob?.availableStock ?? 0} шт.`
+          );
+          setSubmitting(false);
+          return;
+        }
+      } catch {
+        // proceed to backend atomic reservation check
+      }
+
       const idempotencyKey = `pasika_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
       const cityDisplay = form.deliveryRegion.trim()
@@ -173,6 +307,8 @@ export default function Checkout() {
         deliveryCity: form.deliveryCity.trim(),
         deliveryRegion: form.deliveryRegion.trim(),
         deliveryBranch: form.deliveryBranch.trim(),
+        deliveryCityId: form.cityRef || undefined,
+        deliveryBranchId: form.branchRef || undefined,
         city: cityDisplay,
         branch: branchDisplay,
         paymentMethod: cleanPaymentMethod,
@@ -190,6 +326,8 @@ export default function Checkout() {
           providerKey: form.providerKey,
           city: cityDisplay,
           branch: branchDisplay,
+          cityId: form.cityRef || undefined,
+          branchId: form.branchRef || undefined,
         },
         payment: {
           method: cleanPaymentMethod,
@@ -216,7 +354,9 @@ export default function Checkout() {
   if (items.length === 0) {
     return (
       <div className="container-p py-24 text-center max-w-md mx-auto">
-        <div className="text-4xl mb-3">🛒</div>
+        <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-5 shadow-xs">
+          <IconCart className="w-9 h-9" />
+        </div>
         <h1 className="font-serif text-2xl font-bold text-ink">Кошик порожній</h1>
         <p className="text-ink/65 text-sm mt-2">Додайте товари з каталогу, щоб оформити замовлення.</p>
         <Link to="/catalog" className="btn-primary mt-6 inline-flex text-sm">
@@ -230,9 +370,9 @@ export default function Checkout() {
     <div className="container-p py-8 md:py-12 pb-16">
       {/* Breadcrumbs */}
       <nav className="text-xs text-ink/50 mb-3 flex items-center gap-1.5">
-        <Link to="/" className="hover:text-honey">Головна</Link>
+        <Link to="/" className="hover:text-honey transition-colors">Головна</Link>
         <span>/</span>
-        <Link to="/cart" className="hover:text-honey">Кошик</Link>
+        <Link to="/cart" className="hover:text-honey transition-colors">Кошик</Link>
         <span>/</span>
         <span className="text-ink/80 font-medium">Оформлення замовлення</span>
       </nav>
@@ -243,19 +383,40 @@ export default function Checkout() {
 
       {/* Global Error Banner */}
       {errorMsg && (
-        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between shadow-xs">
+        <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center justify-between shadow-xs animate-fadeIn">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <IconClose className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg("")} className="text-red-500 font-bold ml-2 hover:opacity-75">
-            ✕
+          <button onClick={() => setErrorMsg("")} className="text-rose-500 hover:text-rose-800 p-1" aria-label="Закрити">
+            <IconClose className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {stockIssue && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-900 text-sm flex items-start justify-between gap-3 animate-fadeIn">
+          <div className="flex items-start gap-2.5">
+            <IconClock className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold">{stockIssue}</div>
+              <Link to="/cart" className="text-xs text-amber-800 underline mt-1 inline-block">
+                Перейти до кошика для коригування кількості →
+              </Link>
+            </div>
+          </div>
+          <button
+            onClick={() => setStockIssue(null)}
+            className="text-amber-800/60 hover:text-amber-900 p-1"
+            aria-label="Закрити"
+          >
+            <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {/* Stepper Header */}
-      <div className="flex items-center gap-2 sm:gap-4 mb-8 bg-cream/50 p-2.5 sm:p-3 rounded-2xl border border-ink/5 max-w-xl">
+      <div className="flex items-center gap-2 sm:gap-4 mb-8 bg-cream/50 p-2.5 sm:p-3 rounded-2xl border border-amber-900/10 max-w-xl">
         {STEPS.map((s, i) => {
           const stepNumber = i + 1;
           const isActive = step === stepNumber;
@@ -285,7 +446,7 @@ export default function Checkout() {
 
       <div className="grid lg:grid-cols-12 gap-8 items-start">
         {/* Main Step Form Card */}
-        <div className="lg:col-span-8 card p-6 sm:p-8 bg-white border border-ink/10 shadow-sm rounded-3xl">
+        <div className="lg:col-span-8 glass-card p-6 sm:p-8 rounded-3xl shadow-sm">
           {/* STEP 1: Контактні дані */}
           {step === 1 && (
             <div className="space-y-5 animate-fadeIn">
@@ -377,9 +538,9 @@ export default function Checkout() {
                             : "border-ink/10 bg-[#FAF6EE] text-ink/70 hover:border-honey/40"
                         }`}
                       >
-                        <span className="text-2xl">{p.icon}</span>
+                        <div className="shrink-0">{p.logo}</div>
                         <div>
-                          <div className="text-sm leading-tight">{p.name}</div>
+                          <div className="text-sm font-bold leading-tight">{p.name}</div>
                           <div className="text-[11px] text-ink/50 mt-0.5 font-normal">
                             {p.note}
                           </div>
@@ -391,17 +552,54 @@ export default function Checkout() {
               </div>
 
               {/* 1. Місто / населений пункт * */}
-              <div>
-                <label className="label" htmlFor="deliveryCity">Місто / населений пункт *</label>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label mb-0" htmlFor="deliveryCity">Місто / населений пункт *</label>
+                  {cityLoading && (
+                    <span className="text-xs text-ink/50 flex items-center gap-1">
+                      <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                      Пошук міст...
+                    </span>
+                  )}
+                </div>
                 <input
                   id="deliveryCity"
                   name="deliveryCity"
                   className="input"
                   value={form.deliveryCity}
-                  onChange={set("deliveryCity")}
-                  placeholder="напр. Коростень"
+                  onChange={(e) => {
+                    set("deliveryCity")(e);
+                    setShowCityDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (citySuggestions.length > 0) setShowCityDropdown(true);
+                  }}
+                  placeholder="Введіть перші літери (напр. Київ, Львів, Коломия)"
                   autoFocus
+                  autoComplete="off"
                 />
+
+                {/* City Suggestions Dropdown */}
+                {showCityDropdown && citySuggestions.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white rounded-2xl shadow-xl border border-ink/10 py-1.5 divide-y divide-ink/5">
+                    {citySuggestions.map((c, idx) => (
+                      <button
+                        key={c.id || c.ref || idx}
+                        type="button"
+                        onClick={() => selectCity(c)}
+                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm hover:bg-honey/15 transition-colors flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-semibold text-ink">{c.name || c.description}</div>
+                          {(c.region || c.area) && (
+                            <div className="text-[11px] text-ink/50">{c.region || c.area}</div>
+                          )}
+                        </div>
+                        <span className="text-xs text-ink/40">Обрати →</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* 2. Область * */}
@@ -413,21 +611,65 @@ export default function Checkout() {
                   className="input"
                   value={form.deliveryRegion}
                   onChange={set("deliveryRegion")}
-                  placeholder="напр. Житомирська"
+                  placeholder="напр. Івано-Франківська"
                 />
               </div>
 
-              {/* 3. Номер відділення * */}
+              {/* 3. Відділення * */}
               <div>
-                <label className="label" htmlFor="deliveryBranch">Номер відділення *</label>
-                <input
-                  id="deliveryBranch"
-                  name="deliveryBranch"
-                  className="input"
-                  value={form.deliveryBranch}
-                  onChange={set("deliveryBranch")}
-                  placeholder="напр. №5 або 5"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label mb-0" htmlFor="deliveryBranch">Відділення *</label>
+                  {branchLoading && (
+                    <span className="text-xs text-ink/50 flex items-center gap-1">
+                      <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                      Завантаження відділень...
+                    </span>
+                  )}
+                </div>
+
+                {branchOptions.length > 0 ? (
+                  <select
+                    id="deliveryBranch"
+                    className="input text-xs sm:text-sm"
+                    value={form.branchRef || ""}
+                    onChange={(e) => {
+                      const sel = branchOptions.find((b) => (b.id || b.ref) === e.target.value);
+                      if (sel) {
+                        selectBranch(sel);
+                      } else {
+                        set("deliveryBranch")(e);
+                      }
+                    }}
+                  >
+                    <option value="">Оберіть відділення зі списку...</option>
+                    {branchOptions.map((b) => (
+                      <option key={b.id || b.ref} value={b.id || b.ref}>
+                        {b.name || b.description}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="deliveryBranch"
+                    name="deliveryBranch"
+                    className="input"
+                    value={form.deliveryBranch}
+                    onChange={set("deliveryBranch")}
+                    placeholder="напр. Відділення №1 (вул. Центральна, 15)"
+                  />
+                )}
+                {branchOptions.length > 0 && (
+                  <div className="mt-1 text-[11px] text-ink/50 flex justify-between">
+                    <span>Знайдено {branchOptions.length} відділень</span>
+                    <button
+                      type="button"
+                      onClick={() => setBranchOptions([])}
+                      className="text-amber-800 hover:underline"
+                    >
+                      Ввести вручну
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 4. Коментар до замовлення */}
@@ -480,10 +722,10 @@ export default function Checkout() {
                   className={`p-4 rounded-2xl border text-left transition-all ${
                     form.paymentMethod === "cod"
                       ? "border-honey bg-honey/15 ring-2 ring-honey/30 shadow-2xs font-bold text-ink"
-                      : "border-ink/10 bg-[#FAF6EE] text-ink/75 hover:border-honey/40"
+                      : "border-ink/10 bg-white/70 text-ink/75 hover:border-honey/40"
                   }`}
                 >
-                  <div className="text-xl mb-1">💵</div>
+                  <div className="mb-2 text-honey"><IconCash className="w-6 h-6" /></div>
                   <div className="text-sm font-bold text-ink">Оплата при отриманні</div>
                   <div className="text-xs text-ink/55 mt-1 font-normal leading-relaxed">
                     Оплатіть замовлення під час отримання посилки.
@@ -496,10 +738,10 @@ export default function Checkout() {
                   className={`p-4 rounded-2xl border text-left transition-all ${
                     form.paymentMethod === "card"
                       ? "border-honey bg-honey/15 ring-2 ring-honey/30 shadow-2xs font-bold text-ink"
-                      : "border-ink/10 bg-[#FAF6EE] text-ink/75 hover:border-honey/40"
+                      : "border-ink/10 bg-white/70 text-ink/75 hover:border-honey/40"
                   }`}
                 >
-                  <div className="text-xl mb-1">💳</div>
+                  <div className="mb-2 text-honey"><IconCreditCard className="w-6 h-6" /></div>
                   <div className="text-sm font-bold text-ink">Оплатити зараз</div>
                   <div className="text-xs text-ink/55 mt-1 font-normal leading-relaxed">
                     Переказ на картку або IBAN за реквізитами
@@ -509,8 +751,10 @@ export default function Checkout() {
 
               {/* 1. Оплата при отриманні — пояснення (Чек не потрібен) */}
               {form.paymentMethod === "cod" && (
-                <div className="p-4 rounded-2xl bg-[#FAF6EE] border border-gold/30 text-ink/80 text-sm flex items-start gap-3 animate-fadeIn">
-                  <span className="text-2xl shrink-0">📦</span>
+                <div className="p-4 rounded-2xl bg-white/80 border border-amber-900/10 text-ink/80 text-sm flex items-start gap-3 animate-fadeIn">
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-honey shrink-0">
+                    <IconBox className="w-4 h-4" />
+                  </div>
                   <div>
                     <div className="font-bold text-ink">Оплата при отриманні</div>
                     <p className="text-xs text-ink/65 mt-1 leading-relaxed">
@@ -522,10 +766,10 @@ export default function Checkout() {
 
               {/* 2. Оплатити зараз — Реквізити та обов'язкове завантаження чека */}
               {form.paymentMethod === "card" && (
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FDFBF7] to-[#F5EEDF] border border-gold/40 space-y-4 animate-fadeIn">
+                <div className="p-5 rounded-2xl bg-white/90 backdrop-blur-md border border-amber-900/15 space-y-4 shadow-sm animate-fadeIn">
                   <div className="flex items-center justify-between border-b border-ink/5 pb-2.5">
                     <span className="text-xs font-bold uppercase tracking-wider text-honey flex items-center gap-1.5">
-                      <span>💳</span> Реквізити для оплати
+                      <IconCreditCard className="w-4 h-4" /> Реквізити для оплати
                     </span>
                     {settings?.payment?.bank && (
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-ink text-white">
@@ -553,10 +797,11 @@ export default function Checkout() {
                           <button
                             type="button"
                             onClick={copyCard}
-                            className="px-2 py-1 rounded-lg border border-honey/60 text-[11px] font-bold hover:bg-cream text-ink transition-colors flex items-center gap-1 shrink-0"
+                            className="px-2.5 py-1 rounded-lg border border-honey/60 text-[11px] font-bold hover:bg-cream text-ink transition-colors flex items-center gap-1.5 shrink-0"
                             title="Скопіювати реквізити"
                           >
-                            {copied ? "✓ Скопійовано" : "❐ Скопіювати"}
+                            <IconCopy className="w-3.5 h-3.5" />
+                            <span>{copied ? "Скопійовано" : "Скопіювати"}</span>
                           </button>
                         </div>
                       </div>
@@ -579,7 +824,7 @@ export default function Checkout() {
 
                   {settings?.payment?.instruction && (
                     <p className="text-xs text-ink/65 leading-relaxed bg-white/70 p-3 rounded-xl border border-ink/5">
-                      💡 {settings.payment.instruction}
+                      {settings.payment.instruction}
                     </p>
                   )}
 
@@ -587,7 +832,8 @@ export default function Checkout() {
                   <div className="pt-2 border-t border-ink/10 space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
-                        <span>🧾</span> Завантажте чек про оплату *
+                        <IconReceipt className="w-4 h-4 text-honey" />
+                        <span>Завантажте чек про оплату *</span>
                       </label>
                       <span className="text-[11px] text-ink/50">JPG, JPEG, PNG, WEBP, PDF</span>
                     </div>
@@ -604,7 +850,7 @@ export default function Checkout() {
                             />
                           ) : (
                             <div className="w-14 h-14 rounded-xl bg-red-50 border border-red-200 flex flex-col items-center justify-center text-red-600 font-bold text-[10px] shrink-0">
-                              <span className="text-lg">📄</span>
+                              <IconReceipt className="w-6 h-6 text-red-500" />
                               <span>PDF</span>
                             </div>
                           )}
@@ -613,7 +859,8 @@ export default function Checkout() {
                               {form.receiptName || "Чек про оплату"}
                             </div>
                             <div className="text-xs text-leaf font-medium flex items-center gap-1 mt-0.5">
-                              <span>✓</span> Чек успішно прикріплено
+                              <IconCheckCircle className="w-3.5 h-3.5 text-leaf" />
+                              <span>Чек успішно прикріплено</span>
                             </div>
                           </div>
                         </div>
@@ -635,16 +882,17 @@ export default function Checkout() {
                           <button
                             type="button"
                             onClick={removeReceipt}
-                            className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 hover:bg-red-50 rounded-lg transition-colors"
+                            className="text-xs text-red-500 hover:text-red-700 font-bold p-1 hover:bg-red-50 rounded-lg transition-colors"
                             title="Видалити чек"
+                            aria-label="Видалити чек"
                           >
-                            ✕
+                            <IconClose className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
                     ) : (
                       /* Upload Button / Dropzone */
-                      <div className="border-2 border-dashed border-gold/60 rounded-2xl p-5 text-center bg-white hover:bg-cream/40 transition-colors">
+                      <div className="border-2 border-dashed border-amber-500/40 rounded-2xl p-5 text-center bg-white/70 hover:bg-cream/40 transition-colors">
                         <input
                           type="file"
                           accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
@@ -655,13 +903,13 @@ export default function Checkout() {
                         <label htmlFor="receipt-input" className="cursor-pointer block space-y-2">
                           {uploadingReceipt ? (
                             <div className="text-xs text-honey font-semibold animate-pulse py-2 flex items-center justify-center gap-2">
-                              <span className="animate-spin">🔄</span>
+                              <span className="w-4 h-4 border-2 border-honey border-t-transparent rounded-full animate-spin" />
                               <span>Завантаження чека на сервер...</span>
                             </div>
                           ) : (
                             <>
-                              <div className="w-10 h-10 rounded-full bg-honey/15 text-honey text-xl flex items-center justify-center mx-auto">
-                                📎
+                              <div className="w-10 h-10 rounded-full bg-honey/15 text-honey flex items-center justify-center mx-auto">
+                                <IconReceipt className="w-5 h-5" />
                               </div>
                               <div className="text-xs sm:text-sm font-bold text-ink">
                                 Натисніть, щоб завантажити чек
@@ -671,7 +919,7 @@ export default function Checkout() {
                               </div>
                               <div className="pt-1">
                                 <span className="inline-flex btn-primary text-xs py-2 px-5 pointer-events-none">
-                                  Завантажити чек 🧾
+                                  Завантажити чек
                                 </span>
                               </div>
                             </>
@@ -685,8 +933,9 @@ export default function Checkout() {
 
               {/* Notice when card payment selected but receipt missing */}
               {form.paymentMethod === "card" && !form.receiptUrl && (
-                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 text-center font-medium animate-fadeIn">
-                  ⚠️ Для остаточного підтвердження замовлення завантажте чек про оплату.
+                <div className="text-xs text-amber-900 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center font-medium flex items-center justify-center gap-2 animate-fadeIn">
+                  <IconClock className="w-4 h-4 text-amber-800 shrink-0" />
+                  <span>Для остаточного підтвердження замовлення завантажте чек про оплату.</span>
                 </div>
               )}
 
@@ -706,11 +955,11 @@ export default function Checkout() {
                 >
                   {submitting ? (
                     <>
-                      <span className="animate-spin">🔄</span>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       <span>Обробка замовлення...</span>
                     </>
                   ) : (
-                    <span>Підтвердити замовлення ({subtotal} грн) ✓</span>
+                    <span>Підтвердити замовлення ({subtotal} грн)</span>
                   )}
                 </button>
               </div>
@@ -720,7 +969,7 @@ export default function Checkout() {
 
         {/* Order Summary Sidebar */}
         <div className="lg:col-span-4 sticky top-24">
-          <div className="card p-6 bg-[#FAF6EE] border border-gold/30 shadow-sm rounded-3xl">
+          <div className="glass-card p-6 rounded-3xl shadow-sm">
             <h3 className="font-serif font-bold text-lg text-ink pb-3 border-b border-ink/10">
               Ваше замовлення
             </h3>
@@ -757,13 +1006,22 @@ export default function Checkout() {
             </div>
 
             {/* Quick Summary of Choice */}
-            <div className="mt-5 p-3 rounded-xl bg-white/70 border border-ink/5 text-[11px] text-ink/65 space-y-1">
-              <div>📍 <b>Отримувач:</b> {form.firstName} {form.lastName || "—"}</div>
-              <div>
-                🚚 <b>Доставка:</b> {form.providerKey === "up" ? "Укрпошта" : "Нова пошта"}
-                {form.deliveryCity ? ` (${form.deliveryCity}${form.deliveryBranch ? `, ${form.deliveryBranch}` : ""})` : ""}
+            <div className="mt-5 p-3 rounded-xl bg-white/70 border border-amber-900/10 text-[11px] text-ink/75 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <IconMapPin className="w-3.5 h-3.5 text-honey shrink-0" />
+                <span><b>Отримувач:</b> {form.firstName} {form.lastName || "—"}</span>
               </div>
-              <div>💳 <b>Оплата:</b> {form.paymentMethod === "card" ? "Оплатити зараз" : "Оплата при отриманні"}</div>
+              <div className="flex items-center gap-1.5">
+                <IconTruck className="w-3.5 h-3.5 text-honey shrink-0" />
+                <span>
+                  <b>Доставка:</b> {form.providerKey === "up" ? "Укрпошта" : "Нова Пошта"}
+                  {form.deliveryCity ? ` (${form.deliveryCity}${form.deliveryBranch ? `, ${form.deliveryBranch}` : ""})` : ""}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <IconCreditCard className="w-3.5 h-3.5 text-honey shrink-0" />
+                <span><b>Оплата:</b> {form.paymentMethod === "card" ? "Оплатити зараз" : "Оплата при отриманні"}</span>
+              </div>
             </div>
           </div>
         </div>

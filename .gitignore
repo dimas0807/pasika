@@ -33,3 +33,5 @@ storage/products/*
 *.njsproj
 *.sln
 *.sw?
+*.zip
+*.zip

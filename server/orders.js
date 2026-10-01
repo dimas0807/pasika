@@ -72,9 +72,16 @@ export function getFullOrder(orderId, customerToken = null) {
       : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(order.tracking_number)}`;
   }
 
+  // Payments lookup
+  const paymentRecords = db
+    .prepare("SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC")
+    .all(orderId);
+
   return {
     id: order.id,
     number: order.number,
+    orderCode: order.order_code || `PAS-${order.number}`,
+    order_code: order.order_code || `PAS-${order.number}`,
     status: order.status,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
@@ -105,8 +112,24 @@ export function getFullOrder(orderId, customerToken = null) {
     payment: {
       method: order.payment_method,
       methodLabel: order.payment_method === "card" ? "Оплачено наперед" : "Оплата при отриманні",
-      paymentStatus: order.payment_method === "card" ? "Чек на перевірці" : "Очікує оплати",
+      paymentStatus:
+        order.status === "PAID" || order.status === "COMPLETED" || order.status === "SHIPPED"
+          ? "Оплачено"
+          : order.status === "CANCELLED"
+          ? "Скасовано"
+          : order.payment_method === "card"
+          ? "Чек на перевірці"
+          : "Очікує оплати",
       receiptStatus: order.payment_method === "card" ? (order.receipt_url ? "Прикріплено" : "Очікується") : "Не потрібен",
+      records: paymentRecords.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        method: p.method,
+        status: p.status,
+        confirmedBy: p.confirmed_by,
+        confirmedAt: p.confirmed_at,
+        createdAt: p.created_at,
+      })),
     },
     comment: order.comment || "",
     receipt: (order.payment_method === "card" && order.receipt_url)
@@ -261,14 +284,15 @@ export async function createOrder(req, res) {
       finalReceiptName = null;
     }
 
-    // Execute atomic transaction: stock check, stock deduction, order & items insert, claim receipt
+    // Execute atomic transaction: stock check, stock reservation, order & items insert, claim receipt
     const orderId = "o_" + Date.now() + "_" + crypto.randomBytes(3).toString("hex");
     const now = Date.now();
     let calculatedTotal = 0;
-    let newOrderNumber = 1027;
+    let newOrderNumber = 10001;
+    let newOrderCode = "PAS-10001";
 
     const createTx = db.transaction(() => {
-      // Check stock & lock items
+      // Check available stock & lock items
       const resolvedItems = [];
       for (const item of items) {
         const product = db.prepare("SELECT * FROM products WHERE id = ?").get(item.id);
@@ -276,9 +300,13 @@ export async function createOrder(req, res) {
           throw new Error(`Товар з кодом ${item.id} не знайдено`);
         }
         const requestedQty = Number(item.qty);
-        if (product.stock < requestedQty) {
+        const totalStock = Number(product.stock) || 0;
+        const reservedStock = Number(product.reserved_stock) || 0;
+        const availableStock = Math.max(0, totalStock - reservedStock);
+
+        if (availableStock < requestedQty) {
           throw new Error(
-            `Недостатньо товару "${product.name}" на складі (в наявності ${product.stock} шт., запитано ${requestedQty} шт.)`
+            `Недостатньо доступного товару "${product.name}" на складі (в наявності доступно ${availableStock} шт., запитано ${requestedQty} шт.)`
           );
         }
         calculatedTotal += product.price * requestedQty;
@@ -288,18 +316,19 @@ export async function createOrder(req, res) {
         });
       }
 
-      // Next sequential order number
-      const numRow = db.prepare("SELECT COALESCE(MAX(number), 1026) + 1 AS next_num FROM orders").get();
-      newOrderNumber = numRow.next_num;
+      // Next sequential order number (PAS-10001 format)
+      const numRow = db.prepare("SELECT COALESCE(MAX(number), 10000) AS max_num FROM orders").get();
+      newOrderNumber = Math.max(Number(numRow?.max_num || 10000) + 1, 10001);
+      newOrderCode = `PAS-${newOrderNumber}`;
 
-      // Deduct stock
-      const updateStockStmt = db.prepare(`
+      // Reserve stock (stock stays unchanged until packed/shipped, reserved_stock increases)
+      const updateReservedStmt = db.prepare(`
         UPDATE products
-        SET stock = stock - ?, updated_at = ?
+        SET reserved_stock = reserved_stock + ?, updated_at = ?
         WHERE id = ?
       `);
       for (const entry of resolvedItems) {
-        updateStockStmt.run(entry.qty, now, entry.product.id);
+        updateReservedStmt.run(entry.qty, now, entry.product.id);
       }
 
       // Customer deduplication & persistent profile linking by normalized phone
@@ -340,6 +369,14 @@ export async function createOrder(req, res) {
         );
       }
 
+      // Also ensure customer exists in users table
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO users (id, phone, first_name, last_name, email, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run("u_" + customerId, normalizedPhone, cleanFirst, cleanLast, cleanEmail || null, now, now);
+      } catch {}
+
       // Mark receipt as claimed if uploaded during checkout
       if (rawReceiptPath && checkoutToken) {
         const receiptFilename = rawReceiptPath.split("/").pop();
@@ -350,20 +387,23 @@ export async function createOrder(req, res) {
         `).run(checkoutToken, receiptFilename);
       }
 
-      // Insert order with customer_id and delivery_service
+      const initialStatus = cleanPayment === "card" ? "AWAITING_PAYMENT" : "NEW";
+
+      // Insert order with customer_id, delivery_service and order_code
       db.prepare(`
         INSERT INTO orders (
-          id, number, status, customer_first_name, customer_last_name,
+          id, number, order_code, status, customer_first_name, customer_last_name,
           customer_phone, customer_email, customer_id, total, delivery_provider,
           delivery_provider_key, delivery_city_id, delivery_city_name,
           delivery_branch_id, delivery_branch_name, delivery_service, payment_method,
           comment, receipt_url, receipt_name, idempotency_key, customer_token,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         newOrderNumber,
-        "NEW",
+        newOrderCode,
+        initialStatus,
         cleanFirst,
         cleanLast,
         normalizedPhone,
@@ -387,8 +427,41 @@ export async function createOrder(req, res) {
         now
       );
 
+      // Record in stock_reservations table (references orders.id)
+      const insertResStmt = db.prepare(`
+        INSERT INTO stock_reservations (id, order_id, product_id, qty, status, created_at, expires_at)
+        VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+      `);
+      for (const entry of resolvedItems) {
+        const resId = "sr_" + crypto.randomBytes(8).toString("hex");
+        insertResStmt.run(resId, orderId, entry.product.id, entry.qty, now, now + 48 * 3600 * 1000);
+      }
+
+
+      // Record in payments table
+      const paymentId = "pay_" + crypto.randomBytes(8).toString("hex");
+      db.prepare(`
+        INSERT INTO payments (
+          id, order_id, amount, method, status, receipt_url, receipt_name, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        paymentId,
+        orderId,
+        calculatedTotal,
+        cleanPayment,
+        cleanPayment === "card" ? "PENDING" : "PENDING_COD",
+        rawReceiptPath || null,
+        finalReceiptName || null,
+        now
+      );
+
       // Record initial creation in status history
       const historyId = "osh_" + crypto.randomBytes(8).toString("hex");
+      const historyComment =
+        cleanPayment === "card"
+          ? "Замовлення оформлено (очікує підтвердження оплати за чеком)"
+          : "Замовлення оформлено на сайті";
+
       db.prepare(`
         INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -396,8 +469,8 @@ export async function createOrder(req, res) {
         historyId,
         orderId,
         null,
-        "NEW",
-        "Замовлення оформлено на сайті",
+        initialStatus,
+        historyComment,
         "customer",
         now
       );
@@ -443,7 +516,14 @@ export async function createOrder(req, res) {
 
 export function getPublicOrder(req, res) {
   const { id } = req.params;
-  const rawOrder = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+  const numVal = Number(id);
+  let rawOrder = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+  if (!rawOrder && !isNaN(numVal) && numVal > 0) {
+    rawOrder = db.prepare("SELECT * FROM orders WHERE number = ?").get(numVal);
+  }
+  if (!rawOrder) {
+    rawOrder = db.prepare("SELECT * FROM orders WHERE order_code = ?").get(id);
+  }
 
   if (!rawOrder) {
     return res.status(404).json({ error: "Замовлення не знайдено" });
@@ -467,7 +547,7 @@ export function getPublicOrder(req, res) {
     });
   }
 
-  const order = getFullOrder(id, rawOrder.customer_token);
+  const order = getFullOrder(rawOrder.id, rawOrder.customer_token);
   return res.json(order);
 }
 
@@ -519,6 +599,7 @@ export function getAdminOrders(req, res) {
     const pattern = `%${q}%`;
     query += ` AND (
       CAST(number AS TEXT) LIKE ? OR
+      order_code LIKE ? OR
       customer_first_name LIKE ? OR
       customer_last_name LIKE ? OR
       customer_phone LIKE ? OR
@@ -526,7 +607,7 @@ export function getAdminOrders(req, res) {
       delivery_city_name LIKE ? OR
       tracking_number LIKE ?
     )`;
-    params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+    params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
   }
 
   query += " ORDER BY created_at DESC";
@@ -541,7 +622,18 @@ export function updateOrderStatus(req, res) {
     const { id } = req.params;
     const { status, comment } = req.body || {};
 
-    const ALLOWED_STATUSES = ["NEW", "PROCESSING", "PACKED", "SHIPPED", "COMPLETED", "CANCELLED"];
+    const ALLOWED_STATUSES = [
+      "NEW",
+      "PROCESSING",
+      "AWAITING_PAYMENT",
+      "PAID",
+      "PACKED",
+      "SHIPMENT_CREATED",
+      "SHIPPED",
+      "DELIVERED",
+      "COMPLETED",
+      "CANCELLED",
+    ];
     if (!ALLOWED_STATUSES.includes(status)) {
       return res.status(400).json({ error: "Некоректний статус замовлення" });
     }
@@ -553,45 +645,88 @@ export function updateOrderStatus(req, res) {
 
     const prevStatus = existing.status;
     const now = Date.now();
+    const adminUser = req.admin?.username || "admin";
 
     const updateTx = db.transaction(() => {
-      // If transitioning to CANCELLED from another status, restore product stock
+      // 1. If transitioning to CANCELLED: release reservations
       if (status === "CANCELLED" && prevStatus !== "CANCELLED") {
-        const items = db.prepare("SELECT product_id, qty FROM order_items WHERE order_id = ?").all(id);
-        const restoreStockStmt = db.prepare("UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?");
-        for (const item of items) {
-          restoreStockStmt.run(item.qty, now, item.product_id);
+        const reservations = db.prepare("SELECT * FROM stock_reservations WHERE order_id = ?").all(id);
+        for (const resv of reservations) {
+          if (resv.status === "ACTIVE") {
+            db.prepare(`
+              UPDATE products
+              SET reserved_stock = MAX(0, reserved_stock - ?), updated_at = ?
+              WHERE id = ?
+            `).run(resv.qty, now, resv.product_id);
+            db.prepare("UPDATE stock_reservations SET status = 'RELEASED' WHERE id = ?").run(resv.id);
+          } else if (resv.status === "FULFILLED") {
+            // Already fulfilled/deducted: return stock back
+            db.prepare(`
+              UPDATE products
+              SET stock = stock + ?, updated_at = ?
+              WHERE id = ?
+            `).run(resv.qty, now, resv.product_id);
+            db.prepare("UPDATE stock_reservations SET status = 'RELEASED' WHERE id = ?").run(resv.id);
+          }
         }
       }
-      // If restoring from CANCELLED to an active status, check stock FIRST before deducting!
+      // 2. If restoring from CANCELLED to an active status: re-reserve stock
       else if (prevStatus === "CANCELLED" && status !== "CANCELLED") {
         const items = db.prepare("SELECT product_id, qty FROM order_items WHERE order_id = ?").all(id);
-
         for (const item of items) {
-          const prod = db.prepare("SELECT name, stock FROM products WHERE id = ?").get(item.product_id);
-          if (!prod) {
-            throw new Error(`Товар ${item.product_id} не знайдено`);
-          }
-          if (prod.stock < item.qty) {
-            throw new Error(
-              `Недостатньо товару "${prod.name}" на складі для відновлення замовлення (доступно ${prod.stock} шт., потрібно ${item.qty} шт.)`
-            );
+          const prod = db.prepare("SELECT name, stock, reserved_stock FROM products WHERE id = ?").get(item.product_id);
+          if (!prod) throw new Error(`Товар ${item.product_id} не знайдено`);
+          const avail = Math.max(0, (prod.stock || 0) - (prod.reserved_stock || 0));
+          if (avail < item.qty) {
+            throw new Error(`Недостатньо доступного товару "${prod.name}" на складі (доступно ${avail} шт., потрібно ${item.qty} шт.)`);
           }
         }
-
-        const deductStockStmt = db.prepare("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?");
         for (const item of items) {
-          deductStockStmt.run(item.qty, now, item.product_id);
+          db.prepare(`
+            UPDATE products SET reserved_stock = reserved_stock + ?, updated_at = ? WHERE id = ?
+          `).run(item.qty, now, item.product_id);
+          const resId = "sr_" + crypto.randomBytes(8).toString("hex");
+          db.prepare(`
+            INSERT INTO stock_reservations (id, order_id, product_id, qty, status, created_at, expires_at)
+            VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+          `).run(resId, id, item.product_id, item.qty, now, now + 48 * 3600 * 1000);
         }
       }
 
-      // Record shipped_at or completed_at dates if transitioning to those statuses
+      // 3. If transitioning to PACKED, SHIPMENT_CREATED, SHIPPED, DELIVERED, COMPLETED:
+      // Fulfill active reservations (deduct stock, decrement reserved_stock, mark FULFILLED)
+      const FULFILL_STATUSES = ["PACKED", "SHIPMENT_CREATED", "SHIPPED", "DELIVERED", "COMPLETED"];
+      if (FULFILL_STATUSES.includes(status)) {
+        const activeResvs = db.prepare("SELECT * FROM stock_reservations WHERE order_id = ? AND status = 'ACTIVE'").all(id);
+        for (const resv of activeResvs) {
+          db.prepare(`
+            UPDATE products
+            SET stock = MAX(0, stock - ?),
+                reserved_stock = MAX(0, reserved_stock - ?),
+                updated_at = ?
+            WHERE id = ?
+          `).run(resv.qty, resv.qty, now, resv.product_id);
+
+          db.prepare("UPDATE stock_reservations SET status = 'FULFILLED' WHERE id = ?").run(resv.id);
+        }
+      }
+
+      // 4. If status is PAID: update payments table
+      if (status === "PAID") {
+        db.prepare(`
+          UPDATE payments
+          SET status = 'PAID', confirmed_at = ?, confirmed_by = ?
+          WHERE order_id = ?
+        `).run(now, adminUser, id);
+      }
+
+      // 5. Shipped and completed dates
       let shippedAt = existing.shipped_at;
       let completedAt = existing.completed_at;
-      if (status === "SHIPPED" && !shippedAt) {
+      if ((status === "SHIPPED" || status === "SHIPMENT_CREATED") && !shippedAt) {
         shippedAt = now;
       }
-      if (status === "COMPLETED" && !completedAt) {
+      if ((status === "COMPLETED" || status === "DELIVERED") && !completedAt) {
         completedAt = now;
       }
 
@@ -601,13 +736,13 @@ export function updateOrderStatus(req, res) {
         WHERE id = ?
       `).run(status, shippedAt, completedAt, now, id);
 
-      // Record in status history
+      // 6. Record in status history
       const historyId = "osh_" + crypto.randomBytes(8).toString("hex");
       const historyComment = comment || `Зміна статусу з ${prevStatus} на ${status}`;
       db.prepare(`
         INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(historyId, id, prevStatus, status, historyComment, "admin", now);
+      `).run(historyId, id, prevStatus, status, historyComment, adminUser, now);
     });
 
     updateTx();
@@ -616,7 +751,7 @@ export function updateOrderStatus(req, res) {
 
     // Trigger Telegram status update notification in background if status changed
     if (prevStatus !== status) {
-      notifyOrderStatusChange(updated, prevStatus, status).catch((err) => {
+      notifyOrderStatusChange(updated, prevStatus, status, adminUser).catch((err) => {
         console.warn("[Telegram Status Notification Error]:", err.message);
       });
     }
@@ -734,4 +869,138 @@ export function restoreOrder(req, res) {
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+}
+
+export function confirmOrderPayment(req, res) {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare("SELECT * FROM orders WHERE id = ?").get(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Замовлення не знайдено" });
+    }
+
+    const now = Date.now();
+    const prevStatus = existing.status;
+    const adminUser = req.admin?.username || "admin";
+
+    db.transaction(() => {
+      // 1. Update order status to PAID
+      db.prepare(`
+        UPDATE orders
+        SET status = 'PAID', updated_at = ?
+        WHERE id = ?
+      `).run(now, id);
+
+      // 2. Update or insert payment record
+      const pay = db.prepare("SELECT id FROM payments WHERE order_id = ?").get(id);
+      if (pay) {
+        db.prepare(`
+          UPDATE payments
+          SET status = 'PAID', confirmed_at = ?, confirmed_by = ?
+          WHERE id = ?
+        `).run(now, adminUser, pay.id);
+      } else {
+        const payId = "pay_" + crypto.randomBytes(8).toString("hex");
+        db.prepare(`
+          INSERT INTO payments (id, order_id, amount, method, status, confirmed_by, confirmed_at, created_at)
+          VALUES (?, ?, ?, ?, 'PAID', ?, ?, ?)
+        `).run(payId, id, existing.total, existing.payment_method, adminUser, now, now);
+      }
+
+      // 3. Status history
+      const hid = "osh_" + crypto.randomBytes(8).toString("hex");
+      db.prepare(`
+        INSERT INTO order_status_history (id, order_id, from_status, to_status, comment, changed_by, created_at)
+        VALUES (?, ?, ?, 'PAID', 'Оплату перевірено та підтверджено адміністратором', ?, ?)
+      `).run(hid, id, prevStatus, adminUser, now);
+    })();
+
+    const updated = getFullOrder(id);
+    notifyOrderStatusChange(updated, prevStatus, "PAID", adminUser).catch(() => {});
+
+    return res.json({ success: true, order: updated });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+export function getPublicOrderTrack(req, res) {
+  const query = (req.params.query || "").trim();
+  if (!query) {
+    return res.status(400).json({ error: "Вкажіть номер замовлення для відстеження" });
+  }
+
+  // Support queries like "PAS-10001", "10001", "#10001", or UUID "o_172..."
+  const cleanNum = query.replace(/^(PAS-|#)/i, "").trim();
+  const numVal = Number(cleanNum);
+
+  let rawOrder = null;
+  if (!isNaN(numVal) && numVal > 0) {
+    rawOrder = db.prepare("SELECT * FROM orders WHERE number = ? OR order_code = ? OR id = ?").get(numVal, query, query);
+  }
+  if (!rawOrder) {
+    rawOrder = db.prepare("SELECT * FROM orders WHERE order_code = ? OR id = ?").get(query, query);
+  }
+
+  if (!rawOrder) {
+    return res.status(404).json({ error: "Замовлення за вказаним номером не знайдено" });
+  }
+
+  const items = db.prepare("SELECT name, weight, price, qty FROM order_items WHERE order_id = ?").all(rawOrder.id);
+  const statusHistory = db.prepare(
+    "SELECT from_status, to_status, comment, created_at FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC"
+  ).all(rawOrder.id);
+
+  const STATUS_UA = {
+    NEW: "Нове",
+    PROCESSING: "В обробці",
+    AWAITING_PAYMENT: "Очікує оплати / перевірки чека",
+    PAID: "Оплачено",
+    PACKED: "Запаковано",
+    SHIPMENT_CREATED: "Створено ТТН",
+    SHIPPED: "Відправлено",
+    DELIVERED: "Доставлено",
+    COMPLETED: "Виконано",
+    CANCELLED: "Скасовано",
+  };
+
+  const deliveryService = rawOrder.delivery_service || rawOrder.delivery_provider || "Нова Пошта";
+  let trackingUrl = null;
+  if (rawOrder.tracking_number) {
+    const isUp = deliveryService.toLowerCase().includes("укр");
+    trackingUrl = isUp
+      ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(rawOrder.tracking_number)}`
+      : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(rawOrder.tracking_number)}`;
+  }
+
+  return res.json({
+    orderCode: rawOrder.order_code || `PAS-${rawOrder.number}`,
+    number: rawOrder.number,
+    createdAt: rawOrder.created_at,
+    updatedAt: rawOrder.updated_at,
+    status: rawOrder.status,
+    statusLabel: STATUS_UA[rawOrder.status] || rawOrder.status,
+    total: rawOrder.total,
+    delivery: {
+      service: deliveryService,
+      city: rawOrder.delivery_city_name,
+      branch: rawOrder.delivery_branch_name,
+      trackingNumber: rawOrder.tracking_number || null,
+      trackingUrl,
+      shippedAt: rawOrder.shipped_at || null,
+      completedAt: rawOrder.completed_at || null,
+    },
+    items: items.map((i) => ({
+      name: i.name,
+      weight: i.weight,
+      qty: i.qty,
+      price: i.price,
+    })),
+    statusHistory: statusHistory.map((h) => ({
+      fromStatus: h.from_status,
+      toStatus: h.to_status,
+      comment: h.comment,
+      createdAt: h.created_at,
+    })),
+  });
 }

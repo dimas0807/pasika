@@ -179,7 +179,110 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_telegram_interactions_created_at ON telegram_interactions(created_at);
     CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
     CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id);
+
+    -- Production Users Table
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      phone TEXT UNIQUE NOT NULL,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    -- Stock Reservations Table
+    CREATE TABLE IF NOT EXISTS stock_reservations (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      qty INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    -- Payments Table
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      method TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      receipt_url TEXT,
+      receipt_name TEXT,
+      confirmed_by TEXT,
+      confirmed_at INTEGER,
+      comment TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
+    -- Multi-account Delivery Accounts Table
+    CREATE TABLE IF NOT EXISTS delivery_accounts (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      name TEXT NOT NULL,
+      api_key TEXT NOT NULL,
+      sender_ref TEXT,
+      sender_name TEXT,
+      phone TEXT,
+      city_ref TEXT,
+      city_name TEXT,
+      warehouse_ref TEXT,
+      warehouse_name TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    -- Shipments & TTN Tracking Table
+    CREATE TABLE IF NOT EXISTS shipments (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      account_id TEXT,
+      tracking_number TEXT NOT NULL,
+      document_ref TEXT,
+      status TEXT NOT NULL DEFAULT 'CREATED',
+      status_code TEXT,
+      status_description TEXT,
+      sender_data TEXT,
+      recipient_data TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
+    -- Dedicated Settings Tables
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stock_reservations_order ON stock_reservations(order_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_reservations_product ON stock_reservations(product_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_reservations_status ON stock_reservations(status);
+    CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+    CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+    CREATE INDEX IF NOT EXISTS idx_delivery_accounts_provider ON delivery_accounts(provider);
+    CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(order_id);
+    CREATE INDEX IF NOT EXISTS idx_shipments_tracking ON shipments(tracking_number);
   `);
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN order_code TEXT");
+  } catch {}
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN customer_token TEXT");
@@ -210,11 +313,31 @@ export function initDatabase() {
   } catch {}
 
   try {
+    db.exec("ALTER TABLE products ADD COLUMN reserved_stock INTEGER NOT NULL DEFAULT 0");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE products ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE products ADD COLUMN features TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE admin_users ADD COLUMN role TEXT NOT NULL DEFAULT 'ADMIN'");
+  } catch {}
+
+  try {
     db.exec("ALTER TABLE telegram_logs ADD COLUMN recipient_id TEXT");
   } catch {}
 
   try {
     db.exec("ALTER TABLE telegram_logs ADD COLUMN chat_id TEXT");
+  } catch {}
+
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_orders_order_code ON orders(order_code)");
   } catch {}
 
   try {
@@ -340,6 +463,153 @@ function migrateDataPersistence() {
     }
   } catch (err) {
     console.warn("[Status history backfill warning]:", err.message);
+  }
+
+  // 4. Backfill order_code with PAS- prefix if null
+  try {
+    db.prepare(`
+      UPDATE orders
+      SET order_code = 'PAS-' || number
+      WHERE order_code IS NULL
+    `).run();
+  } catch (err) {
+    console.warn("[Order code backfill warning]:", err.message);
+  }
+
+  // 5. Backfill users table from customers if empty
+  try {
+    const userCount = db.prepare("SELECT COUNT(*) AS count FROM users").get().count;
+    if (userCount === 0) {
+      const allCustomers = db.prepare("SELECT * FROM customers").all();
+      if (allCustomers.length > 0) {
+        const insertUser = db.prepare(`
+          INSERT OR IGNORE INTO users (id, phone, first_name, last_name, email, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const tx = db.transaction(() => {
+          for (const c of allCustomers) {
+            insertUser.run(
+              "u_" + c.id,
+              c.phone,
+              c.first_name,
+              c.last_name,
+              c.email || null,
+              c.created_at,
+              c.updated_at
+            );
+          }
+        });
+        tx();
+      }
+    }
+  } catch (err) {
+    console.warn("[Users backfill warning]:", err.message);
+  }
+
+  // 6. Backfill admin_users role (OWNER for primary admin)
+  try {
+    db.prepare(`
+      UPDATE admin_users
+      SET role = 'OWNER'
+      WHERE id = 'admin_1' OR username = 'admin'
+    `).run();
+  } catch {}
+
+  // 7. Seed default delivery accounts if table is empty
+  try {
+    const daCount = db.prepare("SELECT COUNT(*) AS count FROM delivery_accounts").get().count;
+    if (daCount === 0) {
+      const now = Date.now();
+      const npKey = (process.env.NOVA_POSHTA_API_KEY || "").trim();
+      const upKey = (process.env.UKRPOSHTA_API_KEY || "").trim();
+
+      db.prepare(`
+        INSERT INTO delivery_accounts (
+          id, provider, name, api_key, sender_ref, sender_name,
+          phone, city_ref, city_name, warehouse_ref, warehouse_name,
+          is_active, is_default, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        "da_np_main",
+        "np",
+        "Нова Пошта — Основний",
+        npKey,
+        null,
+        "Пасіка Honey Pasika",
+        "+380678352311",
+        null,
+        "с. Новоселиця",
+        null,
+        "Відділення №1",
+        1,
+        1,
+        now,
+        now
+      );
+
+      db.prepare(`
+        INSERT INTO delivery_accounts (
+          id, provider, name, api_key, sender_ref, sender_name,
+          phone, city_ref, city_name, warehouse_ref, warehouse_name,
+          is_active, is_default, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        "da_up_main",
+        "up",
+        "Укрпошта — Основний",
+        upKey,
+        null,
+        "Пасіка Honey Pasika",
+        "+380678352311",
+        null,
+        "с. Новоселиця",
+        null,
+        "Відділення №1",
+        1,
+        1,
+        now,
+        now
+      );
+    }
+  } catch (err) {
+    console.warn("[Delivery accounts seed warning]:", err.message);
+  }
+
+  // 8. Backfill stock_reservations for active orders if none exist
+  try {
+    const resCount = db.prepare("SELECT COUNT(*) AS count FROM stock_reservations").get().count;
+    if (resCount === 0) {
+      const activeOrders = db.prepare(`
+        SELECT id, created_at
+        FROM orders
+        WHERE status IN ('NEW', 'PROCESSING', 'AWAITING_PAYMENT')
+          AND deleted_at IS NULL
+      `).all();
+
+      if (activeOrders.length > 0) {
+        const insertRes = db.prepare(`
+          INSERT INTO stock_reservations (id, order_id, product_id, qty, status, created_at, expires_at)
+          VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+        `);
+        const updateProductReserved = db.prepare(`
+          UPDATE products SET reserved_stock = reserved_stock + ? WHERE id = ?
+        `);
+
+        const tx = db.transaction(() => {
+          for (const ord of activeOrders) {
+            const items = db.prepare("SELECT product_id, qty FROM order_items WHERE order_id = ?").all(ord.id);
+            for (const it of items) {
+              const resId = "sr_" + crypto.randomBytes(8).toString("hex");
+              insertRes.run(resId, ord.id, it.product_id, it.qty, ord.created_at, ord.created_at + 48 * 3600 * 1000);
+              updateProductReserved.run(it.qty, it.product_id);
+            }
+          }
+        });
+        tx();
+      }
+    }
+  } catch (err) {
+    console.warn("[Stock reservations backfill warning]:", err.message);
   }
 }
 

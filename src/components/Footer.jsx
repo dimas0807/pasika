@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 import RealisticBee from "./RealisticBee";
 import { Settings, subscribe } from "../data/db";
 import { getSocialUrl } from "../utils/contacts";
+import {
+  IconShieldCheck,
+  IconTruck,
+  IconTelegram,
+  IconViber,
+  IconInstagram,
+  IconFacebook,
+  IconTikTok,
+} from "./Icons";
 
 export default function Footer() {
   const [s, setS] = useState(() => Settings.get());
@@ -30,6 +39,23 @@ export default function Footer() {
     .map((item) => ({ ...item, url: getSocialUrl(item.key, s?.contacts?.[item.key]) }))
     .filter((item) => Boolean(item.url));
 
+  const renderSocialIcon = (key) => {
+    switch (key) {
+      case "telegram":
+        return <IconTelegram className="w-3.5 h-3.5" />;
+      case "viber":
+        return <IconViber className="w-3.5 h-3.5" />;
+      case "instagram":
+        return <IconInstagram className="w-3.5 h-3.5" />;
+      case "facebook":
+        return <IconFacebook className="w-3.5 h-3.5" />;
+      case "tiktok":
+        return <IconTikTok className="w-3.5 h-3.5" />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <footer className="bg-[#171512] text-[#FFFDF8] border-t border-gold/20 mt-16 sm:mt-24 relative overflow-hidden">
       {/* Ambient warm glow in top-right */}
@@ -45,10 +71,16 @@ export default function Footer() {
           <p className="text-white/70 text-xs sm:text-sm leading-relaxed mt-3.5 max-w-sm">
             {storeDesc}
           </p>
-          <div className="mt-5 flex items-center gap-3 text-xs text-white/50">
-            <span>🌿 Натуральні продукти</span>
-            <span>•</span>
-            <span>🚚 Доставка по Україні</span>
+          <div className="mt-5 flex items-center gap-3 text-xs text-white/60">
+            <span className="inline-flex items-center gap-1.5">
+              <IconShieldCheck className="w-3.5 h-3.5 text-accent" />
+              <span>Натуральні продукти</span>
+            </span>
+            <span className="text-white/20">•</span>
+            <span className="inline-flex items-center gap-1.5">
+              <IconTruck className="w-3.5 h-3.5 text-accent" />
+              <span>Доставка по Україні</span>
+            </span>
           </div>
         </div>
 
@@ -71,6 +103,11 @@ export default function Footer() {
             <li>
               <Link to="/delivery" className="hover:text-accent transition-colors">
                 Доставка та оплата
+              </Link>
+            </li>
+            <li>
+              <Link to="/track-order" className="hover:text-accent transition-colors">
+                Відстежити замовлення
               </Link>
             </li>
             <li>
@@ -128,9 +165,10 @@ export default function Footer() {
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-accent hover:text-ink text-xs font-semibold transition-all"
                   >
-                    {item.label} ↗
+                    {renderSocialIcon(item.key)}
+                    <span>{item.label}</span>
                   </a>
                 ))}
               </li>

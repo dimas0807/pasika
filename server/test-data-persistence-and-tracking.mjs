@@ -1,7 +1,6 @@
 import fs from "node:fs";
-import path from "node:path";
 import Database from "better-sqlite3";
-import { initDatabase, db, normalizePhone, DB_PATH } from "./db.js";
+import { initDatabase, db, normalizePhone } from "./db.js";
 import {
   createOrder,
   getFullOrder,

@@ -3,13 +3,28 @@ import { Link } from "react-router-dom";
 import { request } from "../data/db";
 
 const STATUS_LABEL = {
-  NEW: "Нове", PROCESSING: "В обробці", PACKED: "Запаковано",
-  SHIPPED: "Відправлено", COMPLETED: "Виконано", CANCELLED: "Скасовано",
+  NEW: "Нове",
+  PROCESSING: "В обробці",
+  AWAITING_PAYMENT: "Очікує оплати",
+  PAID: "Оплачено",
+  PACKED: "Запаковано",
+  SHIPMENT_CREATED: "Створено ТТН",
+  SHIPPED: "Відправлено",
+  DELIVERED: "Доставлено",
+  COMPLETED: "Виконано",
+  CANCELLED: "Скасовано",
 };
 const STATUS_COLOR = {
-  NEW: "bg-honey/15 text-honey", PROCESSING: "bg-accent/20 text-ink",
-  PACKED: "bg-gold/20 text-ink", SHIPPED: "bg-leaf/15 text-leaf",
-  COMPLETED: "bg-leaf/20 text-leaf", CANCELLED: "bg-red-100 text-red-500",
+  NEW: "bg-slate-100 text-slate-800",
+  PROCESSING: "bg-blue-100 text-blue-800",
+  AWAITING_PAYMENT: "bg-amber-100 text-amber-900 font-semibold",
+  PAID: "bg-emerald-100 text-emerald-800",
+  PACKED: "bg-indigo-100 text-indigo-800",
+  SHIPMENT_CREATED: "bg-purple-100 text-purple-800",
+  SHIPPED: "bg-teal-100 text-teal-800",
+  DELIVERED: "bg-sky-100 text-sky-800",
+  COMPLETED: "bg-green-100 text-green-800",
+  CANCELLED: "bg-red-100 text-red-600",
 };
 
 export default function Dashboard() {
@@ -25,28 +40,29 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const kpis = data?.kpis || {
-    totalOrders: 0,
-    ordersToday: 0,
-    ordersThisWeek: 0,
-    ordersThisMonth: 0,
-    newOrders: 0,
-    processingOrders: 0,
-    packedOrders: 0,
-    shippedOrders: 0,
-    completedOrders: 0,
-    cancelledOrders: 0,
-    totalRevenue: 0,
-    completedRevenue: 0,
-    averageCheck: 0,
-    totalCustomers: 0,
-    newCustomers: 0,
-    repeatCustomers: 0,
+  const rawKpis = data?.kpis || {};
+  const kpis = {
+    totalOrders: Number(rawKpis.totalOrders ?? 0) || 0,
+    ordersToday: Number(rawKpis.ordersToday ?? 0) || 0,
+    ordersThisWeek: Number(rawKpis.ordersThisWeek ?? 0) || 0,
+    ordersThisMonth: Number(rawKpis.ordersThisMonth ?? 0) || 0,
+    newOrders: Number(rawKpis.newOrders ?? 0) || 0,
+    processingOrders: Number(rawKpis.processingOrders ?? 0) || 0,
+    packedOrders: Number(rawKpis.packedOrders ?? 0) || 0,
+    shippedOrders: Number(rawKpis.shippedOrders ?? 0) || 0,
+    completedOrders: Number(rawKpis.completedOrders ?? 0) || 0,
+    cancelledOrders: Number(rawKpis.cancelledOrders ?? 0) || 0,
+    totalRevenue: Number(rawKpis.totalRevenue ?? 0) || 0,
+    completedRevenue: Number(rawKpis.completedRevenue ?? 0) || 0,
+    averageCheck: Number(rawKpis.averageCheck ?? 0) || 0,
+    totalCustomers: Number(rawKpis.totalCustomers ?? 0) || 0,
+    newCustomers: Number(rawKpis.newCustomers ?? 0) || 0,
+    repeatCustomers: Number(rawKpis.repeatCustomers ?? 0) || 0,
   };
-  const recentOrders = data?.recentOrders || [];
-  const top = data?.topProducts || [];
-  const telegram = data?.telegramLogs || [];
-  const salesOrders = data?.salesOrders || [];
+  const recentOrders = Array.isArray(data?.recentOrders) ? data.recentOrders : [];
+  const top = Array.isArray(data?.topProducts) ? data.topProducts : [];
+  const telegram = Array.isArray(data?.telegramLogs) ? data.telegramLogs : [];
+  const salesOrders = Array.isArray(data?.salesOrders) ? data.salesOrders : [];
 
   return (
     <div className="space-y-6">
@@ -83,18 +99,18 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Kpi
               label="Виручка (виконані)"
-              value={`${kpis.completedRevenue.toLocaleString("uk-UA")} грн`}
+              value={`${(Number(kpis.completedRevenue) || 0).toLocaleString("uk-UA")} грн`}
               sub={`Всього замовлень: ${kpis.totalOrders}`}
               highlight
             />
             <Kpi
               label="Загальна виручка"
-              value={`${kpis.totalRevenue.toLocaleString("uk-UA")} грн`}
+              value={`${(Number(kpis.totalRevenue) || 0).toLocaleString("uk-UA")} грн`}
               sub="Враховуючи всі замовлення"
             />
             <Kpi
               label="Середній чек"
-              value={`${kpis.averageCheck.toLocaleString("uk-UA")} грн`}
+              value={`${(Number(kpis.averageCheck) || 0).toLocaleString("uk-UA")} грн`}
               sub="По завершених покупках"
             />
             <Kpi
@@ -214,7 +230,10 @@ export default function Dashboard() {
                     >
                       <div className="min-w-0">
                         <div className="font-semibold text-ink truncate flex items-center gap-2">
-                          <span>#{o.number} {o.customer?.firstName} {o.customer?.lastName || ""}</span>
+                          <span className="font-mono text-xs font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            {o.orderCode || o.order_code || `PAS-${o.number}`}
+                          </span>
+                          <span>{o.customer?.firstName} {o.customer?.lastName || ""}</span>
                           {o.delivery?.trackingNumber && (
                             <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono hidden sm:inline">
                               ТТН: {o.delivery.trackingNumber}
@@ -272,7 +291,7 @@ export default function Dashboard() {
                 {telegram.map((t) => (
                   <div key={t.id} className="relative">
                     <span className="text-[10px] text-ink/40 block mb-1">
-                      {new Date(t.created_at || t.createdAt).toLocaleString("uk-UA")} • Статус: {t.status}
+                      {new Date(t.created_at || t.createdAt || Date.now()).toLocaleString("uk-UA")} • Статус: {t.status || "—"}
                     </span>
                     <pre className="text-xs bg-ink text-cream/90 rounded-xl p-3 whitespace-pre-wrap break-words font-sans overflow-x-hidden">
                       {t.text}
@@ -304,19 +323,22 @@ function Kpi({ label, value, sub, highlight, className = "" }) {
   );
 }
 
-
 function SalesChart({ orders }) {
-  const last = [...orders].reverse().slice(-10);
+  const last = [...(Array.isArray(orders) ? orders : [])].reverse().slice(-10);
   if (last.length === 0) return <p className="text-sm text-ink/40">Немає даних для графіка.</p>;
-  const max = Math.max(...last.map((o) => o.total), 1);
+  const max = Math.max(...last.map((o) => Number(o?.total) || 0), 1);
   return (
     <div className="flex items-end gap-1.5 sm:gap-2 h-32 w-full overflow-hidden">
-      {last.map((o) => (
-        <div key={o.id} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-1" title={`#${o.number}: ${o.total} грн`}>
-          <div className="w-full bg-honey/80 rounded-t-md transition-colors" style={{ height: `${Math.max(6, (o.total / max) * 100)}%` }} />
-          <span className="text-[10px] text-ink/40 truncate w-full text-center">#{o.number}</span>
-        </div>
-      ))}
+      {last.map((o) => {
+        const orderTotal = Number(o?.total) || 0;
+        const orderNum = o?.orderCode || o?.order_code || (o?.number ? `#${o.number}` : o?.id || "—");
+        return (
+          <div key={o.id || Math.random()} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-1" title={`${orderNum}: ${orderTotal} грн`}>
+            <div className="w-full bg-honey/80 rounded-t-md transition-colors" style={{ height: `${Math.max(6, (orderTotal / max) * 100)}%` }} />
+            <span className="text-[10px] text-ink/40 truncate w-full text-center">{orderNum}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

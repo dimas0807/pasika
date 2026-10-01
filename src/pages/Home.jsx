@@ -5,6 +5,14 @@ import TikTokCard from "../components/TikTokCard";
 import RealisticBee from "../components/RealisticBee";
 import WaxHoneycomb from "../components/WaxHoneycomb";
 import { Categories, Products, Settings, subscribe } from "../data/db";
+import {
+  IconTruck,
+  IconShieldCheck,
+  IconHoneyJar,
+  IconHoneycomb,
+  IconMapPin,
+  IconSparkles,
+} from "../components/Icons";
 
 const TRUST_BADGES = [
   {
@@ -13,17 +21,17 @@ const TRUST_BADGES = [
     desc: "Родинна справа",
   },
   {
-    icon: <span className="text-2xl">🍯</span>,
+    icon: <IconHoneyJar className="w-6 h-6 text-accent" />,
     title: "Натуральний мед",
     desc: "Без цукру та домішок",
   },
   {
-    icon: <span className="text-2xl">🏡</span>,
+    icon: <IconShieldCheck className="w-6 h-6 text-accent" />,
     title: "Понад 100 вуликів",
     desc: "Прикарпаття, с. Новоселиця",
   },
   {
-    icon: <span className="text-2xl">🚚</span>,
+    icon: <IconTruck className="w-6 h-6 text-accent" />,
     title: "Доставка по Україні",
     desc: "Нова пошта та Укрпошта",
   },
@@ -173,7 +181,7 @@ export default function Home() {
             {/* Main Headline */}
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.12] tracking-tight drop-shadow-md">
               Натуральний мед <br />
-              <span className="text-accent drop-shadow-sm">прямо з нашої пасіки 🍯</span>
+              <span className="text-accent drop-shadow-sm">прямо з родинної пасіки</span>
             </h1>
 
             {/* Supporting Story Text */}
@@ -236,7 +244,7 @@ export default function Home() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
             <div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-honey/30 text-xs font-bold uppercase tracking-widest text-honey shadow-2xs">
-                <span>🍯</span>
+                <IconHoneycomb className="w-3.5 h-3.5 text-honey" />
                 <span>Дари нашої пасіки</span>
               </div>
               <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-3">
@@ -339,7 +347,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
             <div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-honey/30 text-xs font-bold uppercase tracking-widest text-honey shadow-2xs">
-                <span>🍯</span>
+                <IconHoneycomb className="w-3.5 h-3.5 text-honey" />
                 <span>З медової комори на ваш стіл</span>
               </div>
               <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-3">
@@ -368,7 +376,8 @@ export default function Home() {
             {/* Wooden Table Shelf Edge Base */}
             <div className="mt-6 pt-4 border-t border-amber-900/10 flex flex-wrap items-center justify-between text-xs text-ink/65 gap-2">
               <span className="flex items-center gap-1.5 font-medium">
-                <span>🪵</span> Натуральне дерев'яне фасування та крафтове пакування
+                <IconShieldCheck className="w-3.5 h-3.5 text-honey shrink-0" />
+                <span>Натуральне фасування та крафтове пакування</span>
               </span>
               <span className="font-semibold text-honey">
                 100% чистий мед без цукру та домішок
@@ -391,7 +400,7 @@ export default function Home() {
                 Подарункова колекція
               </span>
               <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-4 leading-tight">
-                Подарунок, який запам'ятається 💛
+                Подарунок, який запам'ятається
               </h2>
               <p className="mt-4 text-ink/80 text-sm sm:text-base leading-relaxed max-w-lg">
                 Натуральні продукти бджільництва, стильне крафтове пакування та частинка сонячного тепла родинної пасіки у кожному наборі. Ідеально для затишного свята чи подарунка рідним.
@@ -452,8 +461,8 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-lg">
-                    🏡
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
+                    <IconShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-ink">Понад {hivesCount} вуликів</h4>
@@ -462,8 +471,8 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-lg">
-                    📍
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
+                    <IconMapPin className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-ink">{location}</h4>
@@ -472,8 +481,8 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-lg">
-                    🍯
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
+                    <IconHoneyJar className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-ink">Натуральні продукти</h4>
@@ -579,7 +588,9 @@ export default function Home() {
 
             {/* Content */}
             <div className="relative z-20 max-w-2xl mx-auto">
-              <span className="text-3xl mb-3 inline-block">🍯</span>
+              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-accent mx-auto mb-4 shadow-sm">
+                <IconHoneycomb className="w-6 h-6" />
+              </div>
               <h2 className="font-serif text-3xl sm:text-5xl font-extrabold text-white leading-tight drop-shadow-md">
                 Спробуйте смак нашої пасіки
               </h2>

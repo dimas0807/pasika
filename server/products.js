@@ -3,6 +3,10 @@ import { db } from "./db.js";
 
 function mapProductRow(row) {
   if (!row) return null;
+  const totalStock = Number(row.stock) || 0;
+  const reservedStock = Number(row.reserved_stock) || 0;
+  const availableStock = Math.max(0, totalStock - reservedStock);
+
   return {
     id: row.id,
     slug: row.slug,
@@ -11,7 +15,12 @@ function mapProductRow(row) {
     weight: row.weight,
     price: row.price,
     oldPrice: row.old_price,
-    stock: row.stock,
+    stock: totalStock,
+    totalStock,
+    reservedStock,
+    availableStock,
+    isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
+    features: row.features || "",
     featured: Boolean(row.featured),
     giftBox: Boolean(row.gift_box),
     description: row.description,
@@ -24,7 +33,7 @@ function mapProductRow(row) {
 // ---------------- Public Endpoints ----------------
 
 export function getAllProducts(req, res) {
-  const { category, featured } = req.query;
+  const { category, featured, includeInactive } = req.query;
   let sql = "SELECT * FROM products";
   const params = [];
 
@@ -37,6 +46,9 @@ export function getAllProducts(req, res) {
     conditions.push("featured = ?");
     params.push(featured === "true" || featured === "1" ? 1 : 0);
   }
+  if (includeInactive !== "true") {
+    conditions.push("(is_active IS NULL OR is_active = 1)");
+  }
 
   if (conditions.length > 0) {
     sql += " WHERE " + conditions.join(" AND ");
@@ -46,6 +58,41 @@ export function getAllProducts(req, res) {
 
   const rows = db.prepare(sql).all(...params);
   return res.json(rows.map(mapProductRow));
+}
+
+export function validateCartStock(req, res) {
+  const { items } = req.body || {};
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: "Список товарів обов'язковий" });
+  }
+
+  const results = items.map((item) => {
+    const prod = db.prepare("SELECT * FROM products WHERE id = ?").get(item.id);
+    if (!prod) {
+      return { id: item.id, found: false, error: "Товар не знайдено", isAvailable: false };
+    }
+    const total = Number(prod.stock) || 0;
+    const reserved = Number(prod.reserved_stock) || 0;
+    const available = Math.max(0, total - reserved);
+    const requested = Number(item.qty) || 1;
+
+    return {
+      id: prod.id,
+      name: prod.name,
+      requestedQty: requested,
+      totalStock: total,
+      reservedStock: reserved,
+      availableStock: available,
+      isAvailable: available >= requested,
+      maxAllowed: available,
+    };
+  });
+
+  const allAvailable = results.every((r) => r.isAvailable);
+  return res.json({
+    valid: allAvailable,
+    items: results,
+  });
 }
 
 export function getProductBySlug(req, res) {
@@ -140,25 +187,29 @@ export function saveProduct(req, res) {
   const description = body.description || "";
   const now = Date.now();
 
+  const isActive = body.isActive !== undefined ? (body.isActive ? 1 : 0) : (existing && existing.is_active !== undefined ? existing.is_active : 1);
+  const features = body.features !== undefined ? String(body.features) : (existing?.features || "");
+  const reservedStock = body.reservedStock !== undefined ? Math.max(0, Number(body.reservedStock)) : (existing?.reserved_stock || 0);
+
   if (existing) {
     db.prepare(`
       UPDATE products SET
         slug = ?, name = ?, category = ?, weight = ?, price = ?,
-        old_price = ?, stock = ?, featured = ?, gift_box = ?,
-        description = ?, image = ?, updated_at = ?
+        old_price = ?, stock = ?, reserved_stock = ?, is_active = ?, features = ?,
+        featured = ?, gift_box = ?, description = ?, image = ?, updated_at = ?
       WHERE id = ?
     `).run(
-      slug, name, category, weight, price, oldPrice, stock,
+      slug, name, category, weight, price, oldPrice, stock, reservedStock, isActive, features,
       featured, giftBox, description, image, now, id
     );
   } else {
     db.prepare(`
       INSERT INTO products (
-        id, slug, name, category, weight, price, old_price, stock,
+        id, slug, name, category, weight, price, old_price, stock, reserved_stock, is_active, features,
         featured, gift_box, description, image, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, slug, name, category, weight, price, oldPrice, stock,
+      id, slug, name, category, weight, price, oldPrice, stock, reservedStock, isActive, features,
       featured, giftBox, description, image, now, now
     );
   }
@@ -191,13 +242,13 @@ export function duplicateProduct(req, res) {
 
   db.prepare(`
     INSERT INTO products (
-      id, slug, name, category, weight, price, old_price, stock,
+      id, slug, name, category, weight, price, old_price, stock, reserved_stock, is_active, features,
       featured, gift_box, description, image, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     newId, newSlug, newName, existing.category, existing.weight,
-    existing.price, existing.old_price, existing.stock, existing.featured,
-    existing.gift_box, existing.description, existing.image, now, now
+    existing.price, existing.old_price, existing.stock, 0, 1, existing.features || "",
+    existing.featured, existing.gift_box, existing.description, existing.image, now, now
   );
 
   const copied = db.prepare("SELECT * FROM products WHERE id = ?").get(newId);

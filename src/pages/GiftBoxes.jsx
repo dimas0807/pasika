@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import { Products, Settings, subscribe } from "../data/db";
 import { getSocialUrl } from "../utils/contacts";
+import { IconBox, IconHeart, IconSparkles, IconShieldCheck, IconExternalLink } from "../components/Icons";
 
 const OCCASIONS = [
-  { icon: "💍", title: "Весілля та бонбоньєрки", desc: "Міні-баночки з персональними іменами молодят" },
-  { icon: "🎁", title: "Корпоративні подарунки", desc: "Брендовані набори для колег та партнерів" },
-  { icon: "🎂", title: "Дні народження", desc: "Святкове пакування зі стрічками та свічками" },
-  { icon: "🌿", title: "Сімейні свята", desc: "Теплий та корисний подарунок для найрідніших" },
+  { icon: <IconHeart className="w-7 h-7 text-rose-500" />, title: "Весілля та бонбоньєрки", desc: "Міні-баночки з персональними іменами молодят" },
+  { icon: <IconBox className="w-7 h-7 text-amber-800" />, title: "Корпоративні подарунки", desc: "Брендовані набори для колег та партнерів" },
+  { icon: <IconSparkles className="w-7 h-7 text-honey" />, title: "Дні народження", desc: "Святкове пакування зі стрічками та свічками" },
+  { icon: <IconShieldCheck className="w-7 h-7 text-emerald-600" />, title: "Сімейні свята", desc: "Теплий та корисний подарунок для найрідніших" },
 ];
 
 export default function GiftBoxes() {
@@ -44,7 +45,7 @@ export default function GiftBoxes() {
           </span>
 
           <h1 className="font-serif text-3xl sm:text-5xl font-extrabold text-ink mt-4 leading-tight">
-            Подарунок, який запам'ятається 💛
+            Подарунок, який запам'ятається
           </h1>
 
           <p className="mt-4 text-ink/75 text-sm sm:text-base leading-relaxed">
@@ -62,9 +63,9 @@ export default function GiftBoxes() {
         </div>
 
         {/* Custom Events / Personalization Showcase */}
-        <div className="mt-16 card p-6 sm:p-10 md:p-12 bg-gradient-to-br from-[#FAF6EE] to-[#F3ECD9] border border-gold/30">
+        <div className="mt-16 glass-card p-6 sm:p-10 md:p-12 border border-amber-900/10 shadow-sm">
           <div className="max-w-2xl mx-auto text-center">
-            <span className="text-xs font-bold uppercase tracking-wider text-leaf bg-white px-3 py-1 rounded-full border border-leaf/20">
+            <span className="text-xs font-bold uppercase tracking-wider text-leaf bg-leaf/10 px-3 py-1 rounded-full border border-leaf/20">
               Персоналізація
             </span>
             <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink mt-3">
@@ -77,10 +78,12 @@ export default function GiftBoxes() {
 
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {OCCASIONS.map((o) => (
-              <div key={o.title} className="bg-white/80 backdrop-blur-xs p-5 rounded-2xl border border-ink/5 flex flex-col items-center text-center">
-                <span className="text-3xl mb-2">{o.icon}</span>
+              <div key={o.title} className="glass-card p-5 rounded-2xl border border-amber-900/10 flex flex-col items-center text-center shadow-2xs hover:border-amber-500/30 transition-all">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/15 flex items-center justify-center mb-3">
+                  {o.icon}
+                </div>
                 <h4 className="font-bold text-sm text-ink">{o.title}</h4>
-                <p className="text-xs text-ink/60 mt-1">{o.desc}</p>
+                <p className="text-xs text-ink/65 mt-1.5 leading-relaxed">{o.desc}</p>
               </div>
             ))}
           </div>
@@ -94,7 +97,7 @@ export default function GiftBoxes() {
                 className="btn-primary inline-flex items-center gap-2"
               >
                 <span>Обговорити замовлення в Telegram</span>
-                <span>↗</span>
+                <IconExternalLink className="w-4 h-4" />
               </a>
             ) : (
               <Link

@@ -13,6 +13,8 @@ const emptyProduct = {
   price: "",
   oldPrice: "",
   stock: 10,
+  reservedStock: 0,
+  isActive: true,
   featured: false,
   giftBox: false,
   description: "",
@@ -398,7 +400,7 @@ export default function ProductForm() {
 
           <div>
             <label className="label">
-              Залишок, шт <span className="text-red-500">*</span>
+              Загальний склад, шт <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -409,19 +411,36 @@ export default function ProductForm() {
               onChange={setField("stock")}
               required
             />
+            {Number(form.reservedStock) > 0 && (
+              <div className="text-[11px] text-ink/50 mt-1">
+                Зарезервовано: <strong className="text-amber-800">{form.reservedStock} шт</strong> • Доступно: <strong className="text-leaf">{Math.max(0, (Number(form.stock) || 0) - form.reservedStock)} шт</strong>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 6. ПОКАЗУВАТИ НА ГОЛОВНІЙ */}
-        <label className="flex items-center gap-2.5 text-sm text-ink/80 font-medium cursor-pointer p-2 rounded-xl hover:bg-cream/40 transition-colors">
-          <input
-            type="checkbox"
-            checked={Boolean(form.featured)}
-            onChange={setField("featured")}
-            className="w-4 h-4 rounded text-honey focus:ring-honey"
-          />
-          <span>Показувати на головній сторінці (рекомендований товар)</span>
-        </label>
+        {/* 6. АКТИВНІСТЬ ТА РЕКОМЕНДАЦІЇ */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2.5 text-sm text-ink/80 font-medium cursor-pointer p-2 rounded-xl hover:bg-cream/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={form.isActive !== false}
+              onChange={setField("isActive")}
+              className="w-4 h-4 rounded text-leaf focus:ring-leaf"
+            />
+            <span>Активний товар (відображається в каталозі для клієнтів)</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 text-sm text-ink/80 font-medium cursor-pointer p-2 rounded-xl hover:bg-cream/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={Boolean(form.featured)}
+              onChange={setField("featured")}
+              className="w-4 h-4 rounded text-honey focus:ring-honey"
+            />
+            <span>Показувати на головній сторінці (рекомендований товар)</span>
+          </label>
+        </div>
 
         {/* 7. РОЗКРИВНА СЕКЦІЯ: ДОДАТКОВІ НАЛАШТУВАННЯ (SLUG) */}
         <div className="pt-2 border-t border-ink/5">

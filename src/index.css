@@ -37,27 +37,40 @@ h1, h2, h3, .font-serif {
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 bg-gradient-to-r from-honey to-[#E6A620] hover:from-accent hover:to-honey text-[#292821] font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98];
+  @apply inline-flex items-center justify-center gap-2 bg-gradient-to-r from-honey via-[#E8A51C] to-accent hover:from-accent hover:to-honey text-[#292821] font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-[0_4px_16px_rgba(217,154,25,0.28)] hover:shadow-[0_6px_22px_rgba(217,154,25,0.38)] active:scale-[0.98];
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 bg-white/90 hover:bg-cream border border-honey/30 hover:border-honey text-ink font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-sm active:scale-[0.98];
+  @apply inline-flex items-center justify-center gap-2 bg-white/80 hover:bg-white backdrop-blur-md border border-amber-900/15 hover:border-honey/60 text-ink font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-[0_2px_8px_rgba(41,40,33,0.04)] active:scale-[0.98];
 }
 
 .btn-ghost {
   @apply inline-flex items-center justify-center gap-1.5 text-ink/80 hover:text-honey font-medium transition-colors;
 }
 
+/* Premium Card & Glassmorphic Utilities */
 .card {
-  @apply bg-white rounded-2xl shadow-soft border border-ink/5 transition-all duration-200;
+  @apply bg-white/90 backdrop-blur-md rounded-2xl border border-amber-900/10 shadow-[0_4px_24px_rgba(41,40,33,0.04)] transition-all duration-300;
+}
+
+.glass-card {
+  @apply bg-white/75 backdrop-blur-lg rounded-2xl border border-white/80 shadow-[0_8px_30px_rgba(41,40,33,0.05)] transition-all duration-300;
+}
+
+.glass-panel {
+  @apply bg-[#FFFDF8]/80 backdrop-blur-xl border border-amber-900/10 shadow-[0_12px_40px_rgba(41,40,33,0.06)];
+}
+
+.glass-pill {
+  @apply bg-white/70 backdrop-blur-md border border-amber-900/10 shadow-2xs;
 }
 
 .card-hover {
-  @apply hover:-translate-y-1 hover:shadow-lg transition-all duration-300;
+  @apply hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(41,40,33,0.08)] hover:border-honey/40 transition-all duration-300;
 }
 
 .input {
-  @apply w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-honey/50 focus:border-honey transition placeholder:text-ink/35;
+  @apply w-full rounded-xl border border-ink/15 bg-white/90 backdrop-blur-xs px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-honey/40 focus:border-honey transition placeholder:text-ink/35;
 }
 
 .label {

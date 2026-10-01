@@ -12,6 +12,7 @@ import Contacts from "./pages/Contacts";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
+import TrackOrder from "./pages/TrackOrder";
 
 import AdminLogin from "./admin/AdminLogin";
 import AdminLayout from "./admin/AdminLayout";
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/cart" element={<StoreLayout><Cart /></StoreLayout>} />
         <Route path="/checkout" element={<StoreLayout><Checkout /></StoreLayout>} />
         <Route path="/order-success/:id" element={<StoreLayout><OrderSuccess /></StoreLayout>} />
+        <Route path="/track-order" element={<StoreLayout><TrackOrder /></StoreLayout>} />
 
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route

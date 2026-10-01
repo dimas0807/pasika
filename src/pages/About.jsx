@@ -4,6 +4,15 @@ import RealisticBee from "../components/RealisticBee";
 import TikTokCard from "../components/TikTokCard";
 import { Settings, subscribe } from "../data/db";
 import { getSocialUrl } from "../utils/contacts";
+import {
+  IconHoneyJar,
+  IconBox,
+  IconShieldCheck,
+  IconSparkles,
+  IconLeaf,
+  IconSun,
+  IconMapPin,
+} from "../components/Icons";
 
 const VALUES = [
   {
@@ -12,17 +21,17 @@ const VALUES = [
     desc: "Це родинна справа, яка почалася з одного вулика і за 10 років виросла у власне виробництво.",
   },
   {
-    icon: "🍯",
+    icon: <IconHoneyJar className="w-8 h-8 text-amber-800" />,
     title: "Натуральний продукт",
     desc: "Ми працюємо з продуктами власної пасіки та створюємо натуральні медові продукти.",
   },
   {
-    icon: "💛",
+    icon: <IconShieldCheck className="w-8 h-8 text-amber-800" />,
     title: "Дбайливе фасування",
     desc: "Кожен продукт фасується акуратно та з увагою до деталей, щоб зберегти його вигляд і якість до моменту, коли він потрапить до вас.",
   },
   {
-    icon: "📦",
+    icon: <IconBox className="w-8 h-8 text-amber-800" />,
     title: "Надійне пакування",
     desc: "Ми приділяємо увагу пакуванню, щоб продукція безпечно пережила дорогу та приїхала до вас цілою й охайною.",
   },
@@ -33,7 +42,7 @@ const STORY_STEPS = [
     step: "10 років тому",
     title: "Перший вулик",
     desc: "Поява першого вулика та перші кроки в бджільництві.",
-    icon: "🌱",
+    icon: <IconLeaf className="w-7 h-7 text-emerald-600" />,
   },
   {
     step: "Розвиток",
@@ -45,13 +54,13 @@ const STORY_STEPS = [
     step: "Сьогодні",
     title: "100+ вуликів",
     desc: "Велика родинна пасіка серед природи Прикарпаття.",
-    icon: "🍯",
+    icon: <IconHoneyJar className="w-7 h-7 text-amber-800" />,
   },
   {
     step: "Результат",
     title: "Власне виробництво",
     desc: "Створення натуральних медів, крем-медів та наборів.",
-    icon: "✨",
+    icon: <IconSparkles className="w-7 h-7 text-honey" />,
   },
 ];
 
@@ -60,26 +69,26 @@ const SEASONS = [
     season: "Рання весна",
     title: "Пробудження",
     desc: "Початок сезону: весняний огляд вуликів, турбота про бджолосім'ї та підготовка рамок до нового медозбору.",
-    icon: "🌱",
+    icon: <IconLeaf className="w-6 h-6 text-emerald-600" />,
   },
   {
     season: "Літо",
     title: "Медозбір",
     desc: "Активна невтомна праця бджіл серед різнотрав'я, липи та акації. Збір свіжого нектару та сотового меду.",
-    icon: "☀️",
+    icon: <IconSun className="w-6 h-6 text-amber-500" />,
   },
   {
     season: "Осінь",
     title: "Підсумки та затишок",
     desc: "Завершення медового сезону, підготовка вуликів до спокійної зимівлі, дбайливе фасування продукції.",
-    icon: "🍂",
+    icon: <IconHoneyJar className="w-6 h-6 text-amber-700" />,
   },
 ];
 
 const ASSORTMENT = [
   {
     category: "Мед",
-    icon: "🍯",
+    icon: <IconHoneyJar className="w-7 h-7 text-amber-800" />,
     link: "/catalog?category=honey",
     buttonLabel: "Переглянути мед →",
     items: [
@@ -92,7 +101,7 @@ const ASSORTMENT = [
   },
   {
     category: "Крем-мед",
-    icon: "🍓",
+    icon: <IconSparkles className="w-7 h-7 text-rose-500" />,
     link: "/catalog?category=cream-honey",
     buttonLabel: "Переглянути крем-мед →",
     items: [
@@ -107,7 +116,7 @@ const ASSORTMENT = [
   },
   {
     category: "Інші продукти",
-    icon: "🎁",
+    icon: <IconBox className="w-7 h-7 text-amber-800" />,
     link: "/gift-boxes",
     buttonLabel: "Подарункові набори →",
     items: [
@@ -165,7 +174,7 @@ export default function About() {
             {/* Left Content */}
             <div className="lg:col-span-7 flex flex-col items-start">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 border border-honey/30 text-ink text-xs font-bold uppercase tracking-wider mb-4 shadow-xs">
-                <span>📍</span>
+                <IconMapPin className="w-3.5 h-3.5 text-honey" />
                 <span>{location}</span>
               </div>
 
@@ -182,8 +191,8 @@ export default function About() {
 
               {/* Geographic Card */}
               <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border border-gold/30 shadow-2xs w-full max-w-xl flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-white border border-gold/40 flex items-center justify-center text-2xl shrink-0 shadow-2xs">
-                  🌄
+                <div className="w-12 h-12 rounded-xl bg-white border border-gold/40 flex items-center justify-center text-amber-800 shrink-0 shadow-2xs">
+                  <IconMapPin className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wider font-bold text-honey">Географія нашої пасіки</div>
@@ -322,8 +331,8 @@ export default function About() {
             </div>
 
             <div className="card p-6 sm:p-8 bg-white border border-gold/30 rounded-3xl text-center shadow-xs">
-              <div className="text-3xl sm:text-4xl mb-1">
-                📍
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-2">
+                <IconMapPin className="w-6 h-6" />
               </div>
               <div className="font-bold text-ink mt-2 text-base">{location}</div>
               <p className="text-xs text-ink/65 mt-1 leading-relaxed">
@@ -585,8 +594,10 @@ export default function About() {
 
       {/* 8. ФІНАЛЬНИЙ CTA */}
       <section className="container-p pb-12">
-        <div className="card p-8 sm:p-12 text-center bg-[#FAF6EE] border border-gold/30 rounded-3xl shadow-sm max-w-4xl mx-auto">
-          <span className="text-3xl mb-2 inline-block">🍯</span>
+        <div className="glass-card p-8 sm:p-12 text-center border border-amber-900/10 shadow-sm max-w-4xl mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-4 shadow-xs">
+            <IconHoneyJar className="w-7 h-7" />
+          </div>
           <h2 className="font-serif text-2xl sm:text-4xl font-extrabold text-ink">
             Спробуйте смак нашої пасіки
           </h2>

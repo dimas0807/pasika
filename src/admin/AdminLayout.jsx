@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Auth } from "../data/db";
 
@@ -16,13 +16,10 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [prevPath, setPrevPath] = useState(location.pathname);
 
-  // Official React pattern: reset state during render when route changes without useEffect
-  if (prevPath !== location.pathname) {
-    setPrevPath(location.pathname);
+  useEffect(() => {
     setMobileOpen(false);
-  }
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen md:min-h-[85vh] md:grid md:grid-cols-[220px_1fr] bg-cream/30">

@@ -66,7 +66,7 @@ export async function request(endpoint, options = {}) {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
-    credentials: "same-origin",
+    credentials: "include",
   };
 
   let res;
@@ -280,6 +280,12 @@ export const Products = {
     notify();
     return duplicated;
   },
+  validateStock: async (items) => {
+    return await request("/api/products/validate-stock", {
+      method: "POST",
+      body: JSON.stringify({ items: items.map((i) => ({ id: i.id, qty: i.qty })) }),
+    });
+  },
 };
 
 // ---------------- Orders ----------------
@@ -390,6 +396,63 @@ export const Orders = {
       notify();
     }
     return res;
+  },
+  confirmPayment: async (id) => {
+    const res = await request(`/api/admin/orders/${id}/confirm-payment`, {
+      method: "POST",
+    });
+    const updated = res.order || res;
+    const idx = state.orders.findIndex((o) => o.id === id);
+    if (idx >= 0) state.orders[idx] = updated;
+    notify();
+    return updated;
+  },
+  track: async (code) => {
+    return await request(`/api/orders/track/${encodeURIComponent(code)}`);
+  },
+};
+
+// ---------------- Delivery Accounts ----------------
+export const DeliveryAccounts = {
+  getAll: async (provider) => {
+    return await request(`/api/admin/delivery/accounts${provider ? `?provider=${provider}` : ""}`);
+  },
+  create: async (account) => {
+    return await request("/api/admin/delivery/accounts", {
+      method: "POST",
+      body: JSON.stringify(account),
+    });
+  },
+  update: async (id, account) => {
+    return await request(`/api/admin/delivery/accounts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(account),
+    });
+  },
+  remove: async (id) => {
+    return await request(`/api/admin/delivery/accounts/${id}`, {
+      method: "DELETE",
+    });
+  },
+  checkApi: async (provider, apiKey) => {
+    return await request("/api/admin/delivery/check", {
+      method: "POST",
+      body: JSON.stringify({ provider, apiKey }),
+    });
+  },
+  createOrderTtn: async (orderId, form) => {
+    return await request(`/api/admin/delivery/orders/${orderId}/ttn`, {
+      method: "POST",
+      body: JSON.stringify(form),
+    });
+  },
+  cancelOrderTtn: async (orderId) => {
+    return await request(`/api/admin/delivery/orders/${orderId}/ttn`, {
+      method: "DELETE",
+    });
+  },
+  getOrderTracking: async (orderId) => {
+    return await request(`/api/admin/delivery/orders/${orderId}/tracking`);
   },
 };
 

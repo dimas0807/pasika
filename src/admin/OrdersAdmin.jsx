@@ -6,8 +6,12 @@ const ORDER_STATUSES = [
   { key: "all", label: "Всі замовлення" },
   { key: "NEW", label: "Нові" },
   { key: "PROCESSING", label: "В обробці" },
+  { key: "AWAITING_PAYMENT", label: "Очікує оплати" },
+  { key: "PAID", label: "Оплачено" },
   { key: "PACKED", label: "Запаковано" },
+  { key: "SHIPMENT_CREATED", label: "Створено ТТН" },
   { key: "SHIPPED", label: "Відправлено" },
+  { key: "DELIVERED", label: "Доставлено" },
   { key: "COMPLETED", label: "Виконано" },
   { key: "CANCELLED", label: "Скасовано" },
 ];
@@ -15,18 +19,26 @@ const ORDER_STATUSES = [
 const STATUS_LABEL = {
   NEW: "Нове",
   PROCESSING: "В обробці",
+  AWAITING_PAYMENT: "Очікує оплати",
+  PAID: "Оплачено",
   PACKED: "Запаковано",
+  SHIPMENT_CREATED: "Створено ТТН",
   SHIPPED: "Відправлено",
+  DELIVERED: "Доставлено",
   COMPLETED: "Виконано",
   CANCELLED: "Скасовано",
 };
 
 const STATUS_COLOR = {
-  NEW: "bg-honey/15 text-honey font-semibold",
-  PROCESSING: "bg-amber-100 text-amber-900",
-  PACKED: "bg-blue-100 text-blue-900",
-  SHIPPED: "bg-indigo-100 text-indigo-900",
-  COMPLETED: "bg-leaf/20 text-leaf font-semibold",
+  NEW: "bg-slate-100 text-slate-800",
+  PROCESSING: "bg-blue-100 text-blue-800",
+  AWAITING_PAYMENT: "bg-amber-100 text-amber-900 font-semibold",
+  PAID: "bg-emerald-100 text-emerald-800",
+  PACKED: "bg-indigo-100 text-indigo-800",
+  SHIPMENT_CREATED: "bg-purple-100 text-purple-800",
+  SHIPPED: "bg-teal-100 text-teal-800",
+  DELIVERED: "bg-sky-100 text-sky-800",
+  COMPLETED: "bg-green-100 text-green-800 font-semibold",
   CANCELLED: "bg-red-100 text-red-600",
 };
 
@@ -356,9 +368,9 @@ export default function OrdersAdmin() {
                   <div>
                     <Link
                       to={`/admin/orders/${o.id}`}
-                      className="font-serif font-bold text-lg text-ink hover:text-honey transition-colors"
+                      className="font-mono font-bold text-base text-ink hover:text-honey transition-colors bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-0.5"
                     >
-                      #{o.number}
+                      {o.orderCode || o.order_code || `PAS-${o.number}`}
                     </Link>
                     <div className="text-[11px] text-ink/50">
                       {new Date(o.createdAt).toLocaleDateString("uk-UA", {
@@ -571,8 +583,8 @@ export default function OrdersAdmin() {
                     className="border-b border-ink/5 last:border-0 hover:bg-cream/30 transition-colors"
                   >
                     <td className="p-3 font-semibold text-ink">
-                      <Link to={`/admin/orders/${o.id}`} className="hover:text-honey transition-colors">
-                        #{o.number}
+                      <Link to={`/admin/orders/${o.id}`} className="hover:text-honey transition-colors font-mono text-xs font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block">
+                        {o.orderCode || o.order_code || `PAS-${o.number}`}
                       </Link>
                     </td>
                     <td className="p-3 text-xs text-ink/60 whitespace-nowrap">

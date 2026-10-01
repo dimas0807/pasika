@@ -1,6 +1,7 @@
 // Delivery Service — connected to server-side Nova Poshta and Ukrposhta APIs.
 // The backend handles real API queries (or demo fallback if keys aren't set)
 // and returns normalized objects with real IDs: { id, name }.
+import { request } from "../data/db";
 
 export const novaPoshtaAdapter = {
   name: "Нова пошта",
@@ -8,9 +9,8 @@ export const novaPoshtaAdapter = {
   async searchCities(query) {
     if (!query || query.trim().length === 0) return [];
     try {
-      const res = await fetch(`/api/delivery/cities?provider=np&query=${encodeURIComponent(query.trim())}`);
-      if (!res.ok) return [];
-      return await res.json();
+      const data = await request(`/api/delivery/cities?provider=np&query=${encodeURIComponent(query.trim())}`);
+      return Array.isArray(data) ? data : [];
     } catch {
       return [];
     }
@@ -18,9 +18,8 @@ export const novaPoshtaAdapter = {
   async getBranches(cityId) {
     if (!cityId) return [];
     try {
-      const res = await fetch(`/api/delivery/branches?provider=np&cityId=${encodeURIComponent(cityId)}`);
-      if (!res.ok) return [];
-      return await res.json();
+      const data = await request(`/api/delivery/branches?provider=np&cityId=${encodeURIComponent(cityId)}`);
+      return Array.isArray(data) ? data : [];
     } catch {
       return [];
     }
@@ -33,9 +32,8 @@ export const ukrposhtaAdapter = {
   async searchCities(query) {
     if (!query || query.trim().length === 0) return [];
     try {
-      const res = await fetch(`/api/delivery/cities?provider=up&query=${encodeURIComponent(query.trim())}`);
-      if (!res.ok) return [];
-      return await res.json();
+      const data = await request(`/api/delivery/cities?provider=up&query=${encodeURIComponent(query.trim())}`);
+      return Array.isArray(data) ? data : [];
     } catch {
       return [];
     }
@@ -43,9 +41,8 @@ export const ukrposhtaAdapter = {
   async getBranches(cityId) {
     if (!cityId) return [];
     try {
-      const res = await fetch(`/api/delivery/branches?provider=up&cityId=${encodeURIComponent(cityId)}`);
-      if (!res.ok) return [];
-      return await res.json();
+      const data = await request(`/api/delivery/branches?provider=up&cityId=${encodeURIComponent(cityId)}`);
+      return Array.isArray(data) ? data : [];
     } catch {
       return [];
     }
