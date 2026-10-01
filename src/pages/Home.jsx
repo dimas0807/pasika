@@ -171,8 +171,8 @@ export default function Home() {
             loading="eager"
           />
           {/* Atmospheric Cinematic Gradient (Warm Amber Shadow for Pure Contrast) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#17120A]/90 via-[#17120A]/60 md:via-[#17120A]/40 to-transparent z-10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#17120A]/85 via-transparent to-transparent md:hidden z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#17120A]/92 via-[#17120A]/70 md:via-[#17120A]/50 to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#17120A]/90 via-[#17120A]/50 to-transparent md:hidden z-10" />
         </div>
 
         {/* Foreground Content Composed Into The Photograph */}
