@@ -316,7 +316,16 @@ export const Orders = {
       return state.orders;
     }
   },
-  byId: (id) => state.orders.find((o) => o.id === id),
+  byId: (id) => {
+    const mem = state.orders.find((o) => o.id === id || o.orderCode === id);
+    if (mem) return mem;
+    try {
+      const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+      const found = stored.find((o) => o.id === id || o.orderCode === id);
+      if (found) return found;
+    } catch {}
+    return null;
+  },
   fetchById: async (id, token = null) => {
     try {
       // Try public order endpoint with token
@@ -352,6 +361,11 @@ export const Orders = {
         customerToken: res.customerToken,
       };
       state.orders.unshift(orderWithToken);
+      try {
+        const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+        stored.unshift(orderWithToken);
+        localStorage.setItem("pasika_recent_orders", JSON.stringify(stored.slice(0, 30)));
+      } catch {}
       notify();
       return orderWithToken;
     }
@@ -408,7 +422,38 @@ export const Orders = {
     return updated;
   },
   track: async (code) => {
-    return await request(`/api/orders/track/${encodeURIComponent(code)}`);
+    try {
+      return await request(`/api/orders/track/${encodeURIComponent(code)}`);
+    } catch (err) {
+      // Local fallback for client resilience
+      try {
+        const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+        const clean = code.trim().toLowerCase();
+        const found = stored.find(
+          (o) =>
+            o.orderCode?.toLowerCase() === clean ||
+            o.order_code?.toLowerCase() === clean ||
+            o.id?.toLowerCase() === clean ||
+            String(o.number) === clean.replace(/^pas-/i, "") ||
+            o.delivery?.trackingNumber === code.trim()
+        );
+        if (found) {
+          return {
+            found: true,
+            id: found.id,
+            number: found.number,
+            orderCode: found.orderCode || `PAS-${found.number}`,
+            order_code: found.orderCode || `PAS-${found.number}`,
+            status: found.status,
+            createdAt: found.createdAt,
+            total: found.total,
+            delivery: found.delivery,
+            items: found.items || [],
+          };
+        }
+      } catch {}
+      throw err;
+    }
   },
 };
 

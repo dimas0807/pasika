@@ -439,6 +439,43 @@ async function callNovaPoshtaApi(modelName, calledMethod, methodProperties = {},
   }
 }
 
+// ---------------- Edge Order Cache ----------------
+async function saveOrderToEdgeCache(order) {
+  try {
+    const cache = caches.default;
+    const resp = new Response(JSON.stringify(order), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "max-age=86400",
+      },
+    });
+    if (order.id) {
+      await cache.put(`https://cache.internal/orders/${order.id}`, resp.clone());
+    }
+    if (order.orderCode) {
+      await cache.put(`https://cache.internal/orders/${order.orderCode.toLowerCase()}`, resp.clone());
+    }
+    if (order.number) {
+      await cache.put(`https://cache.internal/orders/pas-${order.number}`, resp.clone());
+    }
+  } catch {}
+}
+
+async function getOrderFromEdgeCache(query) {
+  try {
+    const cache = caches.default;
+    const lower = String(query).toLowerCase().trim();
+    let res = await cache.match(`https://cache.internal/orders/${lower}`);
+    if (!res && !lower.startsWith("pas-") && Number(lower)) {
+      res = await cache.match(`https://cache.internal/orders/pas-${lower}`);
+    }
+    if (res) {
+      return await res.json();
+    }
+  } catch {}
+  return null;
+}
+
 // ---------------- Crypto & Security Helpers ----------------
 
 async function getHmacKey(secret) {
@@ -1020,6 +1057,7 @@ export async function onRequest(context) {
       };
 
       memoryOrders.unshift(newOrder);
+      await saveOrderToEdgeCache(newOrder);
       return jsonResponse({ success: true, order: newOrder, customerToken }, 201);
     } catch (err) {
       return jsonResponse({ error: err.message || "Помилка створення замовлення" }, 500);
@@ -1038,7 +1076,11 @@ export async function onRequest(context) {
       (o.delivery?.trackingNumber && o.delivery.trackingNumber === rawQuery) ||
       (o.tracking_number && o.tracking_number === rawQuery);
 
-    const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+    let order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+    if (!order) {
+      order = await getOrderFromEdgeCache(rawQuery);
+      if (order) memoryOrders.unshift(order);
+    }
     if (!order) {
       return jsonResponse({ found: false, error: "Замовлення з таким номером або ТТН не знайдено" }, 404);
     }
@@ -1102,8 +1144,11 @@ export async function onRequest(context) {
   // Public Order Lookup
   if (path.startsWith("/orders/") && method === "GET") {
     const id = path.replace("/orders/", "");
-    const matchOrder = (o) => o.id === id || String(o.number) === id || o.orderCode === id;
-    const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+    let order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+    if (!order) {
+      order = await getOrderFromEdgeCache(id);
+      if (order) memoryOrders.unshift(order);
+    }
     if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
     return jsonResponse(order);
   }
@@ -1546,7 +1591,11 @@ export async function onRequest(context) {
     if (path.startsWith("/admin/orders/") && method === "GET") {
       const id = path.replace("/admin/orders/", "");
       const matchOrder = (o) => o.id === id || String(o.number) === id || o.orderCode === id;
-      const order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+      let order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
+      if (!order) {
+        order = await getOrderFromEdgeCache(id);
+        if (order) memoryOrders.unshift(order);
+      }
       if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       return jsonResponse(order);
     }
