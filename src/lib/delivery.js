@@ -15,10 +15,14 @@ export const novaPoshtaAdapter = {
       return [];
     }
   },
-  async getBranches(cityId) {
-    if (!cityId) return [];
+  async getBranches(cityId, cityName = "", search = "") {
+    if (!cityId && !cityName) return [];
     try {
-      const data = await request(`/api/delivery/branches?provider=np&cityId=${encodeURIComponent(cityId)}`);
+      let url = `/api/delivery/branches?provider=np`;
+      if (cityId) url += `&cityId=${encodeURIComponent(cityId)}`;
+      if (cityName) url += `&cityName=${encodeURIComponent(cityName)}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const data = await request(url);
       return Array.isArray(data) ? data : [];
     } catch {
       return [];

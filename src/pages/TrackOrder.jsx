@@ -201,9 +201,23 @@ export default function TrackOrder() {
                     {orderData.delivery.service || "Нова Пошта"}
                   </div>
                   {(orderData.delivery.city || orderData.delivery.branch) && (
-                    <div className="text-xs text-ink/75 mt-1 leading-relaxed">
-                      {orderData.delivery.city && <div>{orderData.delivery.city}</div>}
-                      {orderData.delivery.branch && <div className="text-ink/60">{orderData.delivery.branch}</div>}
+                    <div className="text-xs text-ink/75 mt-1.5 leading-relaxed space-y-1">
+                      {orderData.delivery.city && (
+                        <div className="font-medium text-ink">
+                          📍 {orderData.delivery.city}
+                          {orderData.delivery.region && !orderData.delivery.city.includes(orderData.delivery.region) ? ` (${orderData.delivery.region})` : ""}
+                        </div>
+                      )}
+                      {orderData.delivery.branch && (
+                        <div className="text-ink/80 font-medium">
+                          🏤 {orderData.delivery.branch}
+                        </div>
+                      )}
+                      {orderData.delivery.warehouseAddress && orderData.delivery.warehouseAddress !== orderData.delivery.branch && (
+                        <div className="text-ink/55 text-[11px]">
+                          {orderData.delivery.warehouseAddress}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

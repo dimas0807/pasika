@@ -814,17 +814,88 @@ export default function OrderDetail() {
                 )}
               </div>
 
-              <div>
-                <span className="text-ink/40 text-xs block">Населений пункт:</span>
-                <span className="font-medium text-ink">
-                  📍 {order.delivery?.city || "Не вказано"}
-                </span>
-              </div>
-              <div>
-                <span className="text-ink/40 text-xs block">Відділення / Адреса:</span>
-                <span className="font-medium text-ink">
-                  🏤 {order.delivery?.branch || "Не вказано"}
-                </span>
+              {/* Destination Block */}
+              <div className="pt-2 border-t border-ink/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📍</span>
+                    <span>Пункт призначення доставки</span>
+                  </span>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-900 border border-amber-500/20 font-bold">
+                    {order.orderCode || order.order_code || `PAS-${order.number}`}
+                  </span>
+                </div>
+
+                <div className="bg-[#FAF6EE] rounded-xl p-3 border border-ink/10 space-y-2.5 text-xs">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="text-ink/50">Служба:</span>
+                    <span className="font-bold text-ink flex items-center gap-1">
+                      <span>{deliveryService.toLowerCase().includes("укр") ? "📮" : "📦"}</span>
+                      <span>{deliveryService}</span>
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="text-ink/50">Населений пункт:</span>
+                    <span className="font-semibold text-ink text-right">
+                      {order.delivery?.city || "Не вказано"}
+                    </span>
+                  </div>
+
+                  {order.delivery?.region && (
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-ink/50">Область:</span>
+                      <span className="font-medium text-ink/80 text-right">
+                        {order.delivery.region}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="text-ink/50">Відділення:</span>
+                    <span className="font-semibold text-ink text-right">
+                      {order.delivery?.branch || "Не вказано"}
+                    </span>
+                  </div>
+
+                  {order.delivery?.warehouseAddress && order.delivery.warehouseAddress !== order.delivery.branch && (
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-ink/50">Адреса відділення:</span>
+                      <span className="font-medium text-ink text-right max-w-[65%]">
+                        {order.delivery.warehouseAddress}
+                      </span>
+                    </div>
+                  )}
+
+                  {(order.delivery?.warehouseRef || order.delivery?.branchId) && (
+                    <div className="flex justify-between items-center gap-2 pt-1 border-t border-ink/5">
+                      <span className="text-ink/50">ID / Ref відділення:</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-[11px] text-ink/60 select-all">
+                          {order.delivery?.warehouseRef || order.delivery?.branchId}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(order.delivery?.warehouseRef || order.delivery?.branchId);
+                            showNotification("Ref відділення скопійовано");
+                          }}
+                          className="text-amber-800 hover:text-amber-900 text-[10px] ml-1 p-0.5"
+                          title="Скопіювати Ref"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-baseline gap-2 pt-1 border-t border-ink/5">
+                    <span className="text-ink/50">Статус доставки:</span>
+                    <span className="font-bold text-ink">
+                      {STATUS_LABELS[order.status] || order.status}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

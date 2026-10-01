@@ -64,6 +64,10 @@ export function initDatabase() {
       receipt_name TEXT,
       idempotency_key TEXT UNIQUE,
       customer_token TEXT,
+      delivery_region TEXT,
+      delivery_warehouse_address TEXT,
+      delivery_warehouse_ref TEXT,
+      delivery_branch_number TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -310,6 +314,22 @@ export function initDatabase() {
 
   try {
     db.exec("ALTER TABLE orders ADD COLUMN deleted_at INTEGER");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_region TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_warehouse_address TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_warehouse_ref TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_branch_number TEXT");
   } catch {}
 
   try {

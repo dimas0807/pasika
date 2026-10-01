@@ -32,22 +32,55 @@ export default function Checkout() {
   const [checkoutToken] = useState(() => "chk_" + Date.now() + "_" + Math.random().toString(36).slice(2, 12));
 
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    email: "",
-    providerKey: "np",
-    deliveryCity: "",
-    deliveryRegion: "",
-    deliveryBranch: "",
-    cityRef: "",
-    branchRef: "",
-    comment: "",
-    paymentMethod: "cod",
-    receiptFile: null,
-    receiptUrl: null,
-    receiptName: null,
+  const FORM_STORAGE_KEY = "pasika_checkout_form";
+
+  const [form, setForm] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pasika_checkout_form");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          firstName: parsed.firstName || "",
+          lastName: parsed.lastName || "",
+          phone: parsed.phone || "",
+          email: parsed.email || "",
+          providerKey: parsed.providerKey || "np",
+          deliveryCity: parsed.deliveryCity || "",
+          deliveryRegion: parsed.deliveryRegion || "",
+          deliveryBranch: parsed.deliveryBranch || "",
+          cityRef: parsed.cityRef || "",
+          branchRef: parsed.branchRef || "",
+          branchNumber: parsed.branchNumber || "",
+          warehouseAddress: parsed.warehouseAddress || "",
+          warehouseType: parsed.warehouseType || "",
+          comment: parsed.comment || "",
+          paymentMethod: parsed.paymentMethod || "cod",
+          receiptFile: null,
+          receiptUrl: parsed.receiptUrl || null,
+          receiptName: parsed.receiptName || null,
+        };
+      }
+    } catch {}
+    return {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
+      providerKey: "np",
+      deliveryCity: "",
+      deliveryRegion: "",
+      deliveryBranch: "",
+      cityRef: "",
+      branchRef: "",
+      branchNumber: "",
+      warehouseAddress: "",
+      warehouseType: "",
+      comment: "",
+      paymentMethod: "cod",
+      receiptFile: null,
+      receiptUrl: null,
+      receiptName: null,
+    };
   });
 
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
@@ -62,10 +95,47 @@ export default function Checkout() {
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [branchOptions, setBranchOptions] = useState([]);
   const [branchLoading, setBranchLoading] = useState(false);
+  const [branchFilter, setBranchFilter] = useState("");
   const [stockIssue, setStockIssue] = useState(null);
+
+  const loadBranches = async (cId, cName = "", searchStr = "", providerKey = form.providerKey) => {
+    if (!cId && !cName) return;
+    setBranchLoading(true);
+    try {
+      let url = `/api/delivery/branches?provider=${encodeURIComponent(providerKey)}`;
+      if (cId) url += `&cityId=${encodeURIComponent(cId)}`;
+      if (cName) url += `&cityName=${encodeURIComponent(cName)}`;
+      if (searchStr) url += `&search=${encodeURIComponent(searchStr)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setBranchOptions(data);
+      }
+    } catch {
+      setBranchOptions([]);
+    } finally {
+      setBranchLoading(false);
+    }
+  };
+
+  // Persist form to localStorage
+  useEffect(() => {
+    try {
+      const { receiptFile: _receiptFile, ...saveable } = form;
+      localStorage.setItem("pasika_checkout_form", JSON.stringify(saveable));
+    } catch {}
+  }, [form]);
 
   useEffect(() => {
     Settings.fetch().then(setSettings).catch(() => {});
+  }, []);
+
+  // Auto-reload branches on mount if city was previously chosen
+  useEffect(() => {
+    if (form.cityRef || (form.deliveryCity && form.providerKey === "np")) {
+      loadBranches(form.cityRef, form.deliveryCity, "", form.providerKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Stock pre-check on checkout mount
@@ -97,7 +167,7 @@ export default function Checkout() {
       setCityLoading(true);
       try {
         const res = await fetch(
-          `/api/delivery/cities?provider=${form.providerKey}&query=${encodeURIComponent(q)}`
+          `/api/delivery/cities?provider=${encodeURIComponent(form.providerKey)}&query=${encodeURIComponent(q)}`
         );
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -113,44 +183,34 @@ export default function Checkout() {
     return () => clearTimeout(timer);
   }, [form.deliveryCity, form.providerKey]);
 
-  const loadBranches = async (cId) => {
-    if (!cId) return;
-    setBranchLoading(true);
-    try {
-      const res = await fetch(
-        `/api/delivery/branches?provider=${form.providerKey}&cityId=${encodeURIComponent(cId)}`
-      );
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setBranchOptions(data);
-      }
-    } catch {
-      setBranchOptions([]);
-    } finally {
-      setBranchLoading(false);
-    }
-  };
-
   const selectCity = (city) => {
+    const cityName = city.name || city.description || "";
+    const cityRegion = city.area || city.region || "";
+    const cityRef = city.id || city.ref || "";
     setForm((f) => ({
       ...f,
-      deliveryCity: city.name || city.description || "",
-      deliveryRegion: city.region || city.area || f.deliveryRegion,
-      cityRef: city.id || city.ref || "",
+      deliveryCity: cityName,
+      deliveryRegion: cityRegion,
+      cityRef: cityRef,
       deliveryBranch: "",
       branchRef: "",
+      branchNumber: "",
+      warehouseAddress: "",
+      warehouseType: "",
     }));
     setShowCityDropdown(false);
-    if (city.id || city.ref) {
-      loadBranches(city.id || city.ref);
-    }
+    setBranchFilter("");
+    loadBranches(cityRef, cityName);
   };
 
   const selectBranch = (branch) => {
     setForm((f) => ({
       ...f,
       deliveryBranch: branch.name || branch.description || "",
-      branchRef: branch.id || branch.ref || "",
+      branchRef: branch.ref || branch.id || "",
+      branchNumber: branch.number || "",
+      warehouseAddress: branch.address || branch.shortAddress || branch.name || "",
+      warehouseType: branch.type || branch.category || "",
     }));
   };
 
@@ -160,10 +220,14 @@ export default function Checkout() {
       providerKey: key,
       cityRef: "",
       branchRef: "",
+      branchNumber: "",
+      warehouseAddress: "",
+      warehouseType: "",
       deliveryBranch: "",
     }));
     setCitySuggestions([]);
     setBranchOptions([]);
+    setBranchFilter("");
   };
 
   const set = (k) => (e) => {
@@ -247,8 +311,9 @@ export default function Checkout() {
   const step2Valid = Boolean(
     form.providerKey &&
     form.deliveryCity.trim() &&
-    form.deliveryRegion.trim() &&
-    form.deliveryBranch.trim()
+    (form.providerKey === "np"
+      ? Boolean(form.branchRef || form.deliveryBranch.trim())
+      : Boolean(form.deliveryRegion.trim() && form.deliveryBranch.trim()))
   );
 
   const copyCard = () => {
@@ -287,13 +352,11 @@ export default function Checkout() {
 
       const idempotencyKey = `pasika_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-      const cityDisplay = form.deliveryRegion.trim()
-        ? `${form.deliveryCity.trim()} (${form.deliveryRegion.trim()})`
-        : form.deliveryCity.trim();
-
-      const branchDisplay = form.deliveryBranch.trim().toLowerCase().includes("відділення") || form.deliveryBranch.trim().startsWith("№")
-        ? form.deliveryBranch.trim()
-        : `Відділення №${form.deliveryBranch.trim()}`;
+      const isNp = form.providerKey === "np";
+      const cityDisplay = form.deliveryCity.trim();
+      const regionDisplay = form.deliveryRegion.trim();
+      const branchDisplay = form.deliveryBranch.trim();
+      const warehouseAddressDisplay = form.warehouseAddress.trim() || branchDisplay;
 
       const isCard = form.paymentMethod === "card";
       const cleanPaymentMethod = isCard ? "card" : "cash_on_delivery";
@@ -304,13 +367,20 @@ export default function Checkout() {
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
         providerKey: form.providerKey,
-        deliveryCity: form.deliveryCity.trim(),
-        deliveryRegion: form.deliveryRegion.trim(),
-        deliveryBranch: form.deliveryBranch.trim(),
+        deliveryCity: cityDisplay,
+        deliveryRegion: regionDisplay || undefined,
+        deliveryBranch: branchDisplay,
+        deliveryWarehouseAddress: warehouseAddressDisplay,
+        deliveryWarehouseRef: form.branchRef || undefined,
+        deliveryBranchNumber: form.branchNumber || undefined,
         deliveryCityId: form.cityRef || undefined,
         deliveryBranchId: form.branchRef || undefined,
         city: cityDisplay,
+        region: regionDisplay || undefined,
         branch: branchDisplay,
+        warehouseAddress: warehouseAddressDisplay,
+        warehouseRef: form.branchRef || undefined,
+        branchNumber: form.branchNumber || undefined,
         paymentMethod: cleanPaymentMethod,
         comment: form.comment.trim() || undefined,
         receiptUrl: isCard ? form.receiptUrl : undefined,
@@ -322,10 +392,15 @@ export default function Checkout() {
           email: form.email.trim() || undefined,
         },
         delivery: {
-          provider: form.providerKey === "up" ? "Укрпошта" : "Нова пошта",
+          provider: isNp ? "Нова пошта" : "Укрпошта",
           providerKey: form.providerKey,
+          deliveryService: isNp ? "Нова пошта" : "Укрпошта",
           city: cityDisplay,
+          region: regionDisplay || undefined,
           branch: branchDisplay,
+          warehouseAddress: warehouseAddressDisplay,
+          warehouseRef: form.branchRef || undefined,
+          branchNumber: form.branchNumber || undefined,
           cityId: form.cityRef || undefined,
           branchId: form.branchRef || undefined,
         },
@@ -342,6 +417,9 @@ export default function Checkout() {
       };
 
       const created = await Orders.create(orderPayload);
+      try {
+        localStorage.removeItem(FORM_STORAGE_KEY);
+      } catch {}
       clear();
       const tokenQuery = created.customerToken ? `?token=${encodeURIComponent(created.customerToken)}` : "";
       navigate(`/order-success/${created.id}${tokenQuery}`);
@@ -551,126 +629,314 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* 1. Місто / населений пункт * */}
-              <div className="relative">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="label mb-0" htmlFor="deliveryCity">Місто / населений пункт *</label>
-                  {cityLoading && (
-                    <span className="text-xs text-ink/50 flex items-center gap-1">
-                      <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
-                      Пошук міст...
-                    </span>
-                  )}
-                </div>
-                <input
-                  id="deliveryCity"
-                  name="deliveryCity"
-                  className="input"
-                  value={form.deliveryCity}
-                  onChange={(e) => {
-                    set("deliveryCity")(e);
-                    setShowCityDropdown(true);
-                  }}
-                  onFocus={() => {
-                    if (citySuggestions.length > 0) setShowCityDropdown(true);
-                  }}
-                  placeholder="Введіть перші літери (напр. Київ, Львів, Коломия)"
-                  autoFocus
-                  autoComplete="off"
-                />
+              {/* NOVA POSHTA FLOW */}
+              {form.providerKey === "np" ? (
+                <div className="space-y-4">
+                  {/* 1. City / Settlement Autocomplete */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="label mb-0" htmlFor="deliveryCity">
+                        Місто / населений пункт *
+                      </label>
+                      {cityLoading && (
+                        <span className="text-xs text-ink/50 flex items-center gap-1">
+                          <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                          Пошук міст...
+                        </span>
+                      )}
+                    </div>
 
-                {/* City Suggestions Dropdown */}
-                {showCityDropdown && citySuggestions.length > 0 && (
-                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white rounded-2xl shadow-xl border border-ink/10 py-1.5 divide-y divide-ink/5">
-                    {citySuggestions.map((c, idx) => (
-                      <button
-                        key={c.id || c.ref || idx}
-                        type="button"
-                        onClick={() => selectCity(c)}
-                        className="w-full text-left px-4 py-2.5 text-xs sm:text-sm hover:bg-honey/15 transition-colors flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="font-semibold text-ink">{c.name || c.description}</div>
-                          {(c.region || c.area) && (
-                            <div className="text-[11px] text-ink/50">{c.region || c.area}</div>
-                          )}
+                    {form.cityRef ? (
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg">📍</span>
+                          <div>
+                            <div className="text-sm font-bold text-ink">{form.deliveryCity}</div>
+                            {form.deliveryRegion && (
+                              <div className="text-xs text-amber-900 font-medium">{form.deliveryRegion}</div>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs text-ink/40">Обрати →</span>
-                      </button>
-                    ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm((f) => ({
+                              ...f,
+                              deliveryCity: "",
+                              deliveryRegion: "",
+                              cityRef: "",
+                              deliveryBranch: "",
+                              branchRef: "",
+                              branchNumber: "",
+                              warehouseAddress: "",
+                              warehouseType: "",
+                            }));
+                            setBranchOptions([]);
+                            setCitySuggestions([]);
+                            setBranchFilter("");
+                          }}
+                          className="text-xs text-amber-900 hover:text-amber-700 font-semibold underline underline-offset-2"
+                        >
+                          Змінити місто
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          id="deliveryCity"
+                          name="deliveryCity"
+                          className="input"
+                          value={form.deliveryCity}
+                          onChange={(e) => {
+                            set("deliveryCity")(e);
+                            setShowCityDropdown(true);
+                          }}
+                          onFocus={() => {
+                            if (citySuggestions.length > 0) setShowCityDropdown(true);
+                          }}
+                          placeholder="Введіть назву міста (наприклад: Коростень, Київ, Львів)"
+                          autoFocus
+                          autoComplete="off"
+                        />
+
+                        {/* City Suggestions Dropdown */}
+                        {showCityDropdown && citySuggestions.length > 0 && (
+                          <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white rounded-2xl shadow-xl border border-ink/10 py-1.5 divide-y divide-ink/5">
+                            {citySuggestions.map((c, idx) => (
+                              <button
+                                key={c.id || c.ref || idx}
+                                type="button"
+                                onClick={() => selectCity(c)}
+                                className="w-full text-left px-4 py-2.5 text-xs sm:text-sm hover:bg-honey/15 transition-colors flex items-center justify-between"
+                              >
+                                <div>
+                                  <div className="font-semibold text-ink">{c.name || c.description}</div>
+                                  {(c.region || c.area) && (
+                                    <div className="text-[11px] text-ink/50">{c.region || c.area}</div>
+                                  )}
+                                </div>
+                                <span className="text-xs text-ink/40">Обрати →</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* 2. Область * */}
-              <div>
-                <label className="label" htmlFor="deliveryRegion">Область *</label>
-                <input
-                  id="deliveryRegion"
-                  name="deliveryRegion"
-                  className="input"
-                  value={form.deliveryRegion}
-                  onChange={set("deliveryRegion")}
-                  placeholder="напр. Івано-Франківська"
-                />
-              </div>
-
-              {/* 3. Відділення * */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="label mb-0" htmlFor="deliveryBranch">Відділення *</label>
-                  {branchLoading && (
-                    <span className="text-xs text-ink/50 flex items-center gap-1">
-                      <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
-                      Завантаження відділень...
-                    </span>
+                  {/* 2. Auto-detected Region Badge */}
+                  {form.deliveryRegion && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF6EE] border border-ink/10 text-xs text-ink/75">
+                      <span className="font-semibold text-ink">Область:</span>
+                      <span className="font-medium text-amber-950">{form.deliveryRegion}</span>
+                      <span className="text-[10px] text-ink/40 ml-auto">(визначено автоматично)</span>
+                    </div>
                   )}
-                </div>
 
-                {branchOptions.length > 0 ? (
-                  <select
-                    id="deliveryBranch"
-                    className="input text-xs sm:text-sm"
-                    value={form.branchRef || ""}
-                    onChange={(e) => {
-                      const sel = branchOptions.find((b) => (b.id || b.ref) === e.target.value);
-                      if (sel) {
-                        selectBranch(sel);
-                      } else {
-                        set("deliveryBranch")(e);
-                      }
-                    }}
-                  >
-                    <option value="">Оберіть відділення зі списку...</option>
-                    {branchOptions.map((b) => (
-                      <option key={b.id || b.ref} value={b.id || b.ref}>
-                        {b.name || b.description}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id="deliveryBranch"
-                    name="deliveryBranch"
-                    className="input"
-                    value={form.deliveryBranch}
-                    onChange={set("deliveryBranch")}
-                    placeholder="напр. Відділення №1 (вул. Центральна, 15)"
-                  />
-                )}
-                {branchOptions.length > 0 && (
-                  <div className="mt-1 text-[11px] text-ink/50 flex justify-between">
-                    <span>Знайдено {branchOptions.length} відділень</span>
-                    <button
-                      type="button"
-                      onClick={() => setBranchOptions([])}
-                      className="text-amber-800 hover:underline"
-                    >
-                      Ввести вручну
-                    </button>
+                  {/* 3. Branch / Postomat Selection */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="label mb-0" htmlFor="deliveryBranch">
+                        Відділення або поштомат *
+                      </label>
+                      {branchLoading && (
+                        <span className="text-xs text-ink/50 flex items-center gap-1">
+                          <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                          Завантаження списку...
+                        </span>
+                      )}
+                    </div>
+
+                    {!form.cityRef && !form.deliveryCity ? (
+                      <div className="text-xs text-ink/50 italic p-3 bg-ink/5 rounded-xl border border-ink/5">
+                        💡 Спочатку оберіть населений пункт зі списку вище, щоб завантажити актуальні відділення та поштомати.
+                      </div>
+                    ) : branchLoading ? (
+                      <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                        Завантажуємо актуальний список відділень Нової пошти...
+                      </div>
+                    ) : form.branchRef ? (
+                      /* Selected Branch Card */
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>{form.warehouseType?.toLowerCase().includes("поштомат") ? "📮" : "📦"}</span>
+                            <span>{form.warehouseType?.toLowerCase().includes("поштомат") ? "Поштомат обрано" : "Відділення обрано"}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm((f) => ({
+                                ...f,
+                                deliveryBranch: "",
+                                branchRef: "",
+                                branchNumber: "",
+                                warehouseAddress: "",
+                                warehouseType: "",
+                              }));
+                            }}
+                            className="text-xs text-amber-900 hover:text-amber-700 font-semibold underline underline-offset-2"
+                          >
+                            Змінити
+                          </button>
+                        </div>
+                        <div className="text-sm font-bold text-ink">
+                          {form.deliveryBranch}
+                        </div>
+                        {form.warehouseAddress && form.warehouseAddress !== form.deliveryBranch && (
+                          <div className="text-xs text-ink/75 flex items-center gap-1">
+                            <span>📍</span>
+                            <span>{form.warehouseAddress}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : branchOptions.length > 0 ? (
+                      /* Branch Picker with Filter */
+                      <div className="space-y-2">
+                        {branchOptions.length > 4 && (
+                          <input
+                            type="text"
+                            value={branchFilter}
+                            onChange={(e) => setBranchFilter(e.target.value)}
+                            placeholder="🔍 Пошук за номером (напр. 1) або адресою..."
+                            className="input text-xs py-2"
+                          />
+                        )}
+                        <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-2xl border border-ink/10 p-2 bg-[#FAF6EE]/50 divide-y divide-ink/5">
+                          {branchOptions
+                            .filter((b) => {
+                              if (!branchFilter.trim()) return true;
+                              const term = branchFilter.toLowerCase().trim();
+                              return (
+                                (b.name && b.name.toLowerCase().includes(term)) ||
+                                (b.number && String(b.number).includes(term)) ||
+                                (b.shortAddress && b.shortAddress.toLowerCase().includes(term)) ||
+                                (b.address && b.address.toLowerCase().includes(term))
+                              );
+                            })
+                            .map((b) => {
+                              const isPostomat = b.category === "Postomat" || b.name?.toLowerCase()?.includes("поштомат");
+                              return (
+                                <button
+                                  key={b.ref || b.id}
+                                  type="button"
+                                  onClick={() => selectBranch(b)}
+                                  className="w-full text-left p-2.5 rounded-xl transition-colors hover:bg-white text-ink/80 flex items-start justify-between gap-2.5"
+                                >
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-bold text-ink">
+                                        {b.number ? `№${b.number}` : ""} {b.name}
+                                      </span>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                                        isPostomat ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"
+                                      }`}>
+                                        {isPostomat ? "Поштомат" : "Відділення"}
+                                      </span>
+                                    </div>
+                                    {(b.address || b.shortAddress) && (
+                                      <div className="text-[11px] text-ink/60">
+                                        📍 {b.address || b.shortAddress}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-honey font-semibold shrink-0 mt-0.5">
+                                    Обрати →
+                                  </span>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-ink/50 italic p-3 bg-ink/5 rounded-xl border border-ink/5">
+                        У цьому населеному пункті не знайдено відділень. Будь ласка, оберіть інший населений пункт.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                /* UKRPOSHTA FLOW (UNMODIFIED) */
+                <div className="space-y-4">
+                  {/* 1. Місто / населений пункт * */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="label mb-0" htmlFor="deliveryCity">Місто / населений пункт *</label>
+                      {cityLoading && (
+                        <span className="text-xs text-ink/50 flex items-center gap-1">
+                          <span className="w-3 h-3 border-2 border-honey border-t-transparent rounded-full animate-spin" />
+                          Пошук міст...
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      id="deliveryCity"
+                      name="deliveryCity"
+                      className="input"
+                      value={form.deliveryCity}
+                      onChange={(e) => {
+                        set("deliveryCity")(e);
+                        setShowCityDropdown(true);
+                      }}
+                      onFocus={() => {
+                        if (citySuggestions.length > 0) setShowCityDropdown(true);
+                      }}
+                      placeholder="Введіть перші літери (напр. Київ, Львів, Коломия)"
+                      autoFocus
+                      autoComplete="off"
+                    />
+
+                    {/* City Suggestions Dropdown */}
+                    {showCityDropdown && citySuggestions.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white rounded-2xl shadow-xl border border-ink/10 py-1.5 divide-y divide-ink/5">
+                        {citySuggestions.map((c, idx) => (
+                          <button
+                            key={c.id || c.ref || idx}
+                            type="button"
+                            onClick={() => selectCity(c)}
+                            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm hover:bg-honey/15 transition-colors flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="font-semibold text-ink">{c.name || c.description}</div>
+                              {(c.region || c.area) && (
+                                <div className="text-[11px] text-ink/50">{c.region || c.area}</div>
+                              )}
+                            </div>
+                            <span className="text-xs text-ink/40">Обрати →</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Область * */}
+                  <div>
+                    <label className="label" htmlFor="deliveryRegion">Область *</label>
+                    <input
+                      id="deliveryRegion"
+                      name="deliveryRegion"
+                      className="input"
+                      value={form.deliveryRegion}
+                      onChange={set("deliveryRegion")}
+                      placeholder="напр. Івано-Франківська"
+                    />
+                  </div>
+
+                  {/* 3. Відділення * */}
+                  <div>
+                    <label className="label" htmlFor="deliveryBranch">Відділення / індекс Укрпошти *</label>
+                    <input
+                      id="deliveryBranch"
+                      name="deliveryBranch"
+                      className="input"
+                      value={form.deliveryBranch}
+                      onChange={set("deliveryBranch")}
+                      placeholder="напр. Відділення 76018 (вул. Січових Стрільців, 15)"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* 4. Коментар до замовлення */}
               <div>

@@ -111,13 +111,13 @@ router.get("/delivery/cities", async (req, res) => {
 });
 
 router.get("/delivery/branches", async (req, res) => {
-  const { provider, cityId } = req.query;
+  const { provider, cityId, cityName, search } = req.query;
   try {
     if (provider === "up") {
-      const branches = await getBranchesUkrposhta(cityId);
+      const branches = await getBranchesUkrposhta(cityId || cityName);
       return res.json(branches);
     } else {
-      const branches = await getBranchesNovaPoshta(cityId);
+      const branches = await getBranchesNovaPoshta(cityId || cityName, search);
       return res.json(branches);
     }
   } catch (err) {

@@ -318,6 +318,127 @@ function resolveEdgeUniqueSlug(baseSlug, productId = null) {
   }
 }
 
+// ---------------- Nova Poshta Edge Delivery ----------------
+const NP_DEFAULT_API_KEY = "286247cbd5b482b2f611332789acdeb0";
+const NP_API_URL = "https://api.novaposhta.ua/v2.0/json/";
+
+const NP_FALLBACK_CITIES = [
+  { id: "8d5a980d-391c-11dd-90d9-001a92567626", name: "Київ", fullName: "м. Київ, Київська обл.", area: "Київська область", region: "Київський р-н" },
+  { id: "1ec09d88-e1c2-11e3-8c4a-0050568002cf", name: "Львів", fullName: "м. Львів, Львівська обл.", area: "Львівська область", region: "Львівський р-н" },
+  { id: "db5c88f5-391c-11dd-90d9-001a92567626", name: "Одеса", fullName: "м. Одеса, Одеська обл.", area: "Одеська область", region: "Одеський р-н" },
+  { id: "db5c88e0-391c-11dd-90d9-001a92567626", name: "Дніпро", fullName: "м. Дніпро, Дніпропетровська обл.", area: "Дніпропетровська область", region: "Дніпровський р-н" },
+  { id: "db5c88c0-391c-11dd-90d9-001a92567626", name: "Харків", fullName: "м. Харків, Харківська обл.", area: "Харківська область", region: "Харківський р-н" },
+  { id: "db5c898c-391c-11dd-90d9-001a92567626", name: "Коростень", fullName: "м. Коростень, Житомирська обл.", area: "Житомирська область", region: "Коростенський р-н" },
+  { id: "db5c8892-391c-11dd-90d9-001a92567626", name: "Івано-Франківськ", fullName: "м. Івано-Франківськ, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Івано-Франківський р-н" },
+  { id: "db5c8979-391c-11dd-90d9-001a92567626", name: "Коломия", fullName: "м. Коломия, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
+  { id: "db5c899c-391c-11dd-90d9-001a92567626", name: "Снятин", fullName: "м. Снятин, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
+  { id: "db5c88f0-391c-11dd-90d9-001a92567626", name: "Житомир", fullName: "м. Житомир, Житомирська обл.", area: "Житомирська область", region: "Житомирський р-н" },
+  { id: "db5c888c-391c-11dd-90d9-001a92567626", name: "Вінниця", fullName: "м. Вінниця, Вінницька обл.", area: "Вінницька область", region: "Вінницький р-н" },
+  { id: "db5c88de-391c-11dd-90d9-001a92567626", name: "Запоріжжя", fullName: "м. Запоріжжя, Запорізька обл.", area: "Запорізька область", region: "Запорізький р-н" },
+  { id: "db5c88b7-391c-11dd-90d9-001a92567626", name: "Полтава", fullName: "м. Полтава, Полтавська обл.", area: "Полтавська область", region: "Полтавський р-н" },
+  { id: "db5c8914-391c-11dd-90d9-001a92567626", name: "Чернігів", fullName: "м. Чернігів, Чернігівська обл.", area: "Чернігівська область", region: "Чернігівський р-н" },
+  { id: "db5c88ac-391c-11dd-90d9-001a92567626", name: "Чернівці", fullName: "м. Чернівці, Чернівецька обл.", area: "Чернівецька область", region: "Чернівецький р-н" },
+  { id: "db5c8901-391c-11dd-90d9-001a92567626", name: "Тернопіль", fullName: "м. Тернопіль, Тернопільська обл.", area: "Тернопільська область", region: "Тернопільський р-н" },
+  { id: "db5c890a-391c-11dd-90d9-001a92567626", name: "Рівне", fullName: "м. Рівне, Рівненська обл.", area: "Рівненська область", region: "Рівненський р-н" },
+  { id: "db5c891b-391c-11dd-90d9-001a92567626", name: "Луцьк", fullName: "м. Луцьк, Волинська обл.", area: "Волинська область", region: "Луцький р-н" },
+  { id: "db5c8928-391c-11dd-90d9-001a92567626", name: "Хмельницький", fullName: "м. Хмельницький, Хмельницька обл.", area: "Хмельницька область", region: "Хмельницький р-н" },
+  { id: "db5c8938-391c-11dd-90d9-001a92567626", name: "Черкаси", fullName: "м. Черкаси, Черкаська обл.", area: "Черкаська область", region: "Черкаський р-н" },
+  { id: "db5c8920-391c-11dd-90d9-001a92567626", name: "Суми", fullName: "м. Суми, Сумська обл.", area: "Сумська область", region: "Сумський р-н" },
+  { id: "db5c88aa-391c-11dd-90d9-001a92567626", name: "Кропивницький", fullName: "м. Кропивницький, Кіровоградська обл.", area: "Кіровоградська область", region: "Кропивницький р-н" },
+  { id: "db5c88f2-391c-11dd-90d9-001a92567626", name: "Миколаїв", fullName: "м. Миколаїв, Миколаївська обл.", area: "Миколаївська область", region: "Миколаївський р-н" },
+  { id: "db5c8942-391c-11dd-90d9-001a92567626", name: "Ужгород", fullName: "м. Ужгород, Закарпатська обл.", area: "Закарпатська область", region: "Ужгородський р-н" },
+];
+
+const KOROSTEN_FALLBACK_BRANCHES = [
+  {
+    id: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+    ref: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+    number: "1",
+    name: "Відділення №1: вул. Героїв Чорнобиля, 7",
+    shortAddress: "вул. Героїв Чорнобиля, 7",
+    address: "м. Коростень, вул. Героїв Чорнобиля, 7",
+    category: "Branch",
+    type: "Вантажне (до 1100 кг)",
+  },
+  {
+    id: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
+    ref: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
+    number: "2",
+    name: "Відділення №2: вул. Сосновського, 28",
+    shortAddress: "вул. Сосновського, 28",
+    address: "м. Коростень, вул. Сосновського, 28",
+    category: "Branch",
+    type: "Поштове (до 30 кг)",
+  },
+  {
+    id: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
+    ref: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
+    number: "3",
+    name: "Відділення №3: вул. Грушевського, 43",
+    shortAddress: "вул. Грушевського, 43",
+    address: "м. Коростень, вул. Грушевського, 43",
+    category: "Branch",
+    type: "Поштове (до 30 кг)",
+  },
+  {
+    id: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
+    ref: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
+    number: "4",
+    name: "Відділення №4: вул. Сергія Кемського, 11",
+    shortAddress: "вул. Сергія Кемського, 11",
+    address: "м. Коростень, вул. Сергія Кемського, 11",
+    category: "Branch",
+    type: "Поштове (до 30 кг)",
+  },
+  {
+    id: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
+    ref: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
+    number: "2541",
+    name: "Поштомат №2541: вул. Грушевського, 26 (ТЦ «Місто»)",
+    shortAddress: "вул. Грушевського, 26",
+    address: "м. Коростень, вул. Грушевського, 26 (ТЦ «Місто»)",
+    category: "Postomat",
+    type: "Поштомат (до 20 кг)",
+  },
+  {
+    id: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
+    ref: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
+    number: "2542",
+    name: "Поштомат №2542: вул. Шевченка, 8",
+    shortAddress: "вул. Шевченка, 8",
+    address: "м. Коростень, вул. Шевченка, 8",
+    category: "Postomat",
+    type: "Поштомат (до 20 кг)",
+  },
+];
+
+async function callNovaPoshtaApi(modelName, calledMethod, methodProperties = {}, apiKey = NP_DEFAULT_API_KEY) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const res = await fetch(NP_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "PasikaHoney/1.0",
+      },
+      body: JSON.stringify({
+        apiKey,
+        modelName,
+        calledMethod,
+        methodProperties,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ---------------- Crypto & Security Helpers ----------------
 
 async function getHmacKey(secret) {
@@ -610,10 +731,123 @@ export async function onRequest(context) {
 
   // Delivery search
   if (path === "/delivery/cities" && method === "GET") {
-    return jsonResponse([]);
+    const provider = url.searchParams.get("provider") || "np";
+    const q = (url.searchParams.get("query") || "").trim();
+    if (!q) return jsonResponse([]);
+
+    if (provider === "up") {
+      const lower = q.toLowerCase();
+      const matched = NP_FALLBACK_CITIES.filter((c) =>
+        c.name.toLowerCase().includes(lower) ||
+        (c.fullName && c.fullName.toLowerCase().includes(lower))
+      ).map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.fullName || c.name,
+        area: c.area,
+        region: c.area,
+      }));
+      return jsonResponse(matched);
+    }
+
+    // Nova Poshta
+    const apiKey = env?.NOVA_POSHTA_API_KEY || NP_DEFAULT_API_KEY;
+    try {
+      const data = await callNovaPoshtaApi("Address", "searchSettlements", {
+        CityName: q,
+        Limit: "25",
+      }, apiKey);
+
+      if (data && data.success && Array.isArray(data.data) && data.data[0]?.Addresses) {
+        const list = data.data[0].Addresses.map((a) => {
+          const area = a.Area ? `${a.Area} область` : "";
+          const reg = a.Region ? `${a.Region} р-н` : "";
+          return {
+            id: a.DeliveryCity || a.Ref,
+            ref: a.Ref,
+            deliveryCity: a.DeliveryCity,
+            name: a.MainDescription || a.Present,
+            description: a.Present || a.MainDescription,
+            area: area || a.Area,
+            region: [area, reg].filter(Boolean).join(", ") || area,
+          };
+        });
+        if (list.length > 0) return jsonResponse(list);
+      }
+    } catch {}
+
+    // Fallback list
+    const lower = q.toLowerCase();
+    const filtered = NP_FALLBACK_CITIES.filter((c) =>
+      c.name.toLowerCase().includes(lower) ||
+      (c.fullName && c.fullName.toLowerCase().includes(lower))
+    ).map((c) => ({
+      id: c.id,
+      ref: c.id,
+      name: c.name,
+      description: c.fullName,
+      area: c.area,
+      region: c.area,
+    }));
+    return jsonResponse(filtered);
   }
+
   if (path === "/delivery/branches" && method === "GET") {
-    return jsonResponse([]);
+    const provider = url.searchParams.get("provider") || "np";
+    const cityId = (url.searchParams.get("cityId") || "").trim();
+    const cityName = (url.searchParams.get("cityName") || "").trim();
+    const search = (url.searchParams.get("search") || "").trim();
+
+    if (!cityId && !cityName) return jsonResponse([]);
+
+    const isKorosten =
+      cityId.toLowerCase().includes("db5c898c") ||
+      cityName.toLowerCase().includes("коростень") ||
+      cityId.toLowerCase().includes("коростень");
+
+    if (provider === "np") {
+      const apiKey = env?.NOVA_POSHTA_API_KEY || NP_DEFAULT_API_KEY;
+      try {
+        const methodProps = { Limit: "100" };
+        if (cityId) methodProps.CityRef = cityId;
+        if (cityName && !methodProps.CityRef) methodProps.CityName = cityName;
+        if (search) methodProps.FindByString = search;
+
+        const data = await callNovaPoshtaApi("AddressGeneral", "getWarehouses", methodProps, apiKey);
+        if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+          const list = data.data.map((w) => ({
+            id: w.Ref,
+            ref: w.Ref,
+            number: String(w.Number),
+            name: w.Description,
+            shortAddress: w.ShortAddress || "",
+            address: w.ShortAddress ? `${w.SettlementDescription || ""}, ${w.ShortAddress}` : w.Description,
+            category: w.CategoryOfWarehouse || (w.Description?.toLowerCase()?.includes("поштомат") ? "Postomat" : "Branch"),
+            type: w.TypeOfWarehouse,
+            cityName: w.SettlementDescription || "",
+            areaName: w.SettlementAreaDescription || "",
+          }));
+          return jsonResponse(list);
+        }
+      } catch {}
+
+      if (isKorosten) {
+        return jsonResponse(KOROSTEN_FALLBACK_BRANCHES);
+      }
+
+      // Default fallback branches
+      return jsonResponse([
+        { id: `np_${cityId || "c"}_1`, ref: `np_${cityId || "c"}_1`, number: "1", name: "Відділення №1: вул. Центральна, 1", shortAddress: "вул. Центральна, 1", address: "вул. Центральна, 1", category: "Branch" },
+        { id: `np_${cityId || "c"}_2`, ref: `np_${cityId || "c"}_2`, number: "2", name: "Відділення №2: вул. Соборна, 15", shortAddress: "вул. Соборна, 15", address: "вул. Соборна, 15", category: "Branch" },
+        { id: `np_${cityId || "c"}_3`, ref: `np_${cityId || "c"}_3`, number: "3", name: "Відділення №3: вул. Шевченка, 28", shortAddress: "вул. Шевченка, 28", address: "вул. Шевченка, 28", category: "Branch" },
+        { id: `np_${cityId || "c"}_pm1`, ref: `np_${cityId || "c"}_pm1`, number: "1051", name: "Поштомат №1051: просп. Миру, 10", shortAddress: "просп. Миру, 10", address: "просп. Миру, 10", category: "Postomat" },
+      ]);
+    }
+
+    return jsonResponse([
+      { id: `up_${cityId || "c"}_1`, ref: `up_${cityId || "c"}_1`, number: "1", name: "Відділення 10001 (вул. Центральна, 1)", address: "вул. Центральна, 1" },
+      { id: `up_${cityId || "c"}_2`, ref: `up_${cityId || "c"}_2`, number: "2", name: "Відділення 10002 (вул. Соборна, 15)", address: "вул. Соборна, 15" },
+    ]);
   }
 
   // Public Order Creation
@@ -634,6 +868,10 @@ export async function onRequest(context) {
       const providerKey = body.providerKey || rawDelivery.providerKey || "np";
       const city = body.city || body.deliveryCity || rawDelivery.city || "";
       const branch = body.branch || body.deliveryBranch || rawDelivery.branch || "";
+      const region = (body.region || body.deliveryRegion || rawDelivery.region || (typeof city === "object" ? (city.area || city.region) : "") || "").trim();
+      const warehouseAddress = (body.warehouseAddress || body.deliveryWarehouseAddress || rawDelivery.warehouseAddress || (typeof branch === "object" ? (branch.address || branch.shortAddress) : "") || "").trim();
+      const warehouseRef = (body.warehouseRef || body.deliveryWarehouseRef || rawDelivery.warehouseRef || body.branchRef || rawDelivery.branchId || (typeof branch === "object" ? (branch.ref || branch.id) : "") || "").trim();
+      const branchNumber = (body.branchNumber || body.deliveryBranchNumber || rawDelivery.branchNumber || (typeof branch === "object" ? branch.number : "") || "").trim();
 
       const paymentMethod = body.paymentMethod || rawPayment.method || "cod";
       const isCard = paymentMethod === "card" || paymentMethod === "card_prepay";
@@ -746,8 +984,19 @@ export async function onRequest(context) {
         delivery: {
           provider: providerKey === "up" ? "Укрпошта" : "Нова пошта",
           providerKey,
+          deliveryService: providerKey === "up" ? "Укрпошта" : "Нова пошта",
           city: cityName,
+          cityId: body.cityRef || body.deliveryCityId || rawDelivery.cityId || null,
+          region: region || null,
           branch: branchName,
+          branchId: warehouseRef || null,
+          branchNumber: branchNumber || null,
+          warehouseAddress: warehouseAddress || null,
+          warehouseRef: warehouseRef || null,
+          trackingNumber: null,
+          trackingUrl: null,
+          shippedAt: null,
+          completedAt: null,
         },
         payment: {
           method: cleanPayment,
@@ -793,8 +1042,50 @@ export async function onRequest(context) {
     if (!order) {
       return jsonResponse({ found: false, error: "Замовлення з таким номером або ТТН не знайдено" }, 404);
     }
+
+    const deliveryService = order.delivery?.deliveryService || order.delivery?.provider || "Нова пошта";
+    const trackingNumber = order.delivery?.trackingNumber || order.tracking_number || null;
+    let trackingUrl = order.delivery?.trackingUrl || null;
+    if (trackingNumber && !trackingUrl) {
+      const isUp = deliveryService.toLowerCase().includes("укр");
+      trackingUrl = isUp
+        ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
+        : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`;
+    }
+
+    const deliveryObj = {
+      service: deliveryService,
+      provider: order.delivery?.provider || deliveryService,
+      city: order.delivery?.city || "",
+      region: order.delivery?.region || "",
+      branch: order.delivery?.branch || "",
+      branchNumber: order.delivery?.branchNumber || null,
+      warehouseAddress: order.delivery?.warehouseAddress || "",
+      warehouseRef: order.delivery?.warehouseRef || order.delivery?.branchId || "",
+      trackingNumber,
+      trackingUrl,
+      shippedAt: order.delivery?.shippedAt || order.shipped_at || null,
+      completedAt: order.delivery?.completedAt || order.completed_at || null,
+    };
+
     return jsonResponse({
       found: true,
+      id: order.id,
+      number: order.number,
+      orderCode: order.orderCode || `PAS-${order.number}`,
+      order_code: order.orderCode || `PAS-${order.number}`,
+      status: order.status,
+      statusLabel: order.status === "DELIVERED" ? "Доставлено" : (order.status === "SHIPPED" ? "Відправлено" : "Нове"),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      total: order.total,
+      delivery: deliveryObj,
+      items: (order.items || []).map((i) => ({
+        name: i.name,
+        weight: i.weight,
+        qty: i.qty,
+        price: i.price,
+      })),
       order: {
         id: order.id,
         number: order.number,
@@ -802,11 +1093,8 @@ export async function onRequest(context) {
         status: order.status,
         createdAt: order.createdAt,
         total: order.total,
-        deliveryService: order.delivery?.deliveryService || order.delivery?.provider || "Нова пошта",
-        trackingNumber: order.delivery?.trackingNumber || order.tracking_number || null,
-        trackingUrl: order.delivery?.trackingUrl || null,
+        delivery: deliveryObj,
         customerFirstName: order.customer?.firstName ? `${order.customer.firstName[0]}***` : "",
-        city: order.delivery?.city || "",
       },
     });
   }

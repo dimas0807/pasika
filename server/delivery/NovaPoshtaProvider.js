@@ -3,27 +3,30 @@ import { DeliveryProvider } from "./DeliveryProvider.js";
 const NP_API_ENDPOINT = "https://api.novaposhta.ua/v2.0/json/";
 
 const NP_FALLBACK_CITIES = [
-  { id: "8d5a980d-391c-11dd-90d9-001a92567626", name: "м. Київ, Київська обл." },
-  { id: "db5c8892-391c-11dd-90d9-001a92567626", name: "м. Житомир, Житомирська обл." },
-  { id: "db5c88f5-391c-11dd-90d9-001a92567626", name: "м. Львів, Львівська обл." },
-  { id: "db5c88d0-391c-11dd-90d9-001a92567626", name: "м. Одеса, Одеська обл." },
-  { id: "db5c88e0-391c-11dd-90d9-001a92567626", name: "м. Харків, Харківська обл." },
-  { id: "db5c888c-391c-11dd-90d9-001a92567626", name: "м. Дніпро, Дніпропетровська обл." },
-  { id: "db5c88de-391c-11dd-90d9-001a92567626", name: "м. Вінниця, Вінницька обл." },
-  { id: "db5c88c4-391c-11dd-90d9-001a92567626", name: "м. Івано-Франківськ, Івано-Франківська обл." },
-  { id: "db5c891b-391c-11dd-90d9-001a92567626", name: "м. Тернопіль, Тернопільська обл." },
-  { id: "db5c893b-391c-11dd-90d9-001a92567626", name: "м. Чернігів, Чернігівська обл." },
-  { id: "db5c8907-391c-11dd-90d9-001a92567626", name: "м. Рівне, Рівненська обл." },
-  { id: "db5c88c6-391c-11dd-90d9-001a92567626", name: "м. Полтава, Полтавська обл." },
-  { id: "db5c8931-391c-11dd-90d9-001a92567626", name: "м. Ужгород, Закарпатська обл." },
-  { id: "db5c88c8-391c-11dd-90d9-001a92567626", name: "м. Чернівці, Чернівецька обл." },
-  { id: "db5c88a8-391c-11dd-90d9-001a92567626", name: "м. Запоріжжя, Запорізька обл." },
-  { id: "db5c88b4-391c-11dd-90d9-001a92567626", name: "м. Миколаїв, Миколаївська обл." },
-  { id: "db5c88fa-391c-11dd-90d9-001a92567626", name: "м. Луцьк, Волинська обл." },
-  { id: "db5c8928-391c-11dd-90d9-001a92567626", name: "м. Хмельницький, Хмельницька обл." },
-  { id: "db5c8938-391c-11dd-90d9-001a92567626", name: "м. Черкаси, Черкаська обл." },
-  { id: "db5c8920-391c-11dd-90d9-001a92567626", name: "м. Суми, Сумська обл." },
-  { id: "db5c88aa-391c-11dd-90d9-001a92567626", name: "м. Кропивницький, Кіровоградська обл." },
+  { id: "db5c898c-391c-11dd-90d9-001a92567626", name: "Коростень", fullName: "м. Коростень, Житомирська обл.", area: "Житомирська область", region: "Коростенський р-н" },
+  { id: "8d5a980d-391c-11dd-90d9-001a92567626", name: "Київ", fullName: "м. Київ, Київська обл.", area: "Київська область", region: "Київ" },
+  { id: "db5c8892-391c-11dd-90d9-001a92567626", name: "Житомир", fullName: "м. Житомир, Житомирська обл.", area: "Житомирська область", region: "Житомирський р-н" },
+  { id: "db5c88f5-391c-11dd-90d9-001a92567626", name: "Львів", fullName: "м. Львів, Львівська обл.", area: "Львівська область", region: "Львівський р-н" },
+  { id: "db5c88d0-391c-11dd-90d9-001a92567626", name: "Одеса", fullName: "м. Одеса, Одеська обл.", area: "Одеська область", region: "Одеський р-н" },
+  { id: "db5c88e0-391c-11dd-90d9-001a92567626", name: "Харків", fullName: "м. Харків, Харківська обл.", area: "Харківська область", region: "Харківський р-н" },
+  { id: "db5c888c-391c-11dd-90d9-001a92567626", name: "Дніпро", fullName: "м. Дніпро, Дніпропетровська обл.", area: "Дніпропетровська область", region: "Дніпровський р-н" },
+  { id: "db5c88de-391c-11dd-90d9-001a92567626", name: "Вінниця", fullName: "м. Вінниця, Вінницька обл.", area: "Вінницька область", region: "Вінницький р-н" },
+  { id: "db5c88c4-391c-11dd-90d9-001a92567626", name: "Івано-Франківськ", fullName: "м. Івано-Франківськ, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Івано-Франківський р-н" },
+  { id: "db5c892f-391c-11dd-90d9-001a92567626", name: "Снятин", fullName: "м. Снятин, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
+  { id: "db5c88cc-391c-11dd-90d9-001a92567626", name: "Коломия", fullName: "м. Коломия, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
+  { id: "db5c88c8-391c-11dd-90d9-001a92567626", name: "Чернівці", fullName: "м. Чернівці, Чернівецька обл.", area: "Чернівецька область", region: "Чернівецький р-н" },
+  { id: "db5c891b-391c-11dd-90d9-001a92567626", name: "Тернопіль", fullName: "м. Тернопіль, Тернопільська обл.", area: "Тернопільська область", region: "Тернопільський р-н" },
+  { id: "db5c893b-391c-11dd-90d9-001a92567626", name: "Чернігів", fullName: "м. Чернігів, Чернігівська обл.", area: "Чернігівська область", region: "Чернігівський р-н" },
+  { id: "db5c8907-391c-11dd-90d9-001a92567626", name: "Рівне", fullName: "м. Рівне, Рівненська обл.", area: "Рівненська область", region: "Рівненський р-н" },
+  { id: "db5c88c6-391c-11dd-90d9-001a92567626", name: "Полтава", fullName: "м. Полтава, Полтавська обл.", area: "Полтавська область", region: "Полтавський р-н" },
+  { id: "db5c8931-391c-11dd-90d9-001a92567626", name: "Ужгород", fullName: "м. Ужгород, Закарпатська обл.", area: "Закарпатська область", region: "Ужгородський р-н" },
+  { id: "db5c88a8-391c-11dd-90d9-001a92567626", name: "Запоріжжя", fullName: "м. Запоріжжя, Запорізька обл.", area: "Запорізька область", region: "Запорізький р-н" },
+  { id: "db5c88b4-391c-11dd-90d9-001a92567626", name: "Миколаїв", fullName: "м. Миколаїв, Миколаївська обл.", area: "Миколаївська область", region: "Миколаївський р-н" },
+  { id: "db5c88fa-391c-11dd-90d9-001a92567626", name: "Луцьк", fullName: "м. Луцьк, Волинська обл.", area: "Волинська область", region: "Луцький р-н" },
+  { id: "db5c8928-391c-11dd-90d9-001a92567626", name: "Хмельницький", fullName: "м. Хмельницький, Хмельницька обл.", area: "Хмельницька область", region: "Хмельницький р-н" },
+  { id: "db5c8938-391c-11dd-90d9-001a92567626", name: "Черкаси", fullName: "м. Черкаси, Черкаська обл.", area: "Черкаська область", region: "Черкаський р-н" },
+  { id: "db5c8920-391c-11dd-90d9-001a92567626", name: "Суми", fullName: "м. Суми, Сумська обл.", area: "Сумська область", region: "Сумський р-н" },
+  { id: "db5c88aa-391c-11dd-90d9-001a92567626", name: "Кропивницький", fullName: "м. Кропивницький, Кіровоградська обл.", area: "Кіровоградська область", region: "Кропивницький р-н" },
 ];
 
 export class NovaPoshtaProvider extends DeliveryProvider {
@@ -35,22 +38,32 @@ export class NovaPoshtaProvider extends DeliveryProvider {
    * Safe fetch helper
    */
   async _post(apiKey, modelName, calledMethod, methodProperties = {}) {
-    const res = await fetch(NP_API_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        apiKey,
-        modelName,
-        calledMethod,
-        methodProperties,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    try {
+      const res = await fetch(NP_API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "PasikaHoney/1.0",
+        },
+        body: JSON.stringify({
+          apiKey,
+          modelName,
+          calledMethod,
+          methodProperties,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      throw new Error(`Помилка HTTP від сервера Нової пошти: ${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        throw new Error(`Помилка HTTP від сервера Нової пошти: ${res.status} ${res.statusText}`);
+      }
+
+      return await res.json();
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return await res.json();
   }
 
   /**
@@ -166,9 +179,15 @@ export class NovaPoshtaProvider extends DeliveryProvider {
         if (data.success && Array.isArray(data.data) && data.data.length > 0) {
           return data.data.map((w) => ({
             id: w.Ref,
+            ref: w.Ref,
             name: w.Description,
             number: String(w.Number),
+            shortAddress: w.ShortAddress || "",
+            address: w.ShortAddress ? `${w.SettlementDescription || ""}, ${w.ShortAddress}` : w.Description,
             type: w.TypeOfWarehouse,
+            category: w.CategoryOfWarehouse || (w.Description?.toLowerCase()?.includes("поштомат") ? "Postomat" : "Branch"),
+            cityName: w.SettlementDescription || "",
+            areaName: w.SettlementAreaDescription || "",
             phone: w.Phone,
             maxWeight: w.TotalMaxWeightAllowed,
           }));
@@ -178,12 +197,79 @@ export class NovaPoshtaProvider extends DeliveryProvider {
       }
     }
 
-    // Fallback standard branches
+    // Korosten-specific branches fallback
+    const isKorosten = String(cityRef).toLowerCase().includes("db5c898c") || String(cityRef).toLowerCase().includes("коростень");
+    if (isKorosten) {
+      return [
+        {
+          id: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+          ref: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+          number: "1",
+          name: "Відділення №1: вул. Героїв Чорнобиля, 7",
+          shortAddress: "вул. Героїв Чорнобиля, 7",
+          address: "м. Коростень, вул. Героїв Чорнобиля, 7",
+          category: "Branch",
+          type: "Вантажне (до 1100 кг)",
+        },
+        {
+          id: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
+          ref: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
+          number: "2",
+          name: "Відділення №2: вул. Сосновського, 28",
+          shortAddress: "вул. Сосновського, 28",
+          address: "м. Коростень, вул. Сосновського, 28",
+          category: "Branch",
+          type: "Поштове (до 30 кг)",
+        },
+        {
+          id: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
+          ref: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
+          number: "3",
+          name: "Відділення №3: вул. Грушевського, 43",
+          shortAddress: "вул. Грушевського, 43",
+          address: "м. Коростень, вул. Грушевського, 43",
+          category: "Branch",
+          type: "Поштове (до 30 кг)",
+        },
+        {
+          id: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
+          ref: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
+          number: "4",
+          name: "Відділення №4: вул. Сергія Кемського, 11",
+          shortAddress: "вул. Сергія Кемського, 11",
+          address: "м. Коростень, вул. Сергія Кемського, 11",
+          category: "Branch",
+          type: "Поштове (до 30 кг)",
+        },
+        {
+          id: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
+          ref: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
+          number: "2541",
+          name: "Поштомат №2541: вул. Грушевського, 26 (ТЦ «Місто»)",
+          shortAddress: "вул. Грушевського, 26",
+          address: "м. Коростень, вул. Грушевського, 26 (ТЦ «Місто»)",
+          category: "Postomat",
+          type: "Поштомат (до 20 кг)",
+        },
+        {
+          id: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
+          ref: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
+          number: "2542",
+          name: "Поштомат №2542: вул. Шевченка, 8",
+          shortAddress: "вул. Шевченка, 8",
+          address: "м. Коростень, вул. Шевченка, 8",
+          category: "Postomat",
+          type: "Поштомат (до 20 кг)",
+        },
+      ];
+    }
+
+    // General fallback branches
     return [
-      { id: `np_${cityRef}_1`, name: "Відділення №1: вул. Центральна, 1", number: "1" },
-      { id: `np_${cityRef}_2`, name: "Відділення №2: вул. Соборна, 15", number: "2" },
-      { id: `np_${cityRef}_5`, name: "Відділення №5: просп. Миру, 12", number: "5" },
-      { id: `np_${cityRef}_pm1`, name: "Поштомат №2201 (ТРЦ)", number: "2201" },
+      { id: `np_${cityRef}_1`, ref: `np_${cityRef}_1`, number: "1", name: "Відділення №1: вул. Центральна, 1", shortAddress: "вул. Центральна, 1", address: "вул. Центральна, 1", category: "Branch" },
+      { id: `np_${cityRef}_2`, ref: `np_${cityRef}_2`, number: "2", name: "Відділення №2: вул. Соборна, 15", shortAddress: "вул. Соборна, 15", address: "вул. Соборна, 15", category: "Branch" },
+      { id: `np_${cityRef}_3`, ref: `np_${cityRef}_3`, number: "3", name: "Відділення №3: вул. Шевченка, 28", shortAddress: "вул. Шевченка, 28", address: "вул. Шевченка, 28", category: "Branch" },
+      { id: `np_${cityRef}_pm1`, ref: `np_${cityRef}_pm1`, number: "1051", name: "Поштомат №1051: просп. Миру, 10", shortAddress: "просп. Миру, 10", address: "просп. Миру, 10", category: "Postomat" },
     ];
   }
 

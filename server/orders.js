@@ -101,8 +101,12 @@ export function getFullOrder(orderId, customerToken = null) {
       providerKey: order.delivery_provider_key,
       city: order.delivery_city_name,
       cityId: order.delivery_city_id,
+      region: order.delivery_region || null,
       branch: order.delivery_branch_name,
       branchId: order.delivery_branch_id,
+      branchNumber: order.delivery_branch_number || null,
+      warehouseAddress: order.delivery_warehouse_address || null,
+      warehouseRef: order.delivery_warehouse_ref || order.delivery_branch_id || null,
       trackingNumber: order.tracking_number || null,
       deliveryService: order.delivery_service || order.delivery_provider || "Нова Пошта",
       trackingUrl,
@@ -241,9 +245,14 @@ export async function createOrder(req, res) {
     const providerName = cleanProviderKey === "up" ? "Укрпошта" : "Нова пошта";
 
     const cityName = typeof city === "object" ? city.name : city;
-    const cityId = typeof city === "object" ? city.id : null;
+    const cityId = typeof city === "object" ? city.id : (req.body?.cityRef || req.body?.deliveryCityId || rawDelivery.cityId || null);
     const branchName = typeof branch === "object" ? branch.name : branch;
-    const branchId = typeof branch === "object" ? branch.id : null;
+    const branchId = typeof branch === "object" ? (branch.id || branch.ref) : (req.body?.branchRef || req.body?.deliveryBranchId || rawDelivery.branchId || null);
+
+    const deliveryRegion = req.body?.deliveryRegion || req.body?.region || rawDelivery.region || (typeof city === "object" ? (city.area || city.region) : null) || null;
+    const deliveryWarehouseAddress = req.body?.deliveryWarehouseAddress || req.body?.warehouseAddress || rawDelivery.warehouseAddress || (typeof branch === "object" ? (branch.address || branch.shortAddress) : null) || null;
+    const deliveryWarehouseRef = req.body?.deliveryWarehouseRef || req.body?.warehouseRef || rawDelivery.warehouseRef || branchId || null;
+    const deliveryBranchNumber = req.body?.deliveryBranchNumber || req.body?.branchNumber || rawDelivery.branchNumber || (typeof branch === "object" ? branch.number : null) || null;
 
     if (!cityName || !branchName) {
       return res.status(400).json({ error: "Оберіть місто та відділення доставки" });
@@ -397,8 +406,9 @@ export async function createOrder(req, res) {
           delivery_provider_key, delivery_city_id, delivery_city_name,
           delivery_branch_id, delivery_branch_name, delivery_service, payment_method,
           comment, receipt_url, receipt_name, idempotency_key, customer_token,
+          delivery_region, delivery_warehouse_address, delivery_warehouse_ref, delivery_branch_number,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         newOrderNumber,
@@ -423,6 +433,10 @@ export async function createOrder(req, res) {
         finalReceiptName || null,
         idempotencyKey || null,
         customerToken,
+        deliveryRegion,
+        deliveryWarehouseAddress,
+        deliveryWarehouseRef,
+        deliveryBranchNumber,
         now,
         now
       );
@@ -984,7 +998,11 @@ export function getPublicOrderTrack(req, res) {
     delivery: {
       service: deliveryService,
       city: rawOrder.delivery_city_name,
+      region: rawOrder.delivery_region || null,
       branch: rawOrder.delivery_branch_name,
+      warehouseAddress: rawOrder.delivery_warehouse_address || null,
+      warehouseRef: rawOrder.delivery_warehouse_ref || null,
+      branchNumber: rawOrder.delivery_branch_number || null,
       trackingNumber: rawOrder.tracking_number || null,
       trackingUrl,
       shippedAt: rawOrder.shipped_at || null,
