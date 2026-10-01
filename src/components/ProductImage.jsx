@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { resolveImageUrl } from "../data/db";
 
 // Mapping from product keys/categories to realistic high-res photographic assets
 const IMAGE_MAP = {
@@ -83,7 +84,11 @@ export default function ProductImage({ image, category, alt = "Продукт п
   // Resolve photographic asset path
   let resolvedSrc = null;
 
-  if (image && (image.startsWith("/") || image.startsWith("http"))) {
+  if (image && (image.startsWith("http://") || image.startsWith("https://") || image.startsWith("data:") || image.startsWith("blob:"))) {
+    resolvedSrc = image;
+  } else if (image && image.startsWith("/uploads/")) {
+    resolvedSrc = resolveImageUrl(image);
+  } else if (image && image.startsWith("/")) {
     resolvedSrc = image;
   } else if (image && IMAGE_MAP[image]) {
     resolvedSrc = IMAGE_MAP[image];

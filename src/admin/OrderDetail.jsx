@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Orders, resolveReceiptUrl, DeliveryAccounts } from "../data/db";
+import { Orders, resolveReceiptUrl, DeliveryAccounts, Auth } from "../data/db";
 
 const STATUSES = [
   { key: "NEW", label: "Нове" },
@@ -99,9 +99,10 @@ export default function OrderDetail() {
     const fetchUrl = resolveReceiptUrl(rawReceiptUrl);
 
     setReceiptLoading(true);
-    setReceiptUnavailable(false);
+    const token = Auth?.getToken ? Auth.getToken() : "";
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-    fetch(fetchUrl, { credentials: "include" })
+    fetch(fetchUrl, { credentials: "include", headers })
       .then(async (res) => {
         if (!active) return;
         if (!res.ok) {

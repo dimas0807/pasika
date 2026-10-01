@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Orders, resolveReceiptUrl } from "../data/db";
+import { Orders, resolveReceiptUrl, Auth } from "../data/db";
 
 const ORDER_STATUSES = [
   { key: "all", label: "Всі замовлення" },
@@ -93,8 +93,10 @@ export default function OrdersAdmin() {
       return;
     }
     const fetchUrl = resolveReceiptUrl(rawUrl);
+    const token = Auth?.getToken ? Auth.getToken() : "";
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(fetchUrl, { credentials: "include" });
+      const res = await fetch(fetchUrl, { credentials: "include", headers });
       if (!res.ok) {
         showNotification("Файл чека недоступний", true);
         return;

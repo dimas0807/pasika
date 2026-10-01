@@ -31,6 +31,8 @@ const ALLOWED_ORIGINS = new Set([
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Allow requests without Origin (same-origin, curl, server-to-server)
   if (ALLOWED_ORIGINS.has(origin)) return true;
+  // Allow Cloudflare Pages preview domains like https://xxx.pasika12.pages.dev
+  if (/^https:\/\/([a-z0-9-]+\.)?pasika12\.pages\.dev$/.test(origin)) return true;
   // Allow localhost & 127.0.0.1 development ports
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
   return false;

@@ -84,20 +84,22 @@ export function cleanExpiredSessions() {
 }
 
 export function setSessionCookie(res, token) {
+  const isProd = process.env.NODE_ENV === "production";
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/",
     maxAge: SESSION_TTL_MS,
   });
 }
 
 export function clearSessionCookie(res) {
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/",
   });
 }
@@ -152,6 +154,7 @@ export async function loginHandler(req, res) {
 
   return res.json({
     success: true,
+    token: session.token,
     username: user.username,
     role: user.role || "ADMIN",
   });

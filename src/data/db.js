@@ -40,7 +40,32 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-export const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+export const API_BASE = (
+  import.meta.env?.VITE_API_URL ||
+  (import.meta.env?.PROD ? "https://pasika-production.up.railway.app" : "")
+).replace(/\/$/, "");
+
+const TOKEN_STORAGE_KEY = "pasika_admin_token";
+
+export function getAdminToken() {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY) || sessionStorage.getItem(TOKEN_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setAdminToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {}
+}
 
 export function resolveReceiptUrl(rawUrl) {
   if (!rawUrl) return "";
@@ -57,13 +82,25 @@ export function resolveReceiptUrl(rawUrl) {
   return `${API_BASE}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
 }
 
-// Fetch helper with error handling and credentials
+export function resolveImageUrl(rawUrl) {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) return rawUrl;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+  if (rawUrl.startsWith("/uploads/")) {
+    return `${API_BASE}${rawUrl}`;
+  }
+  return rawUrl;
+}
+
+// Fetch helper with error handling, credentials and Bearer token fallback
 export async function request(endpoint, options = {}) {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+  const token = getAdminToken();
   const fetchOptions = {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     credentials: "include",
@@ -523,8 +560,8 @@ export const Backups = {
   create: async () => {
     return await request("/api/admin/backup/create", { method: "POST" });
   },
-  downloadUrl: "/api/admin/backup",
-  downloadSpecificUrl: (filename) => `/api/admin/backups/${encodeURIComponent(filename)}`,
+  downloadUrl: `${API_BASE}/api/admin/backup`,
+  downloadSpecificUrl: (filename) => `${API_BASE}/api/admin/backups/${encodeURIComponent(filename)}`,
 };
 
 // ---------------- Settings ----------------
@@ -589,6 +626,8 @@ export const TelegramLog = {
 export const Auth = {
   isAuthed: () => state.adminAuthed,
   getUsername: () => state.adminUsername || "admin",
+  getToken: getAdminToken,
+  setToken: setAdminToken,
   checkSession: async () => {
     try {
       const res = await request("/api/auth/me");
@@ -610,6 +649,9 @@ export const Auth = {
       body: JSON.stringify({ login, password }),
     });
     if (res.success) {
+      if (res.token) {
+        setAdminToken(res.token);
+      }
       state.adminAuthed = true;
       state.adminUsername = res.username || login.trim();
       notify();
@@ -621,6 +663,7 @@ export const Auth = {
     try {
       await request("/api/auth/logout", { method: "POST" });
     } finally {
+      setAdminToken(null);
       state.adminAuthed = false;
       state.adminUsername = null;
       notify();
@@ -654,7 +697,8 @@ export const Storage = {
       res = await fetch(url, {
         method: "POST",
         body: formData,
-        credentials: "same-origin",
+        credentials: "include",
+        headers: checkoutToken ? { "x-checkout-token": checkoutToken } : {},
       });
     } catch {
       throw new Error("Не вдалося підключитися до сервера для завантаження чека.");
@@ -690,13 +734,18 @@ export const Storage = {
     formData.append("file", file);
     formData.append("image", file);
 
+    const token = getAdminToken();
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const url = `${API_BASE}/api/upload-product-image`;
     let res;
     try {
       res = await fetch(url, {
         method: "POST",
         body: formData,
-        credentials: "same-origin",
+        credentials: "include",
+        headers,
       });
     } catch {
       throw new Error("Не вдалося підключитися до сервера для завантаження фото товару.");

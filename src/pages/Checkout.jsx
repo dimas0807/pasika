@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { Orders, Products, Settings, Storage } from "../data/db";
+import { Orders, Products, Settings, Storage, request } from "../data/db";
 import {
   NovaPoshtaLogo,
   UkrposhtaLogo,
@@ -106,8 +106,7 @@ export default function Checkout() {
       if (cId) url += `&cityId=${encodeURIComponent(cId)}`;
       if (cName) url += `&cityName=${encodeURIComponent(cName)}`;
       if (searchStr) url += `&search=${encodeURIComponent(searchStr)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await request(url);
       if (Array.isArray(data)) {
         setBranchOptions(data);
       }
@@ -166,10 +165,9 @@ export default function Checkout() {
     const timer = setTimeout(async () => {
       setCityLoading(true);
       try {
-        const res = await fetch(
+        const data = await request(
           `/api/delivery/cities?provider=${encodeURIComponent(form.providerKey)}&query=${encodeURIComponent(q)}`
         );
-        const data = await res.json();
         if (Array.isArray(data)) {
           setCitySuggestions(data);
           setShowCityDropdown(true);
