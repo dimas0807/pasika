@@ -173,10 +173,12 @@ export default function Home() {
           {/* Atmospheric Cinematic Gradient (Warm Amber Shadow for Pure Contrast) */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#17120A]/92 via-[#17120A]/70 md:via-[#17120A]/50 to-transparent z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#17120A]/90 via-[#17120A]/50 to-transparent md:hidden z-10" />
+          {/* Soft Top Vignette for Transparent Header Legibility */}
+          <div className="absolute inset-x-0 top-0 h-32 sm:h-36 bg-gradient-to-b from-[#120D07]/75 via-[#120D07]/25 to-transparent z-10 pointer-events-none" />
         </div>
 
         {/* Foreground Content Composed Into The Photograph */}
-        <div className="container-p relative z-20 py-16 sm:py-20 lg:py-28 w-full">
+        <div className="container-p relative z-20 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 w-full">
           <div className="max-w-2xl text-white">
             {/* Main Headline */}
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.12] tracking-tight drop-shadow-md">
