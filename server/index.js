@@ -1,15 +1,17 @@
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Load environment variables early
+dotenv.config();
+
 import { initDatabase } from "./db.js";
 import apiRouter from "./routes.js";
 import { serveReceiptFile, STORAGE_DIR, PRODUCTS_STORAGE_DIR } from "./storage.js";
-
-// Load environment variables
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -19,9 +21,44 @@ initDatabase();
 
 export const app = express();
 
+// Configure CORS for production frontend and local development
+const ALLOWED_ORIGINS = new Set([
+  "https://pasika12.pages.dev",
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.replace(/\/$/, "")] : []),
+  ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN.replace(/\/$/, "")] : []),
+]);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Allow requests without Origin (same-origin, curl, server-to-server)
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  // Allow localhost & 127.0.0.1 development ports
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return false;
+};
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-customer-token", "x-checkout-token"],
+  })
+);
+
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Health check endpoint (minimal, no internal secrets)
+app.get(["/api/health", "/health"], (_req, res) => {
+  res.json({ ok: true });
+});
 
 // Serve uploaded product photos publicly
 app.use("/uploads/products", express.static(PRODUCTS_STORAGE_DIR));
@@ -31,11 +68,6 @@ app.get("/uploads/receipts/:filename", serveReceiptFile);
 
 // API Routes
 app.use("/api", apiRouter);
-
-// Health check endpoint
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, timestamp: Date.now() });
-});
 
 // Production: serve built static files from dist/
 const DIST_DIR = path.resolve(__dirname, "../dist");
@@ -59,8 +91,8 @@ app.use((err, _req, res, _next) => {
 
 // Start listening if run directly
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => {
-    console.log(`🍯 Honey Pasika backend server listening on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🍯 Honey Pasika backend server listening on http://0.0.0.0:${PORT}`);
     console.log(`📦 Storage directory: ${STORAGE_DIR}`);
   });
 }

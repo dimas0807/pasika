@@ -7,7 +7,8 @@ import { getSession } from "./auth.js";
 import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const STORAGE_DIR = path.resolve(__dirname, "../storage/receipts");
+export const BASE_STORAGE_DIR = process.env.STORAGE_PATH || path.resolve(__dirname, "../storage");
+export const STORAGE_DIR = process.env.RECEIPTS_STORAGE_PATH || path.join(BASE_STORAGE_DIR, "receipts");
 
 // Ensure directory exists
 if (!fs.existsSync(STORAGE_DIR)) {
@@ -94,7 +95,7 @@ export const uploadReceiptMulter = multer({
 });
 
 // Product Images Storage
-export const PRODUCTS_STORAGE_DIR = path.resolve(__dirname, "../storage/products");
+export const PRODUCTS_STORAGE_DIR = process.env.PRODUCTS_STORAGE_PATH || path.join(BASE_STORAGE_DIR, "products");
 if (!fs.existsSync(PRODUCTS_STORAGE_DIR)) {
   fs.mkdirSync(PRODUCTS_STORAGE_DIR, { recursive: true });
 }

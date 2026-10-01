@@ -9,10 +9,16 @@ import { fileURLToPath } from "node:url";
 import { db, DB_PATH } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const BACKUPS_DIR = path.resolve(__dirname, "../storage/backups");
+export const BACKUPS_DIR = process.env.BACKUPS_STORAGE_PATH || (
+  process.env.STORAGE_PATH
+    ? path.join(process.env.STORAGE_PATH, "backups")
+    : path.resolve(__dirname, "../storage/backups")
+);
 
 // Ensure backup storage directory exists
-fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+if (!fs.existsSync(BACKUPS_DIR)) {
+  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+}
 
 function formatBytes(bytes) {
   if (bytes === 0) return "0 B";

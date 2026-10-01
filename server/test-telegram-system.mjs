@@ -161,8 +161,11 @@ const checkDeleted = getTelegramRecipients().find((r) => r.id === tempRecipient.
 test("2.8 Delete recipient", deleteResult.ok === true && !checkDeleted);
 
 // 2.9 Test Notification to Specific Recipient in SIMULATED mode (no token set)
+const envTokenBackup = process.env.TELEGRAM_BOT_TOKEN;
+process.env.TELEGRAM_BOT_TOKEN = "";
 updateTelegramConfig({ botToken: "" }); // temporarily reset token
 const simTestResult = await testRecipientNotification(ownerRecipient.id);
+process.env.TELEGRAM_BOT_TOKEN = envTokenBackup;
 test("2.9 Test notification in simulated mode (no token)", simTestResult.ok === true && simTestResult.simulated === true, simTestResult.message);
 
 // 2.10 Test Notification with Mocked Telegram API response (token configured)

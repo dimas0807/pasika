@@ -1,8 +1,12 @@
 import Database from "better-sqlite3";
 import crypto from "node:crypto";
+import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Load environment variables early if not already loaded
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "../pasika.db");
