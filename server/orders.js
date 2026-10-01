@@ -170,8 +170,9 @@ export async function createOrder(req, res) {
     const rawDelivery = req.body?.delivery || {};
     const rawPayment = req.body?.payment || {};
 
-    const firstName = req.body?.firstName || rawCustomer.firstName;
-    const lastName = req.body?.lastName || rawCustomer.lastName;
+    const nameParts = (req.body?.name || rawCustomer.name || req.body?.fullName || rawCustomer.fullName || "").trim().split(/\s+/);
+    const firstName = req.body?.firstName || rawCustomer.firstName || (nameParts[0] || "");
+    const lastName = req.body?.lastName || rawCustomer.lastName || (nameParts.slice(1).join(" ") || "");
     const phone = req.body?.phone || rawCustomer.phone;
     const email = req.body?.email || rawCustomer.email;
 
@@ -267,9 +268,11 @@ export async function createOrder(req, res) {
     }
 
     for (const item of items) {
-      if (!item.id || !Number.isInteger(Number(item.qty)) || Number(item.qty) <= 0) {
+      const q = Number(item.qty != null ? item.qty : item.quantity);
+      if (!item.id || !Number.isInteger(q) || q <= 0) {
         return res.status(400).json({ error: "Некоректні товари у кошику" });
       }
+      item.qty = q;
     }
 
     // Generate secure customer token for this order

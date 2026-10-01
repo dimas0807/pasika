@@ -897,8 +897,9 @@ export async function onRequest(context) {
       const rawDelivery = body.delivery || {};
       const rawPayment = body.payment || {};
 
-      const firstName = (body.firstName || rawCustomer.firstName || "").trim();
-      const lastName = (body.lastName || rawCustomer.lastName || "").trim();
+      const nameParts = (body.name || rawCustomer.name || body.fullName || rawCustomer.fullName || "").trim().split(/\s+/);
+      const firstName = (body.firstName || rawCustomer.firstName || nameParts[0] || "").trim();
+      const lastName = (body.lastName || rawCustomer.lastName || nameParts.slice(1).join(" ") || "").trim();
       const rawPhone = body.phone || rawCustomer.phone || "";
       const email = (body.email || rawCustomer.email || "").trim();
 
@@ -971,7 +972,7 @@ export async function onRequest(context) {
       const orderItems = [];
 
       for (const item of items) {
-        const qty = Number(item.qty);
+        const qty = Number(item.qty != null ? item.qty : item.quantity);
         if (!item.id || !Number.isInteger(qty) || qty <= 0) {
           return jsonResponse({ error: "Некоректні товари у кошику" }, 400);
         }
