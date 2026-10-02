@@ -40,10 +40,24 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-export const API_BASE = (
-  import.meta.env?.VITE_API_URL ||
-  (import.meta.env?.PROD ? "https://pasika-production.up.railway.app" : "")
-).replace(/\/$/, "");
+export function getApiBase() {
+  if (typeof window !== "undefined") {
+    // If running in browser directly on Railway, use same-origin relative URLs (/api)
+    if (window.location.hostname.endsWith(".railway.app")) {
+      return "";
+    }
+    // If running on localhost in browser, use relative URLs (Vite proxy)
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "";
+    }
+  }
+  return (
+    import.meta.env?.VITE_API_URL ||
+    (import.meta.env?.PROD ? "https://pasika-production.up.railway.app" : "")
+  ).replace(/\/$/, "");
+}
+
+export const API_BASE = getApiBase();
 
 const TOKEN_STORAGE_KEY = "pasika_admin_token";
 

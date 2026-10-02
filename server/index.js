@@ -33,6 +33,8 @@ const isOriginAllowed = (origin) => {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   // Allow Cloudflare Pages preview domains like https://xxx.pasika12.pages.dev
   if (/^https:\/\/([a-z0-9-]+\.)?pasika12\.pages\.dev$/.test(origin)) return true;
+  // Allow Railway domains (e.g. https://pasika-production.up.railway.app, https://pasika-production-2926.up.railway.app)
+  if (/^https:\/\/([a-z0-9-]+\.)*railway\.app$/.test(origin)) return true;
   // Allow localhost & 127.0.0.1 development ports
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
   return false;
