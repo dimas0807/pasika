@@ -4,6 +4,8 @@ import { Orders, resolveReceiptUrl, DeliveryAccounts, Auth } from "../data/db";
 
 const STATUSES = [
   { key: "NEW", label: "Нове" },
+  { key: "CONFIRMED", label: "Підтверджено" },
+  { key: "COOKING", label: "Готується" },
   { key: "PROCESSING", label: "В обробці" },
   { key: "AWAITING_PAYMENT", label: "Очікує оплати" },
   { key: "PAID", label: "Оплачено" },
@@ -17,6 +19,8 @@ const STATUSES = [
 
 const STATUS_LABELS = {
   NEW: "Нове",
+  CONFIRMED: "Підтверджено",
+  COOKING: "Готується",
   PROCESSING: "В обробці",
   AWAITING_PAYMENT: "Очікує оплати",
   PAID: "Оплачено",
@@ -213,7 +217,7 @@ export default function OrderDetail() {
           accountId: def?.id || "",
           weight: "1.0",
           cost: String(order.total || 0),
-          description: `Мед та продукти бджільництва (${order.orderCode || `PAS-${order.number}`})`,
+          description: `Домашні ковбаси та копченості (${order.orderCode || `GAL-${order.number}`})`,
         });
       }
     } catch {
@@ -540,7 +544,7 @@ export default function OrderDetail() {
             <h1 className="font-serif text-2xl md:text-3xl font-bold text-ink flex items-center gap-2">
               <span>Замовлення</span>
               <span className="font-mono text-xl sm:text-2xl text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-xl border border-amber-200">
-                {order.orderCode || order.order_code || `PAS-${order.number}`}
+                {order.orderCode || order.order_code || `GAL-${order.number}`}
               </span>
             </h1>
             <span
@@ -621,12 +625,19 @@ export default function OrderDetail() {
             </div>
             <div>
               <span className="text-ink/40 text-xs block">Номер телефону:</span>
-              <a
-                href={`tel:${order.customer?.phone}`}
-                className="font-medium text-honey hover:underline"
-              >
-                📞 {order.customer?.phone}
-              </a>
+              <div className="flex items-center gap-2 mt-0.5">
+                <a
+                  href={`tel:${order.customer?.phone}`}
+                  className="font-medium text-honey hover:underline"
+                >
+                  📞 {order.customer?.phone}
+                </a>
+                {order.preferredContact && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20">
+                    {order.preferredContact === "viber" ? "🟣 Viber" : order.preferredContact === "telegram" ? "✈️ Telegram" : "📞 Дзвінок"}
+                  </span>
+                )}
+              </div>
             </div>
             {order.customer?.email && (
               <div>
@@ -835,6 +846,37 @@ export default function OrderDetail() {
                       <span>{deliveryService}</span>
                     </span>
                   </div>
+
+                  {order.delivery?.isInternational && (
+                    <div className="flex justify-between items-center gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900">
+                      <span className="font-bold flex items-center gap-1.5 text-xs">
+                        <span>🌍</span> Міжнародна доставка
+                      </span>
+                      {order.delivery?.country && (
+                        <span className="font-semibold text-xs bg-white px-2 py-0.5 rounded-lg border border-blue-200">
+                          {order.delivery.country}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {order.delivery?.country && (
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-ink/50">Країна призначення:</span>
+                      <span className="font-bold text-ink text-right">
+                        {order.delivery.country}
+                      </span>
+                    </div>
+                  )}
+
+                  {order.delivery?.postalCode && (
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-ink/50">Поштовий індекс:</span>
+                      <span className="font-semibold text-ink text-right font-mono">
+                        {order.delivery.postalCode}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-baseline gap-2">
                     <span className="text-ink/50">Населений пункт:</span>

@@ -90,7 +90,7 @@ export default function TikTokCard({ item }) {
       {/* Card Information */}
       <div className="relative z-10 text-white pointer-events-none">
         <span className="text-[11px] font-semibold text-accent/90 tracking-wide">
-          @honey.dsv
+          @kopchonosti777
         </span>
         <div className="text-xs font-bold mt-0.5 line-clamp-1">{item.label}</div>
         <div className="text-[10px] text-white/75 mt-1 flex items-center gap-1 group-hover:text-accent transition-colors font-medium">

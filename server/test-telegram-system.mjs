@@ -1,5 +1,7 @@
-import { initDatabase, db } from "./db.js";
-import {
+process.env.NODE_ENV = "test";
+
+const { initDatabase, db } = await import("./db.js");
+const {
   getTelegramConfig,
   getTelegramCredentials,
   updateTelegramConfig,
@@ -14,11 +16,11 @@ import {
   formatOrderMessage,
   buildOrderInlineKeyboard,
   sendOrderTelegramNotification,
-} from "./telegram/index.js";
-import { createOrder, getFullOrder } from "./orders.js";
+} = await import("./telegram/index.js");
+const { createOrder, getFullOrder } = await import("./orders.js");
 
 console.log("==================================================");
-console.log("🐝 PASIKA TELEGRAM MODULE COMPREHENSIVE TEST SUITE");
+console.log("🥩 GALINKA TELEGRAM MODULE COMPREHENSIVE TEST SUITE");
 console.log("==================================================\n");
 
 initDatabase();
@@ -292,7 +294,7 @@ db.prepare(`
 const sampleOrder = getFullOrder(testOrderId);
 
 const formattedMsg = formatOrderMessage(sampleOrder);
-test("4.1 Message contains official PASIKA header and order number", formattedMsg.includes("🐝 <b>НОВЕ ЗАМОВЛЕННЯ PASIKA</b>") && formattedMsg.includes("#1088"));
+test("4.1 Message contains official GALINKA header and order number", formattedMsg.includes("🥩 <b>НОВЕ ЗАМОВЛЕННЯ — М'ЯСНИЙ РАЙ У ГАЛИНКИ</b>") && (formattedMsg.includes("1088") || formattedMsg.includes("GAL-1088")));
 test("4.2 Message contains customer name & phone", formattedMsg.includes("Олексій Шевченко") && formattedMsg.includes("+380 50 123 45 67"));
 test("4.3 Message contains items breakdown", formattedMsg.includes("Мед Липовий") && formattedMsg.includes("× 2"));
 test("4.4 Message contains total sum", formattedMsg.includes("620 грн"));
@@ -417,7 +419,7 @@ const newOrderReq = mockReq({
   branch: "Відділення №1",
   paymentMethod: "cod",
   comment: "Тестове замовлення для перевірки Telegram стійкості",
-  items: [{ id: "p1", qty: 1 }],
+  items: [{ id: "prod_dk_1", qty: 1 }],
 });
 
 const newOrderRes = mockRes();
@@ -443,7 +445,7 @@ globalThis.fetch = originalFetch;
 if (createdOrderId) {
   db.prepare("DELETE FROM order_items WHERE order_id = ?").run(createdOrderId);
   db.prepare("DELETE FROM orders WHERE id = ?").run(createdOrderId);
-  db.prepare("UPDATE products SET stock = stock + 1 WHERE id = 'p1'").run();
+  db.prepare("UPDATE products SET stock = stock + 1 WHERE id = 'prod_dk_1'").run();
 }
 
 db.prepare("DELETE FROM order_items WHERE order_id = ?").run(testOrderId);

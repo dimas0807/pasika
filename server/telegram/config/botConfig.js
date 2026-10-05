@@ -145,22 +145,22 @@ export async function testTelegramConnection(customToken, customChatId) {
     }
 
     const botUsername = apiRes.result?.username ? `@${apiRes.result.username}` : "";
-    const botName = apiRes.result?.first_name || "Honey Bot";
+    const botName = apiRes.result?.first_name || "Galinka Bot";
 
-    // Target chat ID for test message: customChatId, or stored recipients, or default 287686358
-    const targetChatId = (customChatId || creds.legacyChatId || "287686358").trim();
+    // Target chat ID for test message: customChatId or stored recipients
+    const targetChatId = (customChatId || creds.legacyChatId || "").trim();
 
     if (targetChatId) {
       const sendRes = await sendMessage(token, {
         chat_id: targetChatId,
         text: [
-          `🐝 <b>PASIKA — Тест підключення</b>`,
+          `🥩 <b>М'ЯСНИЙ РАЙ У ГАЛИНКИ — Тест підключення</b>`,
           ``,
           `Telegram підключено успішно ✅`,
           `Бот: <b>${botName}</b> (${botUsername || "без username"})`,
           `Chat ID: <code>${targetChatId}</code>`,
           ``,
-          `Ви будете отримувати сповіщення про нові замовлення.`,
+          `Ви будете отримувати сповіщення про нові замовлення магазину.`,
         ].join("\n"),
       });
 

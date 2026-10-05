@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Orders } from "../data/db";
 import {
-  IconBox,
   IconTruck,
   IconCopy,
   IconCheckCircle,
-  IconTelegram,
   IconArrowRight,
 } from "../components/Icons";
 
@@ -43,8 +41,8 @@ export default function OrderSuccess() {
   if (loading) {
     return (
       <div className="container-p py-24 text-center">
-        <div className="w-10 h-10 border-3 border-honey border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-ink/60 font-medium text-sm">Завантаження інформації про замовлення...</p>
+        <div className="text-4xl mb-3 animate-bounce">🥩</div>
+        <p className="text-[#A3988E] font-medium text-sm">Завантаження замовлення...</p>
       </div>
     );
   }
@@ -52,12 +50,10 @@ export default function OrderSuccess() {
   if (accessDenied) {
     return (
       <div className="container-p py-24 text-center max-w-md mx-auto">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 text-honey flex items-center justify-center mx-auto mb-4 border border-amber-900/10">
-          <IconBox className="w-6 h-6" />
-        </div>
-        <h2 className="font-serif text-2xl font-bold text-ink mb-2">Доступ обмежено</h2>
-        <p className="text-ink/65 text-sm leading-relaxed">
-          Для безпеки персональних даних деталі замовлення доступні лише за захищеним посиланням з одноразовим токеном.
+        <div className="text-4xl mb-4">🔒</div>
+        <h2 className="font-serif text-2xl font-bold text-[#F4EFEA] mb-2">Доступ захищено</h2>
+        <p className="text-[#A3988E] text-sm leading-relaxed">
+          Для безпеки ваших персональних даних деталі замовлення доступні лише за індивідуальним посиланням.
         </p>
         <Link to="/" className="btn-primary mt-6 inline-flex text-sm">
           На головну
@@ -69,11 +65,9 @@ export default function OrderSuccess() {
   if (!order) {
     return (
       <div className="container-p py-24 text-center max-w-md mx-auto">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 text-honey flex items-center justify-center mx-auto mb-4 border border-amber-900/10">
-          <IconBox className="w-6 h-6" />
-        </div>
-        <h2 className="font-serif text-2xl font-bold text-ink mb-2">Замовлення не знайдено</h2>
-        <p className="text-ink/65 text-sm">Перевірте правильність номера або зверніться до підтримки.</p>
+        <div className="text-4xl mb-4">🥩</div>
+        <h2 className="font-serif text-2xl font-bold text-[#F4EFEA] mb-2">Замовлення не знайдено</h2>
+        <p className="text-[#A3988E] text-sm">Перевірте номер замовлення або зверніться до Галини у Viber.</p>
         <Link to="/" className="btn-primary mt-6 inline-flex text-sm">
           На головну
         </Link>
@@ -89,56 +83,61 @@ export default function OrderSuccess() {
   const deliveryService = order.delivery?.deliveryService || order.delivery?.provider || "Нова Пошта";
   const trackingUrl = order.delivery?.trackingUrl || (
     trackingNumber
-      ? deliveryService.toLowerCase().includes("укр")
-        ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
-        : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`
+      ? `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`
       : null
   );
+
+  const contactMethodLabel = (val) => {
+    switch (val) {
+      case "viber": return "🟣 Viber";
+      case "telegram": return "✈️ Telegram";
+      default: return "📞 Дзвінок телефоном";
+    }
+  };
 
   return (
     <div className="container-p py-10 sm:py-16 md:py-20 max-w-lg mx-auto text-center">
       {/* Success icon */}
-      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto shadow-sm ring-4 ring-emerald-500/15 border border-emerald-500/20">
+      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center mx-auto shadow-sm ring-4 ring-emerald-500/20 border border-emerald-500/30">
         <IconCheckCircle className="w-9 h-9" />
       </div>
 
-      <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 mt-5 inline-block">
-        Замовлення успішно прийнято
+      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 mt-5 inline-block">
+        Замовлення успішно прийнято!
       </span>
 
-      <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-ink mt-2">
-        Дякуємо за довіру!
+      <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-[#F4EFEA] mt-2">
+        Дякуємо за замовлення!
       </h1>
-      <p className="text-ink/65 text-sm sm:text-base mt-2 leading-relaxed">
+      <p className="text-[#A3988E] text-sm sm:text-base mt-2 leading-relaxed">
         Номер вашого замовлення:{" "}
-        <span className="font-mono font-bold text-ink bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-          {order.orderCode || order.order_code || `PAS-${order.number}`}
+        <span className="font-mono font-bold text-bronze bg-[#241F1A] px-2.5 py-1 rounded border border-bronze/40">
+          {order.orderCode || order.order_code || `GAL-${order.number}`}
         </span>
-        . Ми вже отримали його та готуємо до пакування.
       </p>
 
       {/* Delivery Tracking Card */}
       {trackingNumber && (
-        <div className="card p-5 mt-6 text-left bg-indigo-50/70 border border-indigo-200/80 shadow-sm rounded-3xl space-y-3">
+        <div className="p-5 mt-6 text-left bg-[#1C1815] border border-bronze/40 shadow-xl rounded-3xl space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-900">
+              <div className="w-8 h-8 rounded-xl bg-bronze/20 flex items-center justify-center text-bronze">
                 <IconTruck className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-serif font-bold text-base text-indigo-950">Відстеження доставки</h3>
-                <span className="text-xs text-indigo-800/80">{deliveryService}</span>
+                <h3 className="font-serif font-bold text-base text-[#F4EFEA]">Відстеження доставки</h3>
+                <span className="text-xs text-[#8C8074]">{deliveryService}</span>
               </div>
             </div>
-            <span className="badge bg-indigo-100 text-indigo-900 font-semibold text-xs">
+            <span className="badge bg-bronze/20 text-bronze font-semibold text-xs border border-bronze/30">
               {order.status === "COMPLETED" ? "Вручено" : "Відправлено"}
             </span>
           </div>
 
-          <div className="p-3.5 bg-white rounded-2xl border border-indigo-100 flex items-center justify-between gap-2 flex-wrap">
+          <div className="p-3.5 bg-[#141210] rounded-2xl border border-[#2F2821] flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <span className="text-[11px] text-ink/50 block">Номер накладної (ТТН):</span>
-              <span className="font-mono font-bold text-base text-ink tracking-wider">
+              <span className="text-[11px] text-[#8C8074] block">Номер накладної (ТТН):</span>
+              <span className="font-mono font-bold text-base text-[#F4EFEA] tracking-wider">
                 {trackingNumber}
               </span>
             </div>
@@ -146,7 +145,7 @@ export default function OrderSuccess() {
               <button
                 type="button"
                 onClick={() => handleCopyTtn(trackingNumber)}
-                className="btn-secondary text-xs py-1.5 px-3 rounded-xl border-indigo-200 text-indigo-900 bg-indigo-50/50 hover:bg-indigo-100/60 inline-flex items-center gap-1.5"
+                className="btn-secondary text-xs py-1.5 px-3 rounded-xl border-[#3A332B] text-[#D1C7BD] bg-[#1C1815] inline-flex items-center gap-1.5"
               >
                 <IconCopy className="w-3.5 h-3.5" />
                 <span>{copiedTtn ? "Скопійовано" : "Копія"}</span>
@@ -156,64 +155,55 @@ export default function OrderSuccess() {
                   href={trackingUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn-primary text-xs py-1.5 px-3.5 rounded-xl shadow-2xs inline-flex items-center gap-1 font-semibold"
+                  className="btn-primary text-xs py-1.5 px-3.5 rounded-xl inline-flex items-center gap-1 font-semibold"
                 >
                   Відстежити ↗
                 </a>
               )}
             </div>
           </div>
-
-          {order.delivery?.shippedAt && (
-            <p className="text-[11px] text-indigo-900/70 text-right">
-              Дата відправки: {new Date(order.delivery.shippedAt).toLocaleDateString("uk-UA")}
-            </p>
-          )}
         </div>
       )}
 
       {/* Order Details Card */}
-      <div className="card p-5 sm:p-6 mt-6 text-left bg-white/85 backdrop-blur-md border border-amber-900/10 shadow-[0_4px_24px_rgba(41,40,33,0.04)] rounded-3xl space-y-2.5 text-xs sm:text-sm">
+      <div className="p-5 sm:p-6 mt-6 text-left bg-[#1C1815] border border-[#2F2821] shadow-xl rounded-3xl space-y-2.5 text-xs sm:text-sm">
         <Row label="Клієнт" value={customerName} />
         <Row label="Телефон" value={order.customer?.phone} />
-        <Row label="Доставка" value={`${order.delivery?.provider || ""}`} />
+        {order.preferredContact && (
+          <Row label="Зв'язок" value={contactMethodLabel(order.preferredContact)} />
+        )}
+        <Row label="Доставка" value={`${order.delivery?.provider || "Нова Пошта"}`} />
         <Row label="Місто" value={deliveryCity} />
-        {deliveryBranch && <Row label="Відділення" value={deliveryBranch} />}
+        {deliveryBranch && <Row label="Відділення / поштомат" value={deliveryBranch} />}
         <Row
           label="Спосіб оплати"
-          value={order.payment?.method === "card" ? "Оплачено наперед (картка / IBAN)" : "Оплата при отриманні"}
+          value={order.payment?.method === "card" ? "Оплата карткою / IBAN" : "Оплата при отриманні на Новій Пошті"}
         />
-        {order.payment?.method === "card" && (
-          <Row label="Чек про оплату" value="✓ Завантажено (на перевірці)" />
-        )}
-        <div className="pt-2 border-t border-ink/10">
-          <Row label="Сума до сплати" value={`${order.total} грн`} bold />
+        <div className="pt-2 border-t border-[#2F2821]">
+          <Row label="Сума замовлення" value={`${order.total} грн`} bold />
         </div>
       </div>
 
-      {/* Telegram Notification Indicator */}
-      <div className="mt-5 text-xs text-ink/75 card p-4 bg-white/80 border border-amber-900/10 rounded-2xl flex items-center gap-3 text-left">
-        <div className="w-9 h-9 rounded-xl bg-honey/15 flex items-center justify-center text-honey shrink-0">
-          <IconTelegram className="w-4 h-4" />
-        </div>
+      {/* Galinka Kitchen Confirmation Banner */}
+      <div className="mt-5 text-xs card p-4 bg-[#1C1815] border border-bronze/30 rounded-2xl flex items-center gap-3 text-left">
+        <span className="text-2xl shrink-0">👩‍🍳</span>
         <div>
-          <div className="font-bold text-ink">Сповіщення надіслано в Telegram</div>
-          <div className="text-[11px] text-ink/50 mt-0.5">
-            Пасічник отримав ваше замовлення та оновлює статус у реальному часі.
+          <div className="font-bold text-[#F4EFEA]">Галинка вже обробляє замовлення</div>
+          <div className="text-[11px] text-[#A3988E] mt-0.5">
+            Свіжі страви будуть надійно запаковані у термобокс з холодом та передані Новій Пошті.
           </div>
         </div>
       </div>
 
       <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
         <Link
-          to={`/track-order?code=${encodeURIComponent(order.orderCode || order.order_code || order.number || "")}`}
-          className="btn-secondary text-xs sm:text-sm px-6 py-3.5 flex items-center justify-center gap-2 font-semibold shadow-xs"
+          to={`/track-order?code=${encodeURIComponent(order.orderCode || order.order_code || `GAL-${order.number}`)}`}
+          className="btn-secondary text-xs sm:text-sm px-6 py-3.5 flex items-center justify-center gap-2 font-semibold"
         >
-          <IconBox className="w-4 h-4 text-honey" />
-          <span>Відстежити статус</span>
+          <span>Відстежити замовлення</span>
         </Link>
-        <Link to="/catalog" className="btn-primary text-xs sm:text-sm px-7 py-3.5 flex items-center justify-center gap-1.5 font-bold shadow-md">
-          <span>Продовжити покупки</span>
+        <Link to="/catalog" className="btn-primary text-xs sm:text-sm px-7 py-3.5 flex items-center justify-center gap-1.5 font-bold">
+          <span>До каталогу</span>
           <IconArrowRight className="w-4 h-4" />
         </Link>
       </div>
@@ -224,9 +214,9 @@ export default function OrderSuccess() {
 function Row({ label, value, bold }) {
   if (!value) return null;
   return (
-    <div className="flex justify-between items-baseline border-b border-ink/5 pb-2 last:border-0 last:pb-0">
-      <span className="text-ink/50">{label}:</span>
-      <span className={bold ? "font-serif font-bold text-base sm:text-lg text-honey" : "font-medium text-ink text-right"}>
+    <div className="flex justify-between items-baseline border-b border-[#2A241F] pb-2 last:border-0 last:pb-0">
+      <span className="text-[#8C8074]">{label}:</span>
+      <span className={bold ? "font-serif font-bold text-base sm:text-lg text-bronze" : "font-medium text-[#F4EFEA] text-right"}>
         {value}
       </span>
     </div>

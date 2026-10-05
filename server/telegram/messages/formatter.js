@@ -1,42 +1,33 @@
 /**
  * Telegram Message Formatter Module
- * Formats official PASIKA service order cards, notifications, and inline keyboards
+ * Formats official GALINKA service order cards, notifications, and inline keyboards
  */
 
-export const PASIKA_STATUS_LABELS = {
+export const GALINKA_STATUS_LABELS = {
   NEW: "Нове",
+  CONFIRMED: "Підтверджено",
+  COOKING: "Готується",
   PROCESSING: "В обробці",
   PACKED: "Запаковано",
   SHIPPED: "Відправлено",
   COMPLETED: "Виконано",
   CANCELLED: "Скасовано",
 };
+export const PASIKA_STATUS_LABELS = GALINKA_STATUS_LABELS;
 
 /**
- * Format order card matching the official PASIKA service specification:
+ * Format order card matching Galinka service specification:
  * 
- * 🐝 НОВЕ ЗАМОВЛЕННЯ PASIKA
- * № замовлення: #XXXX
- * 👤 Клієнт:
- * Ім'я Прізвище
- * 📞 Телефон:
- * +380...
- * 📧 Email:
- * ...
- * 🍯 Товари:
- * - Мед натуральний — 1 кг × 2 — 760 грн
- * 💰 Разом:
- * 950 грн
- * 🚚 Доставка:
- * Нова Пошта
- * 📍 Населений пункт:
- * ...
- * 🏤 Відділення:
- * №...
- * 💳 Оплата:
- * Оплата при отриманні
- * 💬 Коментар:
- * ...
+ * 🥩 НОВЕ ЗАМОВЛЕННЯ — М'ЯСНИЙ РАЙ У ГАЛИНКИ
+ * № замовлення: GAL-10001
+ * 👤 Клієнт: Ім'я Прізвище
+ * 📞 Телефон: +380...
+ * 💬 Зв'язок: Viber
+ * 🛒 Товари:
+ * - Ковбаса домашня запечена — 1 кг × 2 — 900 грн
+ * 💰 Разом: 900 грн
+ * 🚚 Доставка: Нова Пошта, Київ, Відділення №1
+ * 💬 Коментар: ...
  */
 export function formatOrderMessage(order, options = {}) {
   const isUpdated = Boolean(options.isUpdated);
@@ -44,7 +35,7 @@ export function formatOrderMessage(order, options = {}) {
   const handlerName = options.handlerName || "";
 
   // Order number
-  const orderNumber = order.number ? `#${order.number}` : `#${order.id || ""}`;
+  const orderNumber = order.order_code || order.orderCode || (order.number ? `#${order.number}` : `#${order.id || ""}`);
 
   // Customer info
   const firstName = order.customer_first_name || order.customer?.firstName || "";
@@ -53,17 +44,26 @@ export function formatOrderMessage(order, options = {}) {
   const customerPhone = order.customer_phone || order.customer?.phone || "—";
   const customerEmail = order.customer_email || order.customer?.email || "";
 
+  // Preferred contact method
+  const preferredContact = order.preferred_contact || order.preferredContact || "viber";
+  const contactLabel =
+    preferredContact === "viber"
+      ? "Viber 🟣"
+      : preferredContact === "telegram"
+      ? "Telegram 🔵"
+      : "Телефонний дзвінок 📞";
+
   // Items
   const items = order.items || [];
   const itemsLines =
     items.length > 0
       ? items.map((i) => {
-          const weightPart = i.weight ? ` — ${i.weight}` : "";
+          const weightPart = i.weight ? ` (${i.weight})` : "";
           const qty = i.qty || 1;
           const cost = (i.price || 0) * qty;
-          return `- ${i.name}${weightPart} × ${qty} — ${cost} грн`;
+          return `• <b>${i.name}</b>${weightPart} × ${qty} = <b>${cost} грн</b>`;
         })
-      : ["- Товари уточнюються"];
+      : ["• Товари уточнюються"];
 
   // Total
   const totalSum = order.total !== undefined ? `${order.total} грн` : "0 грн";
@@ -76,8 +76,8 @@ export function formatOrderMessage(order, options = {}) {
   // Payment
   const isCard = (order.payment_method || order.payment?.method) === "card";
   const paymentMethodLabel = isCard
-    ? "Оплата карткою (передоплата)"
-    : "Оплата при отриманні";
+    ? "Оплата карткою / реквізити"
+    : "Оплата при отриманні (накладений платіж)";
 
   let receiptStatus = "";
   if (isCard) {
@@ -89,19 +89,19 @@ export function formatOrderMessage(order, options = {}) {
   const comment = (order.comment || "").trim();
 
   // Status block for updated cards
-  let headerTitle = "🐝 <b>НОВЕ ЗАМОВЛЕННЯ PASIKA</b>";
+  let headerTitle = "🥩 <b>НОВЕ ЗАМОВЛЕННЯ — М'ЯСНИЙ РАЙ У ГАЛИНКИ</b>";
   let statusBlock = "";
 
-  if (isUpdated || (order.status && order.status !== "NEW")) {
-    const statusLabel = PASIKA_STATUS_LABELS[order.status] || order.status;
+  if (isUpdated) {
+    const statusLabel = GALINKA_STATUS_LABELS[order.status] || order.status;
     let statusIcon = "📋";
-    if (order.status === "PROCESSING") statusIcon = "✅";
+    if (order.status === "CONFIRMED" || order.status === "PROCESSING") statusIcon = "✅";
+    if (order.status === "COOKING" || order.status === "PACKED") statusIcon = "👨‍🍳";
     if (order.status === "CANCELLED") statusIcon = "❌";
-    if (order.status === "PACKED") statusIcon = "📦";
     if (order.status === "SHIPPED") statusIcon = "🚚";
     if (order.status === "COMPLETED") statusIcon = "🏁";
 
-    headerTitle = `🐝 <b>ЗАМОВЛЕННЯ PASIKA</b>`;
+    headerTitle = `🥩 <b>ЗАМОВЛЕННЯ — М'ЯСНИЙ РАЙ У ГАЛИНКИ</b>`;
     statusBlock = `\n📌 <b>Статус:</b> ${statusIcon} ${statusLabel}`;
     if (handlerName) {
       statusBlock += `\n👤 <b>Обробив:</b> ${handlerName}`;
@@ -110,6 +110,9 @@ export function formatOrderMessage(order, options = {}) {
       statusBlock += `\n💬 <i>${statusNote}</i>`;
     }
     statusBlock += "\n";
+  } else if (order.status && order.status !== "NEW") {
+    const statusLabel = GALINKA_STATUS_LABELS[order.status] || order.status;
+    statusBlock = `\n📌 <b>Статус:</b> ${statusLabel}\n`;
   }
 
   // Date
@@ -127,29 +130,44 @@ export function formatOrderMessage(order, options = {}) {
     : "щойно";
 
   // Delivery line
-  const deliveryParts = [provider, city !== "Місто не вказано" ? city : "", branch !== "Відділення не вказано" ? branch : ""].filter(Boolean);
-  const deliveryText = deliveryParts.length > 0 ? deliveryParts.join(", ") : provider;
+  const isInternational = Boolean(order.is_international || order.delivery?.isInternational);
+  let deliveryText = "";
+  if (isInternational) {
+    const country = order.delivery_country || order.delivery?.country || "";
+    const postal = order.postal_code || order.delivery?.postalCode || "";
+    const parts = [
+      country ? `Країна: <b>${country}</b>` : "",
+      city !== "Місто не вказано" ? `Місто: ${city}` : "",
+      postal ? `Індекс: <code>${postal}</code>` : "",
+      branch !== "Відділення не вказано" ? `Адреса: ${branch}` : "",
+    ].filter(Boolean);
+    deliveryText = `🌍 <b>МІЖНАРОДНА ДОСТАВКА</b>\n${parts.join("\n")}`;
+  } else {
+    const deliveryParts = [provider, city !== "Місто не вказано" ? city : "", branch !== "Відділення не вказано" ? branch : ""].filter(Boolean);
+    deliveryText = deliveryParts.length > 0 ? deliveryParts.join(", ") : provider;
+  }
 
   const sections = [
     headerTitle,
     ``,
-    `📦 <b>Замовлення:</b> <b>${orderNumber}</b>`,
+    `📦 <b>Номер замовлення:</b> <code>${orderNumber}</code>`,
     statusBlock || null,
     ``,
     `👤 <b>Клієнт:</b> ${customerName}`,
-    `📞 <b>Телефон:</b> ${customerPhone}`,
+    `📞 <b>Телефон:</b> <code>${customerPhone}</code>`,
+    `💬 <b>Бажаний зв'язок:</b> ${contactLabel}`,
     customerEmail ? `📧 <b>Email:</b> ${customerEmail}` : null,
     ``,
     `🛒 <b>Товари:</b>\n${itemsLines.join("\n")}`,
     ``,
-    `💰 <b>Сума:</b> <b>${totalSum}</b>`,
+    `💰 <b>Загальна сума:</b> <b>${totalSum}</b>`,
     ``,
     `🚚 <b>Доставка:</b>\n${deliveryText}`,
     ``,
     `💳 <b>Оплата:</b>\n${paymentMethodLabel}${receiptStatus}`,
     ``,
     `📅 <b>Дата:</b> ${formattedDate}`,
-    comment ? `\n💬 <b>Коментар:</b> ${comment}` : null,
+    comment ? `\n💬 <b>Коментар:</b> <i>${comment}</i>` : null,
   ];
 
   return sections.filter((s) => s !== null && s !== undefined).join("\n");
@@ -205,7 +223,7 @@ export function getAppBaseUrl() {
   if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("localhost")) {
     return process.env.FRONTEND_URL.replace(/\/$/, "");
   }
-  return "https://pasika-production.up.railway.app";
+  return "http://localhost:3001";
 }
 
 /**

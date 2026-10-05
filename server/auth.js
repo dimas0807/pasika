@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { db } from "./db.js";
 
-const SESSION_COOKIE_NAME = "pasika_session";
+const SESSION_COOKIE_NAME = "galinka_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // In-memory rate limiting for login attempts

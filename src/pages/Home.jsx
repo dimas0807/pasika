@@ -1,227 +1,206 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
-import TikTokCard from "../components/TikTokCard";
-import RealisticBee from "../components/RealisticBee";
-import WaxHoneycomb from "../components/WaxHoneycomb";
 import { Categories, Products, Settings, subscribe } from "../data/db";
+import { getSocialUrl } from "../utils/contacts";
 import {
   IconTruck,
   IconShieldCheck,
-  IconHoneyJar,
-  IconHoneycomb,
-  IconMapPin,
   IconSparkles,
+  IconPhone,
+  IconViber,
+  IconTikTok,
+  IconChevronRight,
+  IconCheckCircle,
 } from "../components/Icons";
 
 const TRUST_BADGES = [
   {
-    icon: <RealisticBee size={28} depth="near" />,
-    title: "Власна пасіка",
-    desc: "Родинна справа",
+    icon: "🥩",
+    title: "Добірне домашнє м'ясо",
+    desc: "Свіжа українська свинина та птиця без штучних домішок",
   },
   {
-    icon: <IconHoneyJar className="w-6 h-6 text-accent" />,
-    title: "Натуральний мед",
-    desc: "Без цукру та домішок",
+    icon: "🪵",
+    title: "Натуральне копчення",
+    desc: "Традиційна коптильня на сухих вільхових та фруктових дровах",
   },
   {
-    icon: <IconShieldCheck className="w-6 h-6 text-accent" />,
-    title: "Понад 100 вуликів",
-    desc: "Прикарпаття, с. Новоселиця",
+    icon: "📦",
+    title: "Термоупаковка з льодом",
+    desc: "Свіжість гарантована при доставці Новою Поштою 1-2 дні",
   },
   {
-    icon: <IconTruck className="w-6 h-6 text-accent" />,
-    title: "Доставка по Україні",
-    desc: "Нова пошта та Укрпошта",
-  },
-];
-
-const CATEGORY_SHOWCASE = [
-  {
-    slug: "honey",
-    name: "Мед натуральний",
-    tag: "100% натурально",
-    desc: "Різнотрав'я, липа, лісовий, акація та стільники",
-    image: "/images/prod-honey.jpg",
-    link: "/catalog?category=honey",
-  },
-  {
-    slug: "cream-honey",
-    name: "Крем-мед",
-    tag: "Ніжна текстура",
-    desc: "З кокосом, малиною, смородиною, лимоном та какао",
-    image: "/images/prod-cream-honey.jpg",
-    link: "/catalog?category=cream-honey",
-  },
-  {
-    slug: "nuts-honey",
-    name: "Горіхи в меді",
-    tag: "Добірні горіхи",
-    desc: "Волоський горіх, фундук та мигдаль у свіжому меді",
-    image: "/images/prod-nuts-honey.jpg",
-    link: "/catalog?category=nuts-honey",
-  },
-  {
-    slug: "pollen",
-    name: "Квітковий пилок",
-    tag: "Сила природи",
-    desc: "Натуральні гранули пилку прямо з вуликів",
-    image: "/images/prod-pollen.jpg",
-    link: "/catalog?category=pollen",
-  },
-  {
-    slug: "propolis",
-    name: "Прополіс",
-    tag: "Природний захист",
-    desc: "Очищений пасічний прополіс та настоянки",
-    image: "/images/prod-propolis.jpg",
-    link: "/catalog?category=propolis",
-  },
-  {
-    slug: "perga",
-    name: "Бджолина перга",
-    tag: "Бджолиний хліб",
-    desc: "Концентрована природна користь із воскових сот",
-    image: "/images/prod-perga.jpg",
-    link: "/catalog?category=perga",
-  },
-  {
-    slug: "gift-boxes",
-    name: "Подарункові бокси",
-    tag: "Крафтовий подарунок",
-    desc: "Святкові набори з медом, свічками та веретеном",
-    image: "/images/prod-gift-box.jpg",
-    link: "/gift-boxes",
+    icon: "👩‍🍳",
+    title: "Гарантія смаку від Галинки",
+    desc: "Готуємо з душею за перевіреними родинними рецептами",
   },
 ];
 
-const TIKTOK_PROFILE_URL = "https://www.tiktok.com/@honey.dsv";
-
-const TIKTOK_VIDEOS = [
+const ORDER_STEPS = [
   {
-    id: 1,
-    url: "https://vt.tiktok.com/ZSbLujdn8/",
-    videoSrc: "/tiktok/video-1.mp4",
-    poster: "/tiktok/preview-1.jpg",
-    label: "Життя пасіки",
+    step: "01",
+    title: "Оберіть смаколики",
+    desc: "Домашні ковбаси, шинка, генеральське сало, курочка або паштети.",
   },
   {
-    id: 2,
-    url: "https://vt.tiktok.com/ZSbLujG9o/",
-    videoSrc: "/tiktok/video-2.mp4",
-    poster: "/tiktok/preview-2.jpg",
-    label: "Праця бджіл",
+    step: "02",
+    title: "Додайте до кошика",
+    desc: "Вкажіть потрібну кількість. Замовлення можна оформити за 1 хвилину.",
   },
   {
-    id: 3,
-    url: "https://vt.tiktok.com/ZSbLuJ8S1/",
-    videoSrc: "/tiktok/video-3.mp4",
-    poster: "/tiktok/preview-3.jpg",
-    label: "Свіжий мед",
+    step: "03",
+    title: "Вкажіть Нову Пошту",
+    desc: "Оберіть ваше місто та номер відділення або поштомату.",
   },
   {
-    id: 4,
-    url: "https://vt.tiktok.com/ZSbLuM7kb/",
-    videoSrc: "/tiktok/video-4.mp4",
-    poster: "/tiktok/preview-4.jpg",
-    label: "Крафтові бокси",
+    step: "04",
+    title: "Підтвердіть замовлення",
+    desc: "Отримайте номер замовлення та швидке узгодження деталей.",
+  },
+  {
+    step: "05",
+    title: "Галинка відправляє",
+    desc: "Свіжо приготовлені та запаковані страви прямують до вашого столу.",
   },
 ];
 
 export default function Home() {
   const [, setTick] = useState(0);
   const [s, setS] = useState(() => Settings.get());
+  const [categories, setCategories] = useState(() => Categories.all());
+  const [products, setProducts] = useState(() => Products.all());
 
   useEffect(() => {
-    Products.fetchAll();
-    Categories.fetchAll();
+    Products.fetchAll().then((data) => data && setProducts(data));
+    Categories.fetchAll().then((data) => data && setCategories(data));
     Settings.fetch().then((data) => data && setS(data));
     return subscribe(() => {
       setTick((t) => t + 1);
       setS(Settings.get());
+      setCategories(Categories.all());
+      setProducts(Products.all());
     });
   }, []);
 
-  const featured = Products.featured().slice(0, 5);
+  const featured = products.filter((p) => p.featured).slice(0, 8);
+  const phone = (s?.contacts?.phone || s?.store?.phone || "068 025 78 77").trim();
+  const rawPhone = phone.replace(/\D/g, "");
+  const telHref = rawPhone ? `tel:+${rawPhone.startsWith("38") ? rawPhone : "38" + rawPhone}` : "tel:+380680257877";
 
-  const aboutTitle = s?.about?.title || "Мед, який починається з бджіл";
-  const aboutLead = s?.about?.shortText || s?.about?.lead || "Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району. Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів.";
-  const aboutStory = s?.about?.fullDescription || s?.about?.story || "Робота на пасіці вимагає терпіння, уважності і знань. Це водночас цікавий та трудомісткий процес, який починається з ранньої весни та закінчується восени.";
-  const hivesCount = s?.about?.hivesCount || s?.about?.stats?.hives || "100+";
-  const years = s?.about?.foundationYear
-    ? (s.about.foundationYear.length === 4 && !Number.isNaN(Number(s.about.foundationYear))
-        ? `${Math.max(1, new Date().getFullYear() - Number(s.about.foundationYear))}`
-        : s.about.foundationYear)
-    : s?.about?.stats?.years || "10";
-  const location = s?.about?.location || s?.store?.location || "Прикарпаття, с. Новоселиця";
+  const viberRaw = (s?.contacts?.viber || "0680257877").trim();
+  const viberUrl = getSocialUrl("viber", viberRaw) || "viber://chat?number=%2B380680257877";
+
+  const tiktokUrl = getSocialUrl("tiktok", s?.contacts?.tiktok || "@kopchonosti777") || "https://www.tiktok.com/@kopchonosti777";
+
+  // Category image map helper
+  const getCategoryPhoto = (slug) => {
+    switch (slug) {
+      case "domashni-kovbasy":
+        return "/images/kovbasa-domashnya.jpg";
+      case "kopchenosti":
+        return "/images/rebertsya.jpg";
+      case "kopchene-myaso":
+        return "/images/shynka.jpg";
+      case "kurochka":
+        return "/images/kurochka.jpg";
+      case "sardelky":
+        return "/images/sardelky.jpg";
+      case "pashtety":
+        return "/images/pashtet.jpg";
+      case "salo":
+        return "/images/salo.jpg";
+      default:
+        return "/images/kovbasa-kopchena.jpg";
+    }
+  };
 
   return (
-    <div className="overflow-x-hidden">
+    <div className="overflow-x-hidden bg-[#121110] text-[#F4EFEA]">
       {/* ==================================================
-          01 — IMMERSIVE FULL-WIDTH HERO (85–90vh)
+          01 — HERO SECTION
           ================================================== */}
-      <section className="relative min-h-[85vh] lg:min-h-[90vh] flex items-center overflow-hidden border-b border-ink/5">
-        {/* Full-bleed Authentic Apiary Photography Background */}
+      <section className="relative min-h-[85vh] lg:min-h-[90vh] flex items-center overflow-hidden border-b border-[#28221D]">
+        {/* Full-bleed Authentic Food Photography Background */}
         <div className="absolute inset-0 z-0">
           <img
-            src="/images/about-apiary.jpg"
-            alt="Родинна пасіка серед лугових квітів на Прикарпатті"
-            className="w-full h-full object-cover object-center lg:object-[68%_center] scale-100 transform motion-safe:scale-102 transition-transform duration-1000"
+            src="/images/hero-meat.jpg"
+            alt="Домашні копченості на дровах від Галинки"
+            className="w-full h-full object-cover object-center lg:object-[65%_center] scale-100 transform motion-safe:scale-102 transition-transform duration-1000"
             loading="eager"
           />
-          {/* Atmospheric Cinematic Gradient (Warm Amber Shadow for Pure Contrast) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#17120A]/92 via-[#17120A]/70 md:via-[#17120A]/50 to-transparent z-10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#17120A]/90 via-[#17120A]/50 to-transparent md:hidden z-10" />
-          {/* Soft Top Vignette for Transparent Header Legibility */}
-          <div className="absolute inset-x-0 top-0 h-32 sm:h-36 bg-gradient-to-b from-[#120D07]/75 via-[#120D07]/25 to-transparent z-10 pointer-events-none" />
+          {/* Atmospheric Cinematic Gradients for high contrast and appetizing vibe */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#121110]/95 via-[#121110]/80 md:via-[#121110]/60 to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#121110] via-transparent to-transparent md:hidden z-10" />
         </div>
 
-        {/* Foreground Content Composed Into The Photograph */}
-        <div className="container-p relative z-20 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 w-full">
-          <div className="max-w-2xl text-white">
+        {/* Foreground Content */}
+        <div className="container-p relative z-20 py-16 sm:py-20 lg:py-24 w-full">
+          <div className="max-w-2xl text-white relative">
+            {/* Tagline Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#2A231C]/90 border border-bronze/40 text-xs font-bold uppercase tracking-wider text-bronze shadow-lg mb-5">
+              <span>🔥 Власна коптильня на дровах</span>
+              <span className="text-[#8C8074]">•</span>
+              <span>100% натурально</span>
+            </div>
+
             {/* Main Headline */}
-            <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.12] tracking-tight drop-shadow-md">
-              Натуральний мед <br />
-              <span className="text-accent drop-shadow-sm">прямо з родинної пасіки</span>
+            <h1 className="font-serif text-3xl sm:text-5xl lg:text-[56px] font-bold leading-[1.12] tracking-tight">
+              М'ЯСНИЙ РАЙ <br />
+              <span className="text-bronze">У ГАЛИНКИ</span>
             </h1>
 
+            {/* Subtitle */}
+            <p className="mt-4 text-xl sm:text-2xl font-serif text-[#E8DFD5] font-semibold">
+              Домашні ковбаси та копченості
+            </p>
+
             {/* Supporting Story Text */}
-            <p className="mt-5 text-white/90 text-base sm:text-lg max-w-xl leading-relaxed font-normal drop-shadow-sm">
-              Власна пасіка, натуральні продукти бджільництва та подарункові набори зі швидкою доставкою по всій Україні.
+            <p className="mt-4 text-[#CFC5BA] text-sm sm:text-base max-w-xl leading-relaxed">
+              Справжні ковбаси з печі, соковита шинка, генеральське сало, ніжна копчена курочка та паштети. Готуємо з добірного фермерського м'яса без сої, підсилювачів смаку та рідкого диму.
             </p>
 
             {/* Primary & Secondary CTA Buttons */}
-            <div className="mt-8 flex flex-wrap gap-4 w-full sm:w-auto">
+            <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4 w-full sm:w-auto">
               <Link
                 to="/catalog"
-                className="btn-primary text-base px-8 py-3.5 shadow-lg w-full sm:w-auto text-center font-bold"
+                className="btn-primary text-base px-8 py-4 shadow-lg w-full sm:w-auto text-center font-bold"
               >
-                Переглянути продукцію
+                Перейти до каталогу →
               </Link>
-              <Link
-                to="/gift-boxes"
-                className="inline-flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 border border-white/40 text-white font-semibold px-7 py-3.5 rounded-xl transition-all backdrop-blur-md w-full sm:w-auto text-center"
+
+              <a
+                href={viberUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-viber text-base px-7 py-4 w-full sm:w-auto text-center"
               >
-                Подарункові бокси
-              </Link>
+                <IconViber className="w-5 h-5 text-white" />
+                <span>Написати Галині у Viber</span>
+              </a>
+
+              <a
+                href={telHref}
+                className="inline-flex items-center justify-center gap-2 bg-[#201D1A]/90 hover:bg-[#2A2622] border border-[#3D352D] hover:border-bronze text-[#F4EFEA] font-semibold px-6 py-4 rounded-xl transition-all w-full sm:w-auto text-center"
+              >
+                <IconPhone className="w-4 h-4 text-bronze" />
+                <span>{phone}</span>
+              </a>
             </div>
 
-            {/* 4 Integrated Information Overlays (Glassmorphism) */}
-            <div className="mt-12 pt-6 border-t border-white/20 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {/* Trust Badges Bar */}
+            <div className="mt-12 pt-6 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               {TRUST_BADGES.map((b, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 shadow-xs hover:bg-white/25 transition-all text-white"
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-[#1C1815]/90 border border-[#332A22] shadow-md text-white"
                 >
-                  <div className="shrink-0 flex items-center justify-center">
-                    {b.icon}
-                  </div>
+                  <span className="text-xl shrink-0 mt-0.5">{b.icon}</span>
                   <div>
-                    <div className="text-xs font-bold leading-snug">
+                    <div className="text-xs font-bold leading-tight text-[#F4EFEA]">
                       {b.title}
                     </div>
-                    <div className="text-[10px] text-white/75 hidden sm:block mt-0.5">
+                    <div className="text-[10px] text-[#A3988E] hidden sm:block mt-0.5 leading-snug">
                       {b.desc}
                     </div>
                   </div>
@@ -233,130 +212,86 @@ export default function Home() {
       </section>
 
       {/* ==================================================
-          02 — CATEGORIES SECTION (Meadow Flora & Apiary Harvest)
+          02 — CATEGORIES SECTION
           ================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#FAF5EB] via-[#F5EDDE] to-[#FAF5EB] py-16 md:py-24 border-b border-amber-900/10">
-        {/* Decorative Wax Honeycomb Frame on the Left */}
-        <WaxHoneycomb position="left" withBee={true} className="hidden xl:block" />
-
-        {/* Ambient Warm Amber Glow */}
-        <div className="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-honey/10 blur-3xl pointer-events-none" />
-
-        <div className="container-p relative z-20">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
+      <section className="py-16 md:py-24 border-b border-[#28221D] bg-[#161412] relative">
+        <div className="container-p">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
             <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-honey/30 text-xs font-bold uppercase tracking-widest text-honey shadow-2xs">
-                <IconHoneycomb className="w-3.5 h-3.5 text-honey" />
-                <span>Дари нашої пасіки</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#26201B] border border-bronze/30 text-xs font-bold uppercase tracking-wider text-bronze">
+                <span>🥩 Наш асортимент</span>
               </div>
-              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-3">
-                Категорії продукції
+              <h2 className="font-serif text-3xl sm:text-4xl font-extrabold text-[#F4EFEA] mt-3">
+                Категорії домашніх страв
               </h2>
-              <p className="text-ink/75 text-sm sm:text-base mt-2 max-w-xl leading-relaxed">
-                Кожен продукт — результат невтомної праці бджіл та дбайливого фасування без промислової обробки
+              <p className="text-[#A3988E] text-sm sm:text-base mt-2 max-w-xl">
+                Оберіть улюблені копченості до щоденного столу або до святкового частування
               </p>
             </div>
             <Link
               to="/catalog"
               className="btn-secondary text-xs sm:text-sm py-2.5 px-5 shrink-0 self-start md:self-auto font-bold"
             >
-              Весь каталог товарів →
+              Весь каталог смаколиків →
             </Link>
           </div>
 
-          {/* Top Row: 3 Primary Categories (Large Showcase Cards) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {CATEGORY_SHOWCASE.slice(0, 3).map((cat) => (
-              <Link
-                key={cat.slug}
-                to={cat.link}
-                className="group relative rounded-3xl overflow-hidden aspect-[4/5] shadow-md hover:shadow-2xl border border-amber-900/15 hover:border-honey transition-all duration-500 flex flex-col justify-end p-6 select-none bg-[#FAF6EE]"
-              >
-                {/* Full-bleed Photo */}
-                <img
-                  src={cat.image}
-                  alt={cat.name}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                  loading="lazy"
-                />
-                {/* Cinematic Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent group-hover:from-black/90 transition-colors" />
+          {/* Categories Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {categories.map((cat) => {
+              const photo = getCategoryPhoto(cat.slug);
+              return (
+                <Link
+                  key={cat.slug}
+                  to={`/catalog?category=${cat.slug}`}
+                  className="group relative rounded-2xl overflow-hidden aspect-[4/3] sm:aspect-square bg-[#1F1C19] border border-[#2F2822] hover:border-bronze shadow-md hover:shadow-2xl transition-all duration-300 flex flex-col justify-end p-4 sm:p-5"
+                >
+                  {/* Photo */}
+                  <img
+                    src={photo}
+                    alt={cat.name}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+                    loading="lazy"
+                  />
+                  {/* Dark gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent group-hover:from-black/95 transition-colors" />
 
-                {/* Content Overlay */}
-                <div className="relative z-10 text-white">
-                  <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-accent bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30 mb-2">
-                    {cat.tag}
-                  </span>
-                  <h3 className="font-serif font-extrabold text-2xl sm:text-3xl text-white group-hover:text-accent transition-colors">
-                    {cat.name}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-white/85 mt-1 line-clamp-2 leading-relaxed">
-                    {cat.desc}
-                  </p>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-accent group-hover:translate-x-1.5 transition-transform duration-300">
-                    <span>Переглянути категорію</span>
-                    <span>→</span>
+                  {/* Text */}
+                  <div className="relative z-10">
+                    <span className="text-xl sm:text-2xl mb-1 block">
+                      {cat.icon || "🥩"}
+                    </span>
+                    <h3 className="font-serif font-bold text-base sm:text-lg text-white group-hover:text-bronze transition-colors leading-tight">
+                      {cat.name}
+                    </h3>
+                    <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-bronze group-hover:translate-x-1 transition-transform">
+                      <span>Дивитися страви</span>
+                      <span>→</span>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Bottom Row: 4 Specialist Categories */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {CATEGORY_SHOWCASE.slice(3).map((cat) => (
-              <Link
-                key={cat.slug}
-                to={cat.link}
-                className="group relative rounded-3xl overflow-hidden aspect-[4/5] shadow-sm hover:shadow-lg border border-amber-900/10 hover:border-honey transition-all duration-500 flex flex-col justify-end p-5 select-none bg-[#FAF6EE]"
-              >
-                {/* Full-bleed Photo */}
-                <img
-                  src={cat.image}
-                  alt={cat.name}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                  loading="lazy"
-                />
-                {/* Cinematic Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent group-hover:from-black/90 transition-colors" />
-
-                {/* Content Overlay */}
-                <div className="relative z-10 text-white">
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-accent bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/30 mb-1.5">
-                    {cat.tag}
-                  </span>
-                  <h3 className="font-serif font-bold text-xl text-white group-hover:text-accent transition-colors">
-                    {cat.name}
-                  </h3>
-                  <p className="text-xs text-white/80 mt-1 line-clamp-1">
-                    {cat.desc}
-                  </p>
-                  <div className="mt-3 flex items-center gap-1 text-xs font-bold text-accent group-hover:translate-x-1 transition-transform duration-300">
-                    <span>Переглянути →</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ==================================================
-          03 — POPULAR PRODUCTS (Artisan Wooden Cellar & Table)
+          03 — POPULAR PRODUCTS ("Хіти Галинки")
           ================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#F7EFE2] via-[#FBF7EE] to-[#F7EFE2] py-16 md:py-24 border-b border-amber-900/10">
-        <div className="container-p relative z-20">
+      <section className="py-16 md:py-24 border-b border-[#28221D] bg-[#121110]">
+        <div className="container-p">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
             <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-honey/30 text-xs font-bold uppercase tracking-widest text-honey shadow-2xs">
-                <IconHoneycomb className="w-3.5 h-3.5 text-honey" />
-                <span>З медової комори на ваш стіл</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#26201B] border border-bronze/30 text-xs font-bold uppercase tracking-wider text-bronze">
+                <IconSparkles className="w-3.5 h-3.5 text-bronze" />
+                <span>Вибір покупців</span>
               </div>
-              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-3">
-                Популярні товари
+              <h2 className="font-serif text-3xl sm:text-4xl font-extrabold text-[#F4EFEA] mt-3">
+                Хіти Галинки
               </h2>
-              <p className="text-ink/75 text-sm sm:text-base mt-1">
-                Найулюбленіші медові продукти, свіжо фасовані з родинної пасіки
+              <p className="text-[#A3988E] text-sm sm:text-base mt-1">
+                Найпопулярніші копченості та ковбаси, які замовляють найчастіше
               </p>
             </div>
             <Link
@@ -367,246 +302,285 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Wooden Tabletop Frame for Product Jars */}
-          <div className="relative rounded-3xl p-4 sm:p-6 lg:p-8 bg-[#FFFDF9]/90 backdrop-blur-xs border border-amber-800/15 shadow-sm">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-              {featured.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
+          {/* Products Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {featured.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
 
-            {/* Wooden Table Shelf Edge Base */}
-            <div className="mt-6 pt-4 border-t border-amber-900/10 flex flex-wrap items-center justify-between text-xs text-ink/65 gap-2">
-              <span className="flex items-center gap-1.5 font-medium">
-                <IconShieldCheck className="w-3.5 h-3.5 text-honey shrink-0" />
-                <span>Натуральне фасування та крафтове пакування</span>
-              </span>
-              <span className="font-semibold text-honey">
-                100% чистий мед без цукру та домішок
+          {/* Banner under products */}
+          <div className="mt-10 p-5 rounded-2xl bg-[#1C1815] border border-[#2F2821] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#A3988E]">
+            <div className="flex items-center gap-2.5">
+              <IconShieldCheck className="w-5 h-5 text-bronze shrink-0" />
+              <span>
+                Кожне замовлення збирається свіжим. Вакуумуємо перед самою відправкою.
               </span>
             </div>
+            <Link to="/catalog" className="font-bold text-bronze hover:underline shrink-0">
+              Переглянути повний каталог ({products.length} позицій) →
+            </Link>
           </div>
         </div>
       </section>
 
       {/* ==================================================
-          04 — GIFT BOXES EDITORIAL SHOWCASE (Artisan Craft)
+          04 — ABOUT GALINKA
           ================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#F7EFE2] via-[#FAF5EC] to-[#F7EFE2] py-16 md:py-24 border-b border-amber-900/10">
-        <WaxHoneycomb position="right" withBee={true} className="hidden xl:block" />
-
-        <div className="container-p relative z-20">
-          <div className="rounded-3xl bg-gradient-to-br from-[#FAF5EC] via-[#FFFDF9] to-[#F3ECD9] border border-amber-800/20 p-6 sm:p-10 md:p-14 shadow-md grid md:grid-cols-12 gap-8 lg:gap-12 items-center overflow-hidden relative">
-            <div className="md:col-span-7 z-10">
-              <span className="text-xs font-bold uppercase tracking-widest text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/25 shadow-2xs">
-                Подарункова колекція
-              </span>
-              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-ink mt-4 leading-tight">
-                Подарунок, який запам'ятається
-              </h2>
-              <p className="mt-4 text-ink/80 text-sm sm:text-base leading-relaxed max-w-lg">
-                Натуральні продукти бджільництва, стильне крафтове пакування та частинка сонячного тепла родинної пасіки у кожному наборі. Ідеально для затишного свята чи подарунка рідним.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Link to="/gift-boxes" className="btn-primary text-sm sm:text-base px-8 py-3.5 font-bold shadow-md">
-                  Переглянути всі бокси
-                </Link>
-                <span className="text-xs text-ink/65 font-medium">від 450 грн • надійне пакування</span>
-              </div>
-            </div>
-
-            <div className="md:col-span-5 relative">
-              <div className="rounded-3xl overflow-hidden shadow-xl border-4 border-white aspect-[4/3] bg-white group">
-                <img
-                  src="/images/prod-gift-box.jpg"
-                  alt="Крафтовий подарунковий бокс з медом та свічкою"
-                  className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ==================================================
-          05 — OUR APIARY / ABOUT STORYTELLING (Novoselytsia)
-          ================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#FAF5EB] via-[#F4EDE0] to-[#FAF5EB] py-16 md:py-24 border-b border-amber-900/10">
-        <div className="container-p relative z-20">
+      <section className="py-16 md:py-24 border-b border-[#28221D] bg-[#161412]">
+        <div className="container-p">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            {/* Text & Story */}
-            <div className="lg:col-span-6">
-              <span className="text-xs font-bold uppercase tracking-widest text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/25 shadow-2xs">
-                Наша історія
-              </span>
-              <h2 className="font-serif text-3xl sm:text-4xl font-extrabold text-ink mt-3 leading-snug">
-                {aboutTitle}
-              </h2>
-              <p className="mt-4 text-ink/80 leading-relaxed text-sm sm:text-base">
-                {aboutLead}
-              </p>
-              <p className="mt-3 text-ink/75 leading-relaxed text-sm sm:text-base whitespace-pre-line">
-                {aboutStory}
-              </p>
-
-              {/* 4 Storytelling Badges */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs">
-                    <RealisticBee size={24} depth="near" facing="right" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-ink">{years} років досвіду</h4>
-                    <p className="text-xs text-ink/60 mt-0.5">Від першого вулика до власного виробництва</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
-                    <IconShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-ink">Понад {hivesCount} вуликів</h4>
-                    <p className="text-xs text-ink/60 mt-0.5">Одна родинна справа та щоденна турбота</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
-                    <IconMapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-ink">{location}</h4>
-                    <p className="text-xs text-ink/60 mt-0.5">Екологічно чистий регіон</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-white/85 border border-gold/30 shadow-2xs">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 shadow-2xs text-honey">
-                    <IconHoneyJar className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-ink">Натуральні продукти</h4>
-                    <p className="text-xs text-ink/60 mt-0.5">Мед, соти, крем-меди та набори</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <Link to="/about" className="btn-secondary text-sm font-bold px-7 py-3.5">
-                  Наша історія та цінності →
-                </Link>
-              </div>
-            </div>
-
-            {/* Editorial Collage of Real Honey & Honeycomb */}
-            <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-              <div className="rounded-3xl overflow-hidden shadow-md border-2 border-white aspect-[3/4] bg-white group">
+            {/* Photo Column */}
+            <div className="lg:col-span-5 order-2 lg:order-1">
+              <div className="relative rounded-3xl overflow-hidden border border-[#332A22] shadow-2xl bg-[#1F1C19]">
                 <img
-                  src="/images/hero-honey.jpg"
-                  alt="Свіжий мед у банках зі стільниками"
-                  className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
+                  src="/images/about-galinka.jpg"
+                  alt="Галинка у власній домашній майстерні копченостей"
+                  className="w-full h-full object-cover aspect-[4/5]"
                   loading="lazy"
                 />
-              </div>
-              <div className="flex flex-col gap-4">
-                <div className="rounded-3xl overflow-hidden shadow-md border-2 border-white aspect-[4/3] bg-white group">
-                  <img
-                    src="/images/about-honeycomb.jpg"
-                    alt="Стільники з натуральним медом"
-                    className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="rounded-3xl overflow-hidden shadow-md border-2 border-white aspect-[4/3] bg-white group">
-                  <img
-                    src="/images/about-2.jpg"
-                    alt="Праця бджіл на рамці"
-                    className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
-                    loading="lazy"
-                  />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                <div className="absolute bottom-5 left-5 right-5 text-white">
+                  <div className="font-serif font-bold text-lg text-[#F4EFEA]">
+                    Галина
+                  </div>
+                  <div className="text-xs text-bronze font-semibold">
+                    Засновниця та майстриня «М'ясного раю»
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ==================================================
-          06 — TIKTOK / VIDEO HOVER PREVIEW SECTION
-          ================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#FAF5EB] via-[#F5EDDE] to-[#FAF5EB] py-16 border-b border-amber-900/10">
-        <div className="container-p relative z-20">
-          <div className="rounded-3xl bg-gradient-to-br from-[#FAF5EC] via-[#FFFDF9] to-[#F3ECD9] border border-amber-800/20 text-ink p-6 sm:p-10 md:p-12 shadow-md">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-              <div>
-                <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-honey bg-white px-3.5 py-1.5 rounded-full border border-honey/25 shadow-2xs">
-                  <RealisticBee size={18} depth="near" facing="right" />
-                  <span>Офіційний TikTok: @honey.dsv</span>
-                </div>
-                <h2 className="font-serif text-2xl sm:text-4xl font-extrabold text-ink mt-3 leading-tight">
-                  Більше життя нашої пасіки — у TikTok
-                </h2>
-                <p className="mt-2 text-ink/75 text-sm sm:text-base max-w-xl leading-relaxed">
-                  Підписуйтесь на наш офіційний канал <b>@honey.dsv</b>: показуємо щоденне життя пасіки, процес збору меду та залаштунки створення нашої продукції.
+            {/* Story Column */}
+            <div className="lg:col-span-7 order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#26201B] border border-bronze/30 text-xs font-bold uppercase tracking-wider text-bronze mb-3">
+                <span>👩‍🍳 Про людину за брендом</span>
+              </div>
+              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F4EFEA] leading-tight">
+                Готую з любов'ю, як для власної родини
+              </h2>
+              <div className="mt-6 space-y-4 text-sm sm:text-base text-[#CFC5BA] leading-relaxed">
+                <p>
+                  Мене звати Галина. Своє коптильне діло я починала для родини та близьких друзів. Згодом люди почали замовляти знову і знову, розповідати знайомим — і так народився наш «М'ясний рай».
+                </p>
+                <p>
+                  Головний наш принцип — жодних компромісів щодо якості. Ми не використовуємо соєвих добавок, крохмалю, фосфатів чи «рідкого диму». Тільки добірне свіже м'ясо, перець, часник і натуральне копчення на сухих дровах у нашій коптильні.
+                </p>
+                <p>
+                  Сьогодні наші копченості замовляють по всій Україні через TikTok та сайт. Ми дуже цінуємо вашу довіру і щодня прагнемо робити найсмачніший продукт, який з гордістю ставимо на святковий стіл.
                 </p>
               </div>
-              <a
-                href={TIKTOK_PROFILE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-primary text-sm sm:text-base px-7 py-3.5 font-bold shadow-md hover:shadow-lg shrink-0 flex items-center gap-2"
-              >
-                <span>Дивитися нашу пасіку в TikTok →</span>
-              </a>
-            </div>
 
-            {/* 4 Vertical Video Preview Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {TIKTOK_VIDEOS.map((item) => (
-                <TikTokCard key={item.id} item={item} />
-              ))}
+              {/* Action buttons */}
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link to="/about" className="btn-secondary text-sm font-bold">
+                  Дізнатися більше про коптильню →
+                </Link>
+                <a
+                  href={viberUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-viber text-sm"
+                >
+                  <IconViber className="w-4 h-4 text-white" />
+                  <span>Написати Галині особисто</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* ==================================================
-          07 — FINAL ATMOSPHERIC PHOTO CTA SCENE
+          05 — TIKTOK SECTION
           ================================================== */}
-      <section className="relative overflow-hidden bg-[#FAF5EB] py-16">
+      <section className="py-16 md:py-24 border-b border-[#28221D] bg-[#121110]">
         <div className="container-p">
-          <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-amber-800/30 text-white min-h-[380px] flex items-center justify-center p-8 sm:p-14 text-center">
-            {/* Atmospheric Background Photo */}
-            <img
-              src="/images/hero-honey.jpg"
-              alt="Натуральний мед та стільники"
-              className="absolute inset-0 w-full h-full object-cover object-center scale-102"
-              loading="lazy"
-            />
-            {/* Warm Dark Honey Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/65 to-black/75 z-10" />
+          <div className="rounded-3xl bg-gradient-to-br from-[#1C1815] via-[#211B17] to-[#171412] border border-bronze/30 p-8 sm:p-12 lg:p-14 shadow-2xl relative overflow-hidden">
+            {/* Glow background */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-bronze/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Content */}
-            <div className="relative z-20 max-w-2xl mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-accent mx-auto mb-4 shadow-sm">
-                <IconHoneycomb className="w-6 h-6" />
+            <div className="grid lg:grid-cols-12 gap-8 items-center relative z-10">
+              <div className="lg:col-span-8">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 border border-white/20 text-xs font-bold text-white mb-4">
+                  <IconTikTok className="w-4 h-4 text-white" />
+                  <span>@kopchonosti777</span>
+                </div>
+                <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F4EFEA] leading-tight">
+                  Галинка в TikTok: дивіться як ми готуємо наживо
+                </h2>
+                <p className="mt-4 text-sm sm:text-base text-[#CFC5BA] max-w-2xl leading-relaxed">
+                  Показуємо весь процес без прикрас: від вибору м'яса та запікання ковбасок до виймання гарячої шинки з коптильні. Дивіться відео, огляди та відгуки наших замовників!
+                </p>
+
+                {/* TikTok Audience Stats */}
+                <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-[#F4EFEA]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif font-extrabold text-2xl text-bronze">110K+</span>
+                    <span className="text-xs text-[#A3988E]">підписників у TikTok</span>
+                  </div>
+                  <div className="h-6 w-px bg-white/10 hidden sm:block" />
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif font-extrabold text-2xl text-bronze">700K+</span>
+                    <span className="text-xs text-[#A3988E]">лайків на відео</span>
+                  </div>
+                  <div className="h-6 w-px bg-white/10 hidden sm:block" />
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif font-extrabold text-2xl text-bronze">100%</span>
+                    <span className="text-xs text-[#A3988E]">справжні живі відгуки</span>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <a
+                    href={tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2.5 bg-black hover:bg-[#1A1A1A] text-white font-bold px-7 py-3.5 rounded-xl border border-white/30 hover:border-[#FE2C55] shadow-lg transition-all active:scale-98 text-sm sm:text-base"
+                  >
+                    <IconTikTok className="w-5 h-5 text-white" />
+                    <span>Дивитися TikTok @kopchonosti777</span>
+                  </a>
+
+                  <Link to="/catalog" className="btn-primary text-sm sm:text-base">
+                    Замовити смаколики на сайті
+                  </Link>
+                </div>
               </div>
-              <h2 className="font-serif text-3xl sm:text-5xl font-extrabold text-white leading-tight drop-shadow-md">
-                Спробуйте смак нашої пасіки
-              </h2>
-              <p className="mt-4 text-white/90 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-                Мед, крем-меди, пилок, прополіс, горішки в меді, свічки та подарункові набори — обирайте те, що припаде до душі.
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <Link to="/catalog" className="btn-primary text-base px-9 py-3.5 font-bold shadow-lg hover:shadow-xl">
-                  Перейти до магазину
-                </Link>
-                <Link to="/contacts" className="inline-flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 border border-white/40 text-white font-semibold px-7 py-3.5 rounded-xl transition-all backdrop-blur-md">
-                  Контакти пасіки
-                </Link>
+
+              {/* TikTok Badge / preview mockup */}
+              <div className="lg:col-span-4 flex justify-center">
+                <div className="w-full max-w-xs rounded-2xl bg-[#141211] border border-[#332A22] p-5 shadow-xl text-center">
+                  <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-bronze to-meat flex items-center justify-center text-4xl shadow-inner border-2 border-white/20 mb-3">
+                    🥩
+                  </div>
+                  <div className="font-bold text-base text-[#F4EFEA]">Домашні копченості 🥩</div>
+                  <div className="text-xs text-bronze font-semibold mt-0.5">@kopchonosti777</div>
+                  <p className="text-xs text-[#8C8074] mt-2 leading-relaxed">
+                    «М'ясний рай у Галинки» — щоденні відео про копчення на дровах та смачні рецепти
+                  </p>
+                  <a
+                    href={tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 block w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors"
+                  >
+                    Перейти до профілю →
+                  </a>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ==================================================
+          06 — ORDERING & NOVA POSHTA DELIVERY STEPS
+          ================================================== */}
+      <section className="py-16 md:py-24 border-b border-[#28221D] bg-[#161412]">
+        <div className="container-p">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#26201B] border border-bronze/30 text-xs font-bold uppercase tracking-wider text-bronze">
+              <IconTruck className="w-4 h-4 text-bronze" />
+              <span>Швидко, просто та надійно</span>
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F4EFEA] mt-3">
+              Як замовити на сайті?
+            </h2>
+            <p className="text-[#A3988E] text-sm sm:text-base mt-2">
+              Оформлення займає всього 1-2 хвилини без обов'язкової реєстрації
+            </p>
+          </div>
+
+          {/* 5 Steps Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+            {ORDER_STEPS.map((s, idx) => (
+              <div
+                key={idx}
+                className="rounded-2xl bg-[#1C1815] border border-[#2F2821] p-5 flex flex-col justify-between hover:border-bronze/60 transition-colors shadow-md"
+              >
+                <div>
+                  <span className="font-serif text-2xl font-black text-bronze/70 mb-2 block">
+                    {s.step}
+                  </span>
+                  <h3 className="font-serif font-bold text-base text-[#F4EFEA] mb-1.5 leading-snug">
+                    {s.title}
+                  </h3>
+                  <p className="text-xs text-[#A3988E] leading-relaxed">
+                    {s.desc}
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 text-[11px] text-bronze font-medium">
+                  <IconCheckCircle className="w-3.5 h-3.5" />
+                  <span>Крок {idx + 1}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Delivery Details Card */}
+          <div className="mt-12 rounded-2xl bg-[#1C1815] border border-[#2F2821] p-6 sm:p-8 grid md:grid-cols-3 gap-6 text-sm">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🚚</span>
+              <div>
+                <div className="font-bold text-[#F4EFEA]">Доставка Новою Поштою</div>
+                <div className="text-xs text-[#A3988E] mt-1 leading-relaxed">
+                  Відправляємо у відділення та поштомати по всій Україні. Термін доставки 1–2 дні.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">❄️</span>
+              <div>
+                <div className="font-bold text-[#F4EFEA]">Термозахист та свіжість</div>
+                <div className="text-xs text-[#A3988E] mt-1 leading-relaxed">
+                  Продукти пакуються у вакуум та термопакети з холодоелементами. Завжди приїжджає свіжим.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">💳</span>
+              <div>
+                <div className="font-bold text-[#F4EFEA]">Зручна оплата</div>
+                <div className="text-xs text-[#A3988E] mt-1 leading-relaxed">
+                  Оплата при отриманні на Новій Пошті або переказ на розрахунковий рахунок/карту.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ==================================================
+          07 — FINAL CTA BANNER
+          ================================================== */}
+      <section className="py-16 md:py-20 bg-[#121110]">
+        <div className="container-p">
+          <div className="rounded-3xl bg-gradient-to-r from-[#211B16] via-[#2A221C] to-[#1A1613] border border-bronze/40 p-8 sm:p-12 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden">
+            <span className="text-4xl mb-3 block">🥩</span>
+            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F4EFEA]">
+              Бажаєте справжнього домашнього м'яса?
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#CFC5BA] max-w-xl mx-auto leading-relaxed">
+              Обирайте смаколики в каталозі прямо зараз або пишіть Галині у Viber, якщо потрібна порада чи особливе замовлення.
+            </p>
+
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link to="/catalog" className="btn-primary text-base px-8 py-4 font-bold w-full sm:w-auto">
+                Перейти до каталогу страв →
+              </Link>
+
+              <a
+                href={viberUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-viber text-base px-7 py-4 w-full sm:w-auto"
+              >
+                <IconViber className="w-5 h-5 text-white" />
+                <span>Написати у Viber ({phone})</span>
+              </a>
             </div>
           </div>
         </div>

@@ -32,11 +32,11 @@ export default function Checkout() {
   const [checkoutToken] = useState(() => "chk_" + Date.now() + "_" + Math.random().toString(36).slice(2, 12));
 
   const [step, setStep] = useState(1);
-  const FORM_STORAGE_KEY = "pasika_checkout_form";
+  const FORM_STORAGE_KEY = "galinka_checkout_form";
 
   const [form, setForm] = useState(() => {
     try {
-      const saved = localStorage.getItem("pasika_checkout_form");
+      const saved = localStorage.getItem("galinka_checkout_form");
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
@@ -44,6 +44,10 @@ export default function Checkout() {
           lastName: parsed.lastName || "",
           phone: parsed.phone || "",
           email: parsed.email || "",
+          preferredContact: parsed.preferredContact || "viber",
+          isInternational: Boolean(parsed.isInternational),
+          deliveryCountry: parsed.deliveryCountry || "",
+          postalCode: parsed.postalCode || "",
           providerKey: parsed.providerKey || "np",
           deliveryCity: parsed.deliveryCity || "",
           deliveryRegion: parsed.deliveryRegion || "",
@@ -66,6 +70,10 @@ export default function Checkout() {
       lastName: "",
       phone: "",
       email: "",
+      preferredContact: "viber",
+      isInternational: false,
+      deliveryCountry: "",
+      postalCode: "",
       providerKey: "np",
       deliveryCity: "",
       deliveryRegion: "",
@@ -121,7 +129,7 @@ export default function Checkout() {
   useEffect(() => {
     try {
       const { receiptFile: _receiptFile, ...saveable } = form;
-      localStorage.setItem("pasika_checkout_form", JSON.stringify(saveable));
+      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(saveable));
     } catch {}
   }, [form]);
 
@@ -306,13 +314,20 @@ export default function Checkout() {
   };
 
   const step1Valid = Boolean(form.firstName.trim() && form.lastName.trim() && form.phone.trim());
-  const step2Valid = Boolean(
-    form.providerKey &&
-    form.deliveryCity.trim() &&
-    (form.providerKey === "np"
-      ? Boolean(form.branchRef || form.deliveryBranch.trim())
-      : Boolean(form.deliveryRegion.trim() && form.deliveryBranch.trim()))
-  );
+  const step2Valid = form.isInternational
+    ? Boolean(
+        form.deliveryCountry.trim() &&
+        form.deliveryCity.trim() &&
+        form.deliveryBranch.trim() &&
+        form.postalCode.trim()
+      )
+    : Boolean(
+        form.providerKey &&
+        form.deliveryCity.trim() &&
+        (form.providerKey === "np"
+          ? Boolean(form.branchRef || form.deliveryBranch.trim())
+          : Boolean(form.deliveryRegion.trim() && form.deliveryBranch.trim()))
+      );
 
   const copyCard = () => {
     const cardNum = settings?.payment?.card || "";
@@ -348,11 +363,12 @@ export default function Checkout() {
         // proceed to backend atomic reservation check
       }
 
-      const idempotencyKey = `pasika_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const idempotencyKey = `galinka_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-      const isNp = form.providerKey === "np";
+      const isInternational = Boolean(form.isInternational);
+      const isNp = !isInternational && form.providerKey === "np";
       const cityDisplay = form.deliveryCity.trim();
-      const regionDisplay = form.deliveryRegion.trim();
+      const regionDisplay = isInternational ? form.deliveryCountry.trim() : form.deliveryRegion.trim();
       const branchDisplay = form.deliveryBranch.trim();
       const warehouseAddressDisplay = form.warehouseAddress.trim() || branchDisplay;
 
@@ -364,21 +380,26 @@ export default function Checkout() {
         lastName: form.lastName.trim(),
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
-        providerKey: form.providerKey,
+        preferredContact: form.preferredContact || "viber",
+        isInternational,
+        deliveryCountry: isInternational ? form.deliveryCountry.trim() : undefined,
+        country: isInternational ? form.deliveryCountry.trim() : undefined,
+        postalCode: isInternational ? form.postalCode.trim() : undefined,
+        providerKey: isInternational ? "international" : form.providerKey,
         deliveryCity: cityDisplay,
         deliveryRegion: regionDisplay || undefined,
         deliveryBranch: branchDisplay,
         deliveryWarehouseAddress: warehouseAddressDisplay,
-        deliveryWarehouseRef: form.branchRef || undefined,
-        deliveryBranchNumber: form.branchNumber || undefined,
-        deliveryCityId: form.cityRef || undefined,
-        deliveryBranchId: form.branchRef || undefined,
+        deliveryWarehouseRef: !isInternational ? (form.branchRef || undefined) : undefined,
+        deliveryBranchNumber: !isInternational ? (form.branchNumber || undefined) : undefined,
+        deliveryCityId: !isInternational ? (form.cityRef || undefined) : undefined,
+        deliveryBranchId: !isInternational ? (form.branchRef || undefined) : undefined,
         city: cityDisplay,
         region: regionDisplay || undefined,
         branch: branchDisplay,
         warehouseAddress: warehouseAddressDisplay,
-        warehouseRef: form.branchRef || undefined,
-        branchNumber: form.branchNumber || undefined,
+        warehouseRef: !isInternational ? (form.branchRef || undefined) : undefined,
+        branchNumber: !isInternational ? (form.branchNumber || undefined) : undefined,
         paymentMethod: cleanPaymentMethod,
         comment: form.comment.trim() || undefined,
         receiptUrl: isCard ? form.receiptUrl : undefined,
@@ -390,17 +411,20 @@ export default function Checkout() {
           email: form.email.trim() || undefined,
         },
         delivery: {
-          provider: isNp ? "Нова пошта" : "Укрпошта",
-          providerKey: form.providerKey,
-          deliveryService: isNp ? "Нова пошта" : "Укрпошта",
+          provider: isInternational ? "Міжнародна доставка" : (isNp ? "Нова пошта" : "Укрпошта"),
+          providerKey: isInternational ? "international" : form.providerKey,
+          deliveryService: isInternational ? "Міжнародна доставка" : (isNp ? "Нова пошта" : "Укрпошта"),
+          isInternational,
+          country: isInternational ? form.deliveryCountry.trim() : undefined,
+          postalCode: isInternational ? form.postalCode.trim() : undefined,
           city: cityDisplay,
           region: regionDisplay || undefined,
           branch: branchDisplay,
           warehouseAddress: warehouseAddressDisplay,
-          warehouseRef: form.branchRef || undefined,
-          branchNumber: form.branchNumber || undefined,
-          cityId: form.cityRef || undefined,
-          branchId: form.branchRef || undefined,
+          warehouseRef: !isInternational ? (form.branchRef || undefined) : undefined,
+          branchNumber: !isInternational ? (form.branchNumber || undefined) : undefined,
+          cityId: !isInternational ? (form.cityRef || undefined) : undefined,
+          branchId: !isInternational ? (form.branchRef || undefined) : undefined,
         },
         payment: {
           method: cleanPaymentMethod,
@@ -409,7 +433,12 @@ export default function Checkout() {
           receiptUrl: isCard ? form.receiptUrl : undefined,
           receiptName: isCard ? form.receiptName : undefined,
         },
-        items: items.map((i) => ({ id: i.id, qty: i.qty })),
+        items: items.map((i) => ({
+          id: i.id,
+          qty: i.qty,
+          boxItems: i.boxItems || undefined,
+          isCustomBox: i.isCustomBox || undefined,
+        })),
         idempotencyKey,
         checkoutToken,
       };
@@ -561,11 +590,11 @@ export default function Checkout() {
                     type="tel"
                     value={form.phone}
                     onChange={set("phone")}
-                    placeholder="+380 67 123 45 67"
+                    placeholder={form.isInternational ? "+48 123 456 789 (або з кодом країни)" : "+380 67 123 45 67"}
                   />
                 </div>
                 <div>
-                  <label className="label">Email (для квитанції)</label>
+                  <label className="label">Email (необов'язково)</label>
                   <input
                     className="input"
                     type="email"
@@ -573,6 +602,45 @@ export default function Checkout() {
                     onChange={set("email")}
                     placeholder="olena@example.com"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Як з вами зручніше зв'язатися для підтвердження? *</label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, preferredContact: "viber" }))}
+                    className={`py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      (form.preferredContact || "viber") === "viber"
+                        ? "border-[#7360F2] bg-[#7360F2]/20 text-[#A599FA] ring-2 ring-[#7360F2]/40"
+                        : "border-[#3A332B] bg-[#181614] text-[#A3988E] hover:border-bronze"
+                    }`}
+                  >
+                    <span>🟣 Viber</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, preferredContact: "phone" }))}
+                    className={`py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      form.preferredContact === "phone"
+                        ? "border-bronze bg-bronze/20 text-bronze ring-2 ring-bronze/40"
+                        : "border-[#3A332B] bg-[#181614] text-[#A3988E] hover:border-bronze"
+                    }`}
+                  >
+                    <span>📞 Дзвінок</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, preferredContact: "telegram" }))}
+                    className={`py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      form.preferredContact === "telegram"
+                        ? "border-[#2AABEE] bg-[#2AABEE]/20 text-[#2AABEE] ring-2 ring-[#2AABEE]/40"
+                        : "border-[#3A332B] bg-[#181614] text-[#A3988E] hover:border-bronze"
+                    }`}
+                  >
+                    <span>✈️ Telegram</span>
+                  </button>
                 </div>
               </div>
 
@@ -594,11 +662,44 @@ export default function Checkout() {
             <div className="space-y-5 animate-fadeIn">
               <div className="border-b border-ink/5 pb-3">
                 <h2 className="font-serif text-xl font-bold text-ink">2. Доставка</h2>
-                <p className="text-xs text-ink/60 mt-0.5">Оберіть службу доставки та вкажіть пункт отримання</p>
+                <p className="text-xs text-ink/60 mt-0.5">Оберіть напрямок та вкажіть пункт отримання</p>
               </div>
 
-              {/* Delivery Carrier Selection */}
+              {/* Destination selector: Ukraine vs International */}
               <div>
+                <label className="label">Напрямок доставки *</label>
+                <div className="grid grid-cols-2 gap-3 p-1.5 rounded-2xl bg-[#1C1815] border border-[#332A22]">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, isInternational: false }))}
+                    className={`py-3 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      !form.isInternational
+                        ? "bg-gradient-to-r from-bronze to-gold text-[#141210] shadow-md"
+                        : "text-[#D1C7BD] hover:text-white"
+                    }`}
+                  >
+                    <span>🇺🇦</span>
+                    <span>Україна</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, isInternational: true }))}
+                    className={`py-3 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      form.isInternational
+                        ? "bg-gradient-to-r from-bronze to-gold text-[#141210] shadow-md"
+                        : "text-[#D1C7BD] hover:text-white"
+                    }`}
+                  >
+                    <span>🌍</span>
+                    <span>За кордон</span>
+                  </button>
+                </div>
+              </div>
+
+              {!form.isInternational ? (
+                <>
+                  {/* Delivery Carrier Selection */}
+                  <div>
                 <label className="label">Служба доставки *</label>
                 <div className="grid grid-cols-2 gap-3">
                   {DELIVERY_SERVICES.map((p) => {
@@ -932,6 +1033,71 @@ export default function Checkout() {
                       onChange={set("deliveryBranch")}
                       placeholder="напр. Відділення 76018 (вул. Січових Стрільців, 15)"
                     />
+                  </div>
+                </div>
+              )}
+                </>
+              ) : (
+                /* INTERNATIONAL DELIVERY FLOW */
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="p-4 rounded-2xl bg-[#241C16] border border-bronze/30 text-xs sm:text-sm text-[#D1C7BD] flex items-center gap-3">
+                    <span className="text-2xl shrink-0">✈️</span>
+                    <div>
+                      <span className="font-bold text-[#F4EFEA]">Міжнародна доставка делікатесів:</span>
+                      <p className="text-xs text-[#A89B8F] mt-0.5">
+                        Відправляємо кур'єрськими службами у вакуумі та спеціальних термобоксах з холодоагентом. Вартість та точні терміни менеджер узгодить у Viber/Telegram.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label" htmlFor="deliveryCountry">Країна призначення *</label>
+                      <input
+                        id="deliveryCountry"
+                        name="deliveryCountry"
+                        className="input"
+                        value={form.deliveryCountry}
+                        onChange={set("deliveryCountry")}
+                        placeholder="напр. Польща, Німеччина, Чехія"
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="deliveryCity">Місто призначення *</label>
+                      <input
+                        id="deliveryCity"
+                        name="deliveryCity"
+                        className="input"
+                        value={form.deliveryCity}
+                        onChange={set("deliveryCity")}
+                        placeholder="напр. Варшава, Берлін, Прага"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="label" htmlFor="postalCode">Поштовий індекс *</label>
+                      <input
+                        id="postalCode"
+                        name="postalCode"
+                        className="input"
+                        value={form.postalCode}
+                        onChange={set("postalCode")}
+                        placeholder="напр. 00-001"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="label" htmlFor="deliveryBranch">Точна адреса (вулиця, будинок, кв.) *</label>
+                      <input
+                        id="deliveryBranch"
+                        name="deliveryBranch"
+                        className="input"
+                        value={form.deliveryBranch}
+                        onChange={set("deliveryBranch")}
+                        placeholder="напр. ul. Marszałkowska 10, m. 4"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

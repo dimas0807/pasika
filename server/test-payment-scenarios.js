@@ -90,7 +90,7 @@ try {
       branch: { id: "b1", name: "Відділення №1" },
       paymentMethod: "cod",
       comment: "Передзвоніть після 15:00",
-      items: [{ id: "p1", qty: 1 }],
+      items: [{ id: "prod_dk_1", qty: 1 }],
       idempotencyKey: "test_cod_" + Date.now(),
     }),
   });
@@ -132,7 +132,7 @@ try {
       city: { id: "c2", name: "Львів" },
       branch: { id: "b2", name: "Відділення №2" },
       paymentMethod: "card",
-      items: [{ id: "p2", qty: 1 }],
+      items: [{ id: "prod_km_1", qty: 1 }],
       idempotencyKey: "test_fail_card_" + Date.now(),
     }),
   });
@@ -178,7 +178,7 @@ try {
       receiptName: uploadRes.data.originalName,
       checkoutToken,
       comment: "Запакуйте як подарунок",
-      items: [{ id: "p2", qty: 1 }],
+      items: [{ id: "prod_km_1", qty: 1 }],
       idempotencyKey: "test_success_card_" + Date.now(),
     }),
   });

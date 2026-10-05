@@ -7,8 +7,8 @@ import { getSession } from "./auth.js";
 import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const BASE_STORAGE_DIR = process.env.STORAGE_PATH || path.resolve(__dirname, "../storage");
-export const STORAGE_DIR = process.env.RECEIPTS_STORAGE_PATH || path.join(BASE_STORAGE_DIR, "receipts");
+export const BASE_STORAGE_DIR = process.env.STORAGE_PATH ? path.resolve(process.env.STORAGE_PATH) : path.resolve(__dirname, "../storage");
+export const STORAGE_DIR = process.env.RECEIPTS_STORAGE_PATH ? path.resolve(process.env.RECEIPTS_STORAGE_PATH) : path.join(BASE_STORAGE_DIR, "receipts");
 
 // Ensure directory exists
 if (!fs.existsSync(STORAGE_DIR)) {
@@ -260,11 +260,11 @@ export function serveReceiptFile(req, res) {
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
     res.setHeader("Cache-Control", "private, max-age=3600");
-    return res.sendFile(filePath);
+    return res.sendFile(path.resolve(filePath));
   }
 
   // 1. Admin access check
-  let adminToken = req.cookies?.pasika_session;
+  let adminToken = req.cookies?.galinka_session || req.cookies?.pasika_session;
   if (!adminToken && req.headers.authorization?.startsWith("Bearer ")) {
     adminToken = req.headers.authorization.substring(7).trim();
   }

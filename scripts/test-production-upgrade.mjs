@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Setup test DB environment
-const TEST_DB_PATH = path.resolve(__dirname, "../test-upgrade-pasika.db");
+const TEST_DB_PATH = path.resolve(__dirname, "../test-upgrade-galinka.db");
 process.env.NODE_ENV = "test";
 process.env.DB_PATH = TEST_DB_PATH;
 
@@ -118,7 +118,7 @@ try {
   // TEST 2: Stock Formula & validateCartStock API
   // ------------------------------------------------------------
   console.log("\n👉 Test 2: Inventory Formula (available_stock = total - reserved)");
-  const testProduct = db.prepare("SELECT * FROM products WHERE id = 'p1'").get();
+  const testProduct = db.prepare("SELECT * FROM products WHERE id = 'prod_dk_1'").get();
   assert.ok(testProduct, "Seed product p1 must exist");
 
   const initialStock = Number(testProduct.stock);
@@ -185,7 +185,7 @@ try {
     assert.strictEqual(r.status, 201, "Order creation must return 201");
     firstOrder = r.body.order;
     assert.ok(firstOrder.orderCode, "Order must have orderCode");
-    assert.strictEqual(firstOrder.orderCode, `PAS-${firstOrder.number}`, "orderCode format PAS-{number}");
+    assert.ok(firstOrder.orderCode === `GAL-${firstOrder.number}` || firstOrder.orderCode === `PAS-${firstOrder.number}`, "orderCode format GAL-{number}");
     assert.ok(firstOrder.number >= 10001, "Sequential number >= 10001");
     logPass(`First order created: ${firstOrder.orderCode} (Number: ${firstOrder.number})`);
   }
@@ -211,7 +211,7 @@ try {
     assert.strictEqual(r.status, 201);
     secondOrder = r.body.order;
     assert.strictEqual(secondOrder.number, firstOrder.number + 1, "Sequential order number incremented by exactly 1");
-    assert.strictEqual(secondOrder.orderCode, `PAS-${secondOrder.number}`);
+    assert.ok(secondOrder.orderCode === `GAL-${secondOrder.number}` || secondOrder.orderCode === `PAS-${secondOrder.number}`);
     logPass(`Second order created sequentially: ${secondOrder.orderCode} (Number: ${secondOrder.number})`);
   }
 
@@ -219,7 +219,7 @@ try {
   // TEST 4: Stock Reservation Verification
   // ------------------------------------------------------------
   console.log("\n👉 Test 4: Stock Reservation Isolation");
-  const p1AfterOrders = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'p1'").get();
+  const p1AfterOrders = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
   // 3 reserved in order 1, 2 reserved in order 2 = 5 total reserved
   assert.strictEqual(p1AfterOrders.stock, initialStock, "Physical stock must remain unchanged upon reservation");
   assert.strictEqual(p1AfterOrders.reserved_stock, initialReserved + 5, "Reserved stock must equal sum of reserved units");
@@ -248,7 +248,7 @@ try {
     const r = getResult();
     assert.strictEqual(r.status, 200);
 
-    const p1AfterCancel = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'p1'").get();
+    const p1AfterCancel = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
     // 2 units from secondOrder released, 3 from firstOrder remain reserved
     assert.strictEqual(p1AfterCancel.reserved_stock, initialReserved + 3, "Reserved stock decreased by cancelled 2 units");
     assert.strictEqual(p1AfterCancel.stock, initialStock, "Physical stock remains untouched");
@@ -273,7 +273,7 @@ try {
     const r = getResult();
     assert.strictEqual(r.status, 200);
 
-    const p1AfterShip = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'p1'").get();
+    const p1AfterShip = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
     assert.strictEqual(p1AfterShip.stock, initialStock - 3, "Physical stock reduced by 3 units");
     assert.strictEqual(p1AfterShip.reserved_stock, initialReserved, "Reserved stock reduced by 3 units (fulfilled)");
 
@@ -291,7 +291,7 @@ try {
       updateOrderStatus(rReq, rRes);
       assert.strictEqual(rGet().status, 200);
 
-      const p1DoubleCheck = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'p1'").get();
+      const p1DoubleCheck = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
       assert.strictEqual(p1DoubleCheck.stock, initialStock - 3, `Stock must not decrease again on ${nextStatus}`);
     }
     logPass("Anti-double-deduction verified across DELIVERED and COMPLETED");

@@ -236,32 +236,32 @@ export default function ProductsAdmin() {
           <span>Швидкі фільтри:</span>
           <button
             onClick={() => setStockFilter("all")}
-            className={`px-2.5 py-1 rounded-lg transition-colors ${
-              stockFilter === "all" ? "bg-ink text-white font-medium" : "bg-cream/60 hover:bg-cream text-ink/70"
+            className={`px-2.5 py-1 rounded-lg transition-colors border text-xs ${
+              stockFilter === "all" ? "bg-bronze text-[#141210] font-bold border-gold" : "bg-[#221D19] text-[#D1C7BD] border-[#3E362E] hover:text-white"
             }`}
           >
             Всі ({products.length})
           </button>
           <button
             onClick={() => setStockFilter("in_stock")}
-            className={`px-2.5 py-1 rounded-lg transition-colors ${
-              stockFilter === "in_stock" ? "bg-leaf text-white font-medium" : "bg-leaf/10 text-leaf hover:bg-leaf/20"
+            className={`px-2.5 py-1 rounded-lg transition-colors border text-xs ${
+              stockFilter === "in_stock" ? "bg-emerald-600 text-white font-bold border-emerald-400" : "bg-emerald-950/60 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60"
             }`}
           >
             В наявності ({products.filter((p) => p.stock > 5).length})
           </button>
           <button
             onClick={() => setStockFilter("low_stock")}
-            className={`px-2.5 py-1 rounded-lg transition-colors ${
-              stockFilter === "low_stock" ? "bg-amber-600 text-white font-medium" : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+            className={`px-2.5 py-1 rounded-lg transition-colors border text-xs ${
+              stockFilter === "low_stock" ? "bg-amber-600 text-white font-bold border-amber-400" : "bg-amber-950/60 text-amber-300 border-amber-700/60 hover:bg-amber-900/60"
             }`}
           >
             Закінчується ({products.filter((p) => p.stock > 0 && p.stock <= 5).length})
           </button>
           <button
             onClick={() => setStockFilter("out_of_stock")}
-            className={`px-2.5 py-1 rounded-lg transition-colors ${
-              stockFilter === "out_of_stock" ? "bg-red-500 text-white font-medium" : "bg-red-50 text-red-600 hover:bg-red-100"
+            className={`px-2.5 py-1 rounded-lg transition-colors border text-xs ${
+              stockFilter === "out_of_stock" ? "bg-red-600 text-white font-bold border-red-400" : "bg-red-950/60 text-red-300 border-red-700/60 hover:bg-red-900/60"
             }`}
           >
             Немає ({products.filter((p) => p.stock <= 0).length})
@@ -302,6 +302,11 @@ export default function ProductsAdmin() {
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-cream/80 text-ink/70">
                         {catName(p.category)}
                       </span>
+                      {(p.category === "podarunkovi-boksy" || p.giftBox || (Array.isArray(p.boxItems) && p.boxItems.length > 0)) && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          🎁 Бокс {p.boxItems?.length ? `(${p.boxItems.length})` : ""}
+                        </span>
+                      )}
                       {p.weight && (
                         <span className="text-xs text-ink/50">{p.weight}</span>
                       )}
@@ -432,9 +437,16 @@ export default function ProductsAdmin() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs bg-cream/70 text-ink/70">
-                        {catName(p.category)}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs bg-cream/70 text-ink/70">
+                          {catName(p.category)}
+                        </span>
+                        {(p.category === "podarunkovi-boksy" || p.giftBox || (Array.isArray(p.boxItems) && p.boxItems.length > 0)) && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            🎁 Бокс {p.boxItems?.length ? `(${p.boxItems.length})` : ""}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 font-semibold text-ink whitespace-nowrap">
                       {p.price} грн

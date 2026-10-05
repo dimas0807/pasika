@@ -21,6 +21,7 @@ function mapProductRow(row) {
     availableStock,
     isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
     features: row.features || "",
+    boxItems: row.box_items ? (typeof row.box_items === "string" ? (() => { try { return JSON.parse(row.box_items); } catch { return null; } })() : row.box_items) : null,
     featured: Boolean(row.featured),
     giftBox: Boolean(row.gift_box),
     description: row.description,
@@ -67,7 +68,10 @@ export function validateCartStock(req, res) {
   }
 
   const results = items.map((item) => {
-    const prod = db.prepare("SELECT * FROM products WHERE id = ?").get(item.id);
+    let prod = db.prepare("SELECT * FROM products WHERE id = ?").get(item.id);
+    if (!prod && typeof item.id === "string" && item.id.startsWith("custom_box")) {
+      prod = db.prepare("SELECT * FROM products WHERE id = ?").get("custom_box");
+    }
     if (!prod) {
       return { id: item.id, found: false, error: "Товар не знайдено", isAvailable: false };
     }
@@ -159,33 +163,31 @@ export function saveProduct(req, res) {
     return res.status(400).json({ error: "Назва товару обов'язкова" });
   }
 
-  const existing = db.prepare("SELECT id, image FROM products WHERE id = ?").get(id);
+  const existing = db.prepare("SELECT id, image, box_items FROM products WHERE id = ?").get(id);
 
-  // Mandatory photo validation for NEW products:
+  // Photo is optional: fallback to existing or category placeholder
   let image = (body.image || "").trim();
-  if (!existing) {
-    if (!image) {
-      return res.status(400).json({ error: "Фото товару обов'язкове для створення нового товару" });
-    }
-  } else {
-    if (!image) {
-      image = existing.image || "";
-    }
+  if (!image && existing) {
+    image = existing.image || "";
   }
 
   const rawSlug = (body.slug || "").trim() || transliterateUa(name);
   const cleanSlug = transliterateUa(rawSlug);
   const slug = resolveUniqueSlug(cleanSlug, existing ? id : null);
 
-  const category = body.category || "honey";
+  const category = body.category || "domashni-kovbasy";
   const weight = body.weight || "";
   const price = Number(body.price) || 0;
   const oldPrice = body.oldPrice ? Number(body.oldPrice) : null;
   const stock = Number.isInteger(Number(body.stock)) ? Number(body.stock) : 0;
   const featured = body.featured ? 1 : 0;
-  const giftBox = category === "gift-boxes" || body.giftBox ? 1 : 0;
+  const giftBox = category === "podarunkovi-boksy" || category === "gift-boxes" || body.giftBox ? 1 : 0;
   const description = body.description || "";
   const now = Date.now();
+
+  const boxItems = body.boxItems !== undefined
+    ? (typeof body.boxItems === "string" ? body.boxItems : JSON.stringify(body.boxItems))
+    : (existing?.box_items || null);
 
   const isActive = body.isActive !== undefined ? (body.isActive ? 1 : 0) : (existing && existing.is_active !== undefined ? existing.is_active : 1);
   const features = body.features !== undefined ? String(body.features) : (existing?.features || "");
@@ -196,21 +198,21 @@ export function saveProduct(req, res) {
       UPDATE products SET
         slug = ?, name = ?, category = ?, weight = ?, price = ?,
         old_price = ?, stock = ?, reserved_stock = ?, is_active = ?, features = ?,
-        featured = ?, gift_box = ?, description = ?, image = ?, updated_at = ?
+        featured = ?, gift_box = ?, description = ?, image = ?, box_items = ?, updated_at = ?
       WHERE id = ?
     `).run(
       slug, name, category, weight, price, oldPrice, stock, reservedStock, isActive, features,
-      featured, giftBox, description, image, now, id
+      featured, giftBox, description, image, boxItems, now, id
     );
   } else {
     db.prepare(`
       INSERT INTO products (
         id, slug, name, category, weight, price, old_price, stock, reserved_stock, is_active, features,
-        featured, gift_box, description, image, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        featured, gift_box, description, image, box_items, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, slug, name, category, weight, price, oldPrice, stock, reservedStock, isActive, features,
-      featured, giftBox, description, image, now, now
+      featured, giftBox, description, image, boxItems, now, now
     );
   }
 
@@ -319,15 +321,20 @@ export function getDashboardStats(req, res) {
   const ordersThisWeek = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND created_at >= ?").get(startOfWeek).count;
   const ordersThisMonth = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND created_at >= ?").get(startOfMonth).count;
 
-  const newOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'NEW'").get().count;
-  const processingOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'PROCESSING'").get().count;
+  const newOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status IN ('NEW', 'AWAITING_PAYMENT')").get().count;
+  const pendingOrders = db.prepare(`
+    SELECT COUNT(*) as count FROM orders 
+    WHERE deleted_at IS NULL 
+      AND status IN ('NEW', 'CONFIRMED', 'COOKING', 'PREPARING', 'PROCESSING', 'AWAITING_PAYMENT', 'PAID', 'PACKED', 'SHIPMENT_CREATED')
+  `).get().count;
+  const processingOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status IN ('PROCESSING', 'CONFIRMED', 'COOKING', 'PREPARING')").get().count;
   const packedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'PACKED'").get().count;
   const shippedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'SHIPPED'").get().count;
-  const completedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'COMPLETED'").get().count;
+  const completedOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status IN ('COMPLETED', 'DELIVERED')").get().count;
   const cancelledOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE deleted_at IS NULL AND status = 'CANCELLED'").get().count;
 
   const totalRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE deleted_at IS NULL AND status != 'CANCELLED'").get().rev;
-  const completedRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE deleted_at IS NULL AND status = 'COMPLETED'").get().rev;
+  const completedRevenue = db.prepare("SELECT COALESCE(SUM(total), 0) as rev FROM orders WHERE deleted_at IS NULL AND status IN ('COMPLETED', 'DELIVERED')").get().rev;
 
   const activeOrdersCount = Math.max(totalOrders - cancelledOrders, 0);
   const averageCheck = activeOrdersCount > 0 ? Math.round(totalRevenue / activeOrdersCount) : 0;
@@ -337,9 +344,24 @@ export function getDashboardStats(req, res) {
   const newCustomers = db.prepare("SELECT COUNT(*) as count FROM customers WHERE total_orders = 1").get()?.count || 0;
   const repeatCustomers = db.prepare("SELECT COUNT(*) as count FROM customers WHERE total_orders > 1").get()?.count || 0;
 
-  // Recent 6 orders
+  // Inventory & Stock State
+  const inventory = {
+    totalProducts: db.prepare("SELECT COUNT(*) as count FROM products WHERE is_active = 1").get().count,
+    inStock: db.prepare("SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND (stock - reserved_stock) > 10").get().count,
+    lowStock: db.prepare("SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND (stock - reserved_stock) > 0 AND (stock - reserved_stock) <= 10").get().count,
+    outOfStock: db.prepare("SELECT COUNT(*) as count FROM products WHERE is_active = 1 AND (stock - reserved_stock) <= 0").get().count,
+    lowStockItems: db.prepare(`
+      SELECT id, name, category, stock, reserved_stock, (stock - reserved_stock) as available, price
+      FROM products
+      WHERE is_active = 1
+      ORDER BY available ASC
+      LIMIT 6
+    `).all(),
+  };
+
+  // Recent orders
   const recentOrders = db.prepare(`
-    SELECT id, number, status, total, customer_first_name, customer_last_name, tracking_number, delivery_service, created_at
+    SELECT id, number, order_code, status, total, customer_first_name, customer_last_name, tracking_number, delivery_service, delivery_city_name, created_at
     FROM orders
     WHERE deleted_at IS NULL
     ORDER BY created_at DESC
@@ -347,33 +369,73 @@ export function getDashboardStats(req, res) {
   `).all().map((o) => ({
     id: o.id,
     number: o.number,
+    orderCode: o.order_code || `GAL-${o.number}`,
     status: o.status,
     total: o.total,
     trackingNumber: o.tracking_number,
     deliveryService: o.delivery_service,
+    deliveryCity: o.delivery_city_name,
     customer: { firstName: o.customer_first_name, lastName: o.customer_last_name },
     createdAt: o.created_at,
   }));
 
   // Top products sold
   const topProducts = db.prepare(`
-    SELECT name, SUM(qty) as qty
-    FROM order_items
-    JOIN orders ON order_items.order_id = orders.id
-    WHERE orders.deleted_at IS NULL AND orders.status != 'CANCELLED'
-    GROUP BY name
+    SELECT oi.name, oi.product_id, SUM(oi.qty) as qty, SUM(oi.qty * oi.price) as revenue
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    WHERE o.deleted_at IS NULL AND o.status != 'CANCELLED'
+    GROUP BY oi.name
     ORDER BY qty DESC
-    LIMIT 5
+    LIMIT 6
   `).all();
 
-  // Last 10 orders for sales chart
-  const salesOrders = db.prepare(`
-    SELECT id, number, total, created_at
-    FROM orders
-    WHERE deleted_at IS NULL
-    ORDER BY created_at DESC
-    LIMIT 10
-  `).all();
+  // Dynamic Sales chart data: Day (last 7 days), Week (last 4 weeks), Month (last 6 months)
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const dayStart = d.getTime();
+    const dayEnd = dayStart + 86400000;
+    const label = d.toLocaleDateString("uk-UA", { weekday: "short", day: "numeric", month: "numeric" });
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(total), 0) as rev, COUNT(*) as orders_count
+      FROM orders
+      WHERE deleted_at IS NULL AND status != 'CANCELLED' AND created_at >= ? AND created_at < ?
+    `).get(dayStart, dayEnd);
+    days.push({ label, revenue: row.rev, count: row.orders_count });
+  }
+
+  const weeks = [];
+  for (let i = 3; i >= 0; i--) {
+    const wStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek + i * 7)).getTime();
+    const wEnd = wStart + 7 * 86400000;
+    const label = `Тижд ${4 - i}`;
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(total), 0) as rev, COUNT(*) as orders_count
+      FROM orders
+      WHERE deleted_at IS NULL AND status != 'CANCELLED' AND created_at >= ? AND created_at < ?
+    `).get(wStart, wEnd);
+    weeks.push({ label, revenue: row.rev, count: row.orders_count });
+  }
+
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const mDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mNext = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const label = mDate.toLocaleDateString("uk-UA", { month: "short" });
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(total), 0) as rev, COUNT(*) as orders_count
+      FROM orders
+      WHERE deleted_at IS NULL AND status != 'CANCELLED' AND created_at >= ? AND created_at < ?
+    `).get(mDate.getTime(), mNext.getTime());
+    months.push({ label, revenue: row.rev, count: row.orders_count });
+  }
+
+  const salesCharts = {
+    day: days,
+    week: weeks,
+    month: months,
+  };
 
   // Telegram logs (last 5)
   const telegramLogs = db.prepare(`
@@ -390,6 +452,7 @@ export function getDashboardStats(req, res) {
       ordersThisWeek,
       ordersThisMonth,
       newOrders,
+      pendingOrders,
       processingOrders,
       packedOrders,
       shippedOrders,
@@ -402,9 +465,10 @@ export function getDashboardStats(req, res) {
       newCustomers,
       repeatCustomers,
     },
+    inventory,
+    salesCharts,
     recentOrders,
     topProducts,
-    salesOrders,
     telegramLogs,
   });
 }

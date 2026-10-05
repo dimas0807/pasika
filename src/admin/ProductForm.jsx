@@ -8,15 +8,16 @@ const emptyProduct = {
   id: "",
   slug: "",
   name: "",
-  category: "honey",
-  weight: "",
+  category: "domashni-kovbasy",
+  weight: "1 кг",
   price: "",
   oldPrice: "",
-  stock: 10,
+  stock: 20,
   reservedStock: 0,
   isActive: true,
   featured: false,
   giftBox: false,
+  boxItems: [],
   description: "",
   image: "",
 };
@@ -31,6 +32,9 @@ export default function ProductForm() {
 
   const [form, setForm] = useState(() => (!isNew ? Products.byId(id) || emptyProduct : emptyProduct));
   const [categories, setCategories] = useState(() => Categories.all());
+  const [allProducts, setAllProducts] = useState([]);
+  const [selectedSubProdId, setSelectedSubProdId] = useState("");
+  const [selectedSubQty, setSelectedSubQty] = useState(1);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -40,6 +44,7 @@ export default function ProductForm() {
 
   useEffect(() => {
     Categories.fetchAll().then(setCategories);
+    Products.fetchAll().then((p) => p && setAllProducts(p));
     if (!isNew) {
       Products.fetchById(id).then((p) => {
         if (p) {
@@ -115,6 +120,36 @@ export default function ProductForm() {
     setForm((f) => ({ ...f, image: "" }));
   };
 
+  const addBoxItem = () => {
+    if (!selectedSubProdId) return;
+    const prod = allProducts.find((p) => p.id === selectedSubProdId);
+    if (!prod) return;
+    const currentItems = Array.isArray(form.boxItems) ? form.boxItems : [];
+    const existingIdx = currentItems.findIndex((i) => i.id === prod.id);
+    if (existingIdx >= 0) {
+      const next = [...currentItems];
+      next[existingIdx] = { ...next[existingIdx], qty: next[existingIdx].qty + Number(selectedSubQty) };
+      setForm((f) => ({ ...f, boxItems: next }));
+    } else {
+      setForm((f) => ({
+        ...f,
+        boxItems: [
+          ...currentItems,
+          { id: prod.id, name: prod.name, price: prod.price, qty: Number(selectedSubQty) || 1 },
+        ],
+      }));
+    }
+    setSelectedSubProdId("");
+    setSelectedSubQty(1);
+  };
+
+  const removeBoxItem = (idx) => {
+    setForm((f) => ({
+      ...f,
+      boxItems: (f.boxItems || []).filter((_, i) => i !== idx),
+    }));
+  };
+
   const save = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -122,12 +157,6 @@ export default function ProductForm() {
     const name = form.name.trim();
     if (!name) {
       setErrorMsg("Вкажіть назву товару");
-      return;
-    }
-
-    // MANDATORY PHOTO VALIDATION
-    if (!form.image || !form.image.trim()) {
-      setErrorMsg("Фото товару обов'язкове для збереження. Будь ласка, завантажте фото.");
       return;
     }
 
@@ -141,17 +170,20 @@ export default function ProductForm() {
 
     try {
       const slug = (form.slug || "").trim() || transliterateUa(name);
+      const isBox = form.category === "podarunkovi-boksy" || form.category === "gift-boxes" || Boolean(form.giftBox);
 
       const productPayload = {
         ...form,
         id: form.id || undefined,
         name,
         slug: transliterateUa(slug),
-        category: form.category || "honey",
+        category: form.category || "domashni-kovbasy",
         price,
+        image: form.image?.trim() || "",
         oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
         stock: Number.isInteger(Number(form.stock)) ? Number(form.stock) : 0,
-        giftBox: form.category === "gift-boxes" || form.giftBox,
+        giftBox: isBox,
+        boxItems: Array.isArray(form.boxItems) ? form.boxItems : [],
       };
 
       await Products.save(productPayload);
@@ -189,28 +221,28 @@ export default function ProductForm() {
         </div>
       )}
 
-      <form onSubmit={save} className="card p-6 sm:p-7 space-y-6 bg-white border border-ink/10 shadow-sm rounded-3xl">
-        {/* 1. ФОТО ТОВАРУ (ОБОВ'ЯЗКОВЕ) */}
+      <form onSubmit={save} className="card p-6 sm:p-7 space-y-6 bg-[#1C1A17] border border-[#3A332B] shadow-lg rounded-3xl text-[#F4EFEA]">
+        {/* 1. ФОТО ТОВАРУ */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-1.5">
-              <span>📷</span> Фото товару <span className="text-red-500">*</span>
+            <label className="text-xs font-bold text-[#FBF7EE] uppercase tracking-wider flex items-center gap-1.5">
+              <span>📷</span> Фото товару <span className="text-[#A89C8E] font-normal">(опціонально)</span>
             </label>
             {!hasPhoto ? (
-              <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
-                Фото обов'язкове
+              <span className="text-[11px] font-medium text-[#D1C7BD] bg-[#221D19] px-2.5 py-0.5 rounded-full border border-[#3A332B]">
+                Фото категорії за замовчуванням
               </span>
             ) : (
-              <span className="text-[11px] font-semibold text-leaf bg-leaf/10 px-2.5 py-0.5 rounded-full">
-                ✓ Фото завантажено
+              <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2.5 py-0.5 rounded-full">
+                ✓ Власне фото завантажено
               </span>
             )}
           </div>
 
           {hasPhoto ? (
             /* Uploaded Photo Preview Card */
-            <div className="p-4 rounded-2xl bg-cream/40 border border-ink/10 flex flex-col sm:flex-row items-center gap-4">
-              <div className="w-28 h-28 shrink-0 rounded-2xl overflow-hidden border border-ink/10 shadow-2xs bg-white">
+            <div className="p-4 rounded-2xl bg-[#221D19] border border-[#3A332B] flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-28 h-28 shrink-0 rounded-2xl overflow-hidden border border-[#3A332B] shadow-2xs bg-[#151311]">
                 <ProductImage
                   image={form.image}
                   category={form.category}
@@ -294,7 +326,7 @@ export default function ProductForm() {
                   </div>
                   <p className="text-xs text-ink/55 max-w-sm mx-auto">
                     Підтримуються формати: <span className="font-semibold text-ink">JPG, PNG, WEBP</span> (до 10 МБ).
-                    Фото є обов'язковим для публікації.
+                    Якщо фото не завантажено, буде показано стандартну ілюстрацію категорії.
                   </p>
                   <button
                     type="button"
@@ -317,7 +349,7 @@ export default function ProductForm() {
             className="input text-base font-medium"
             value={form.name}
             onChange={handleNameChange}
-            placeholder="Наприклад: Мед натуральний 500 г"
+            placeholder="Наприклад: Ковбаса домашня запечена 1 кг"
             required
           />
         </div>
@@ -440,7 +472,106 @@ export default function ProductForm() {
             />
             <span>Показувати на головній сторінці (рекомендований товар)</span>
           </label>
+
+          <label className="flex items-center gap-2.5 text-sm text-ink/80 font-medium cursor-pointer p-2 rounded-xl hover:bg-cream/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={form.category === "podarunkovi-boksy" || Boolean(form.giftBox)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setForm((f) => ({
+                  ...f,
+                  giftBox: checked,
+                  category: checked && f.category !== "podarunkovi-boksy" ? "podarunkovi-boksy" : f.category,
+                }));
+              }}
+              className="w-4 h-4 rounded text-bronze focus:ring-bronze"
+            />
+            <span>Подарунковий бокс (складається з набору делікатесів)</span>
+          </label>
         </div>
+
+        {/* Склад подарункового боксу */}
+        {(form.category === "podarunkovi-boksy" || form.giftBox) && (
+          <div className="p-5 rounded-2xl bg-[#FAF6EE] border border-gold/40 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-serif font-bold text-base text-ink flex items-center gap-2">
+                  <span>🎁</span> Склад подарункового боксу
+                </h3>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  Виберіть страви з каталогу, які входять у цей подарунковий набір
+                </p>
+              </div>
+            </div>
+
+            {/* Selector to add items */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value={selectedSubProdId}
+                onChange={(e) => setSelectedSubProdId(e.target.value)}
+                className="input flex-1 text-xs"
+              >
+                <option value="">-- Оберіть товар для додавання --</option>
+                {allProducts
+                  .filter((p) => p.id !== form.id && p.category !== "podarunkovi-boksy")
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.price} грн)
+                    </option>
+                  ))}
+              </select>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={selectedSubQty}
+                  onChange={(e) => setSelectedSubQty(Math.max(1, Number(e.target.value)))}
+                  className="input w-20 text-xs text-center"
+                  placeholder="К-сть"
+                />
+                <button
+                  type="button"
+                  onClick={addBoxItem}
+                  disabled={!selectedSubProdId}
+                  className="btn-secondary text-xs px-4 py-2 shrink-0 disabled:opacity-40"
+                >
+                  + Додати
+                </button>
+              </div>
+            </div>
+
+            {/* List of items in box */}
+            {Array.isArray(form.boxItems) && form.boxItems.length > 0 ? (
+              <div className="space-y-2 pt-2">
+                {form.boxItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-ink/10 text-xs"
+                  >
+                    <span className="font-semibold text-ink">
+                      • {item.name}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-ink/60 font-medium">{item.qty} шт</span>
+                      <button
+                        type="button"
+                        onClick={() => removeBoxItem(idx)}
+                        className="text-red-500 hover:text-red-700 font-bold px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-ink/50 italic">
+                У бокс поки не додано товарів. Додайте товари або клієнти бачитимуть загальний опис набору.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 7. РОЗКРИВНА СЕКЦІЯ: ДОДАТКОВІ НАЛАШТУВАННЯ (SLUG) */}
         <div className="pt-2 border-t border-ink/5">

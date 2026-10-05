@@ -8,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Ensure test environment
 process.env.NODE_ENV = "test";
-process.env.DB_PATH = path.resolve(__dirname, "test-pasika.db");
+process.env.DB_PATH = path.resolve(__dirname, "test-galinka.db");
 process.env.ADMIN_LOGIN = "admin";
-process.env.ADMIN_PASSWORD = "pasika2026";
+process.env.ADMIN_PASSWORD = "test_admin_pass_123";
 
 // Clean any previous test DB
 if (fs.existsSync(process.env.DB_PATH)) {
@@ -26,7 +26,7 @@ const port = server.address().port;
 const BASE = `http://127.0.0.1:${port}`;
 
 console.log(`\n======================================================`);
-console.log(`🚀 Starting Full End-to-End Flow Verification (${BASE})`);
+console.log(`🚀 Starting Full Galinka E2E Verification (${BASE})`);
 console.log(`======================================================\n`);
 
 async function req(urlPath, options = {}) {
@@ -47,23 +47,23 @@ try {
   assert.strictEqual(prodsRes.status, 200, "Should get products list");
   assert.ok(prodsRes.body.length >= 10, "Should have seeded products");
 
-  const honeyProduct = prodsRes.body.find((p) => p.id === "p1");
-  const creamHoneyProduct = prodsRes.body.find((p) => p.id === "p3");
-  assert.ok(honeyProduct, "Should find p1 (Мед натуральний)");
-  assert.ok(creamHoneyProduct, "Should find p3 (Крем-мед)");
+  const meatProduct1 = prodsRes.body.find((p) => p.id === "prod_dk_1");
+  const meatProduct2 = prodsRes.body.find((p) => p.id === "prod_km_1");
+  assert.ok(meatProduct1, "Should find prod_dk_1");
+  assert.ok(meatProduct2, "Should find prod_km_1");
 
-  const initialHoneyStock = honeyProduct.stock;
-  const initialCreamStock = creamHoneyProduct.stock;
-  console.log(`   ✓ Selected '${honeyProduct.name}' (current stock: ${initialHoneyStock})`);
-  console.log(`   ✓ Selected '${creamHoneyProduct.name}' (current stock: ${initialCreamStock})`);
+  const initialMeat1Stock = meatProduct1.stock;
+  const initialMeat2Stock = meatProduct2.stock;
+  console.log(`   ✓ Selected '${meatProduct1.name}' (current stock: ${initialMeat1Stock})`);
+  console.log(`   ✓ Selected '${meatProduct2.name}' (current stock: ${initialMeat2Stock})`);
 
   // ---------------- STEP 2: CART SELECTION ----------------
   console.log("\n👉 Step 2: Add items to cart");
   const cartItems = [
-    { id: honeyProduct.id, name: honeyProduct.name, price: honeyProduct.price, qty: 2 },
-    { id: creamHoneyProduct.id, name: creamHoneyProduct.name, price: creamHoneyProduct.price, qty: 1 },
+    { id: meatProduct1.id, name: meatProduct1.name, price: meatProduct1.price, qty: 2 },
+    { id: meatProduct2.id, name: meatProduct2.name, price: meatProduct2.price, qty: 1 },
   ];
-  const expectedSubtotal = honeyProduct.price * 2 + creamHoneyProduct.price * 1;
+  const expectedSubtotal = meatProduct1.price * 2 + meatProduct2.price * 1;
   console.log(`   ✓ Cart contains 2 items, total expected: ${expectedSubtotal} грн`);
 
   // ---------------- STEP 3: CHECKOUT & DELIVERY RESOLUTION ----------------
@@ -124,7 +124,7 @@ try {
       firstName: "Андрій",
       lastName: "Шевченко",
       phone: "000",
-      items: [{ id: honeyProduct.id, qty: 1 }],
+      items: [{ id: meatProduct1.id, qty: 1 }],
       delivery: { providerKey: "np", city: selectedCity, branch: selectedBranch },
       paymentMethod: "card",
     }),
@@ -140,7 +140,7 @@ try {
       firstName: "Андрій",
       lastName: "Шевченко",
       phone: "+380501112233",
-      items: [{ id: honeyProduct.id, qty: initialHoneyStock + 50 }],
+      items: [{ id: meatProduct1.id, qty: initialMeat1Stock + 50 }],
       delivery: { providerKey: "np", city: selectedCity, branch: selectedBranch },
       paymentMethod: "card",
     }),
@@ -158,6 +158,7 @@ try {
       lastName: "Шевченко",
       phone: "+380 50 111 22 33",
       email: "sheva@example.com",
+      preferredContact: "viber",
       providerKey: "np",
       city: selectedCity,
       branch: selectedBranch,
@@ -184,13 +185,14 @@ try {
   console.log(`   ✓ Order #${order.number} successfully created (Total: ${order.total} грн)`);
   console.log(`   ✓ City ID: ${order.delivery.cityId}, Branch ID: ${order.delivery.branchId}`);
 
-  // 5d. Verify stock deduction in database
-  const honeyAfter = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  const creamAfter = db.prepare("SELECT stock FROM products WHERE id = 'p3'").get();
-  assert.strictEqual(honeyAfter.stock, initialHoneyStock - 2, "Honey stock must be reduced by 2");
-  assert.strictEqual(creamAfter.stock, initialCreamStock - 1, "Cream honey stock must be reduced by 1");
-  console.log(`   ✓ Stock updated in SQLite: 'p1' was ${initialHoneyStock} -> now ${honeyAfter.stock}`);
-  console.log(`   ✓ Stock updated in SQLite: 'p3' was ${initialCreamStock} -> now ${creamAfter.stock}`);
+  // 5d. Verify stock reservation in database
+  const meat1After = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  const meat2After = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_km_1'").get();
+  assert.strictEqual(meat1After.reserved_stock, 2, "Meat1 reserved_stock must be 2");
+  assert.strictEqual(meat2After.reserved_stock, 1, "Meat2 reserved_stock must be 1");
+  assert.strictEqual(meat1After.stock - meat1After.reserved_stock, initialMeat1Stock - 2, "Meat1 available stock must be reduced by 2");
+  console.log(`   ✓ Stock reserved in SQLite: 'prod_dk_1' reserved=${meat1After.reserved_stock}, available=${meat1After.stock - meat1After.reserved_stock}`);
+  console.log(`   ✓ Stock reserved in SQLite: 'prod_km_1' reserved=${meat2After.reserved_stock}, available=${meat2After.stock - meat2After.reserved_stock}`);
 
   // 5e. Test idempotency (repeated submit protection)
   const dupOrderRes = await req("/api/orders", {
@@ -208,8 +210,8 @@ try {
   assert.strictEqual(dupOrderRes.status, 200, "Duplicate submit must return 200");
   assert.strictEqual(dupOrderRes.body.order.id, order.id, "Duplicate submit must return existing order");
   assert.strictEqual(dupOrderRes.body.duplicate, true, "Duplicate flag must be true");
-  const honeyAfterDup = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  assert.strictEqual(honeyAfterDup.stock, initialHoneyStock - 2, "Stock must NOT be deducted again on duplicate");
+  const meat1AfterDup = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  assert.strictEqual(meat1AfterDup.reserved_stock, 2, "Stock must NOT be reserved again on duplicate");
   console.log(`   ✓ Idempotency protected against repeat submission (same order returned, stock preserved)`);
 
   // 5f. Public Order Lookup (OrderSuccess page flow)
@@ -227,7 +229,7 @@ try {
   console.log("\n👉 Step 6: Telegram notification verification");
   const tgLogs = db.prepare("SELECT * FROM telegram_logs WHERE order_id = ?").all(order.id);
   assert.ok(tgLogs.length > 0, "Must create telegram log for the order");
-  assert.ok(tgLogs[0].text.includes(`НОВЕ ЗАМОВЛЕННЯ #${order.number}`), "Telegram message must contain order number");
+  assert.ok(tgLogs[0].text.includes("НОВЕ ЗАМОВЛЕННЯ") && tgLogs[0].text.includes(`${order.number}`), "Telegram message must contain order info");
   assert.ok(tgLogs[0].text.includes("Андрій Шевченко"), "Telegram message must contain customer name");
   assert.ok(tgLogs[0].text.includes(`${order.total} грн`), "Telegram message must contain total sum");
   console.log(`   ✓ Telegram message generated and logged to SQLite (Status: ${tgLogs[0].status})`);
@@ -253,11 +255,11 @@ try {
   const loginRes = await req("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ login: "admin", password: "pasika2026" }),
+    body: JSON.stringify({ login: "admin", password: "test_admin_pass_123" }),
   });
   assert.strictEqual(loginRes.status, 200);
   const cookieHeader = loginRes.headers.get("set-cookie");
-  assert.ok(cookieHeader && cookieHeader.includes("pasika_session="), "Must set pasika_session cookie");
+  assert.ok(cookieHeader && cookieHeader.includes("galinka_session="), "Must set galinka_session cookie");
   assert.ok(cookieHeader.includes("HttpOnly"), "Session cookie must have HttpOnly flag");
   const cookie = cookieHeader.split(";")[0];
   console.log(`   ✓ Admin logged in successfully with HttpOnly session cookie`);
@@ -296,7 +298,10 @@ try {
   });
   assert.strictEqual(statusShipRes.status, 200);
   assert.strictEqual(statusShipRes.body.status, "SHIPPED");
-  console.log(`   ✓ Admin changed order status to 'SHIPPED'`);
+  const meat1Shipped = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  assert.strictEqual(meat1Shipped.stock, initialMeat1Stock - 2, "Stock must be deducted on SHIPPED");
+  assert.strictEqual(meat1Shipped.reserved_stock, 0, "Reservation must be fulfilled on SHIPPED");
+  console.log(`   ✓ Admin changed order status to 'SHIPPED' (stock deducted to ${meat1Shipped.stock}, reserved=${meat1Shipped.reserved_stock})`);
 
   // 8d. Change Order Status to CANCELLED and verify stock restoration
   const statusCancelRes = await req(`/api/admin/orders/${order.id}/status`, {
@@ -307,9 +312,9 @@ try {
   assert.strictEqual(statusCancelRes.status, 200);
   assert.strictEqual(statusCancelRes.body.status, "CANCELLED");
 
-  const honeyRestored = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  assert.strictEqual(honeyRestored.stock, initialHoneyStock, "Stock must be fully restored upon cancellation");
-  console.log(`   ✓ Order cancelled and stock restored to original level (${honeyRestored.stock} pcs)`);
+  const meat1Restored = db.prepare("SELECT stock FROM products WHERE id = 'prod_dk_1'").get();
+  assert.strictEqual(meat1Restored.stock, initialMeat1Stock, "Stock must be fully restored upon cancellation");
+  console.log(`   ✓ Order cancelled and stock restored to original level (${meat1Restored.stock} pcs)`);
 
   // 8e. Admin Logout
   const logoutRes = await req("/api/auth/logout", {

@@ -107,37 +107,19 @@ export async function handleStartCommand(message, token) {
     payload: { text, date: message.date },
   });
 
-  // 2. Check if user is already an authorized recipient, or auto-register 287686358
+  // 2. Check if user is already an authorized recipient
   let recipient = getTelegramRecipientByChatId(chatId);
-  if (!recipient && (chatId === "287686358" || String(chatId).trim() === "287686358")) {
-    try {
-      const now = Date.now();
-      db.prepare(`
-        INSERT INTO telegram_recipients (id, name, username, chat_id, role, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-      `).run(
-        "tr_owner_287686358",
-        from.first_name ? `${from.first_name} ${from.last_name || ""}`.trim() : "Адміністратор PASIKA",
-        from.username ? `@${from.username}` : "@pasika_honey",
-        "287686358",
-        "owner",
-        now,
-        now
-      );
-      recipient = getTelegramRecipientByChatId(chatId);
-    } catch {}
-  }
 
-  // 3. Prepare response text matching the exact specification:
-  // 🐝 PASIKA — Замовлення
+  // 3. Prepare response text:
+  // 🥩 М'ЯСНИЙ РАЙ У ГАЛИНКИ — Замовлення
   // Бот підключений успішно ✅
   // Ви будете отримувати сповіщення про нові замовлення.
   const replyText = [
-    `🐝 <b>PASIKA — Замовлення</b>`,
+    `🥩 <b>М'ЯСНИЙ РАЙ У ГАЛИНКИ — Замовлення</b>`,
     ``,
-    `Бот підключений успішно ✅`,
-    ``,
-    `Ви будете отримувати сповіщення про нові замовлення.`,
+    recipient?.is_active
+      ? `Бот підключений успішно ✅\nВи будете отримувати сповіщення про нові замовлення магазину.`
+      : `Привіт! Ваш Chat ID: <code>${chatId}</code>\nДля отримання сповіщень додайте цей ID у розділі Налаштування в адмін-панелі сайту.`,
   ].join("\n");
 
   // 4. Send reply message if token is configured

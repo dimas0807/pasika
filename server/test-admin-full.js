@@ -1,6 +1,7 @@
-process.env.NODE_ENV = "test";
 import http from "node:http";
-import { app } from "./index.js";
+
+process.env.NODE_ENV = "test";
+const { app } = await import("./index.js");
 
 async function runFullAdminSuite() {
   console.log("🐝 Running Full Admin Panel Audit & Functional Verification Suite...\n");
@@ -30,7 +31,7 @@ async function runFullAdminSuite() {
 
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) {
-      const match = setCookie.match(/pasika_session=[^;]+/);
+      const match = setCookie.match(/(?:galinka_session|pasika_session)=[^;]+/);
       if (match) {
         if (setCookie.includes("Max-Age=0") || setCookie.includes("expires=")) {
           cookie = "";
@@ -56,25 +57,24 @@ async function runFullAdminSuite() {
     console.log("👉 1. Admin Login");
     const loginRes = await api("/api/auth/login", {
       method: "POST",
-      body: { login: "admin", password: "pasika2026" },
+      body: { login: "admin", password: process.env.ADMIN_PASSWORD || "galinka2026" },
     });
     if (!loginRes.ok) throw new Error("Login failed: " + JSON.stringify(loginRes.data));
     console.log("   ✓ Successfully logged in as admin with session cookie\n");
 
-    // 2. Mandatory Product Photo Validation (Should reject if image is missing)
-    console.log("👉 2. Product Photo Validation: Reject new product without photo");
+    // 2. Mandatory Product Name Validation (Should reject if name is missing)
+    console.log("👉 2. Product Name Validation: Reject new product without name");
     const badProdRes = await api("/api/admin/products", {
       method: "POST",
       body: {
-        name: "Мед без фото",
-        category: "honey",
+        name: "",
+        category: "domashni-kovbasy",
         price: 250,
         weight: "400 г",
-        // no image!
       },
     });
     if (badProdRes.status !== 400 || !badProdRes.data?.error) {
-      throw new Error(`Expected 400 rejection for missing photo, got ${badProdRes.status}: ${JSON.stringify(badProdRes.data)}`);
+      throw new Error(`Expected 400 rejection for missing name, got ${badProdRes.status}: ${JSON.stringify(badProdRes.data)}`);
     }
     console.log(`   ✓ Correctly rejected with 400: "${badProdRes.data.error}"\n`);
 
@@ -105,7 +105,7 @@ async function runFullAdminSuite() {
       method: "POST",
       body: {
         name: "Карпатський лісовий мед",
-        category: "honey",
+        category: "domashni-kovbasy",
         price: 320,
         weight: "500 г",
         stock: 15,

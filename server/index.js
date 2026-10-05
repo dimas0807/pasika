@@ -23,7 +23,7 @@ export const app = express();
 
 // Configure CORS for production frontend and local development
 const ALLOWED_ORIGINS = new Set([
-  "https://pasika12.pages.dev",
+  "https://galinka.pages.dev",
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.replace(/\/$/, "")] : []),
   ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN.replace(/\/$/, "")] : []),
 ]);
@@ -31,9 +31,9 @@ const ALLOWED_ORIGINS = new Set([
 const isOriginAllowed = (origin) => {
   if (!origin) return true; // Allow requests without Origin (same-origin, curl, server-to-server)
   if (ALLOWED_ORIGINS.has(origin)) return true;
-  // Allow Cloudflare Pages preview domains like https://xxx.pasika12.pages.dev
-  if (/^https:\/\/([a-z0-9-]+\.)?pasika12\.pages\.dev$/.test(origin)) return true;
-  // Allow Railway domains (e.g. https://pasika-production.up.railway.app, https://pasika-production-2926.up.railway.app)
+  // Allow Cloudflare Pages preview domains like https://xxx.pages.dev
+  if (/^https:\/\/([a-z0-9-]+\.)?pages\.dev$/.test(origin)) return true;
+  // Allow Railway / hosting domains
   if (/^https:\/\/([a-z0-9-]+\.)*railway\.app$/.test(origin)) return true;
   // Allow localhost & 127.0.0.1 development ports
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
@@ -96,7 +96,7 @@ app.use((err, _req, res, _next) => {
 // Start listening if run directly
 if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🍯 Honey Pasika backend server listening on http://0.0.0.0:${PORT}`);
+    console.log(`🥩 М'ясний рай у Галинки backend server listening on http://0.0.0.0:${PORT}`);
     console.log(`📦 Storage directory: ${STORAGE_DIR}`);
   });
 }

@@ -45,7 +45,7 @@ export class NovaPoshtaProvider extends DeliveryProvider {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "PasikaHoney/1.0",
+          "User-Agent": "GalinkaShop/1.0",
         },
         body: JSON.stringify({
           apiKey,

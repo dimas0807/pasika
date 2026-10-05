@@ -84,6 +84,9 @@ export function CartProvider({ children }) {
             category: product.category,
             qty: maxStock,
             availableStock: maxStock,
+            boxItems: product.boxItems || null,
+            isCustomBox: Boolean(product.isCustomBox),
+            description: product.description || "",
           },
         ];
       }
@@ -100,6 +103,9 @@ export function CartProvider({ children }) {
           category: product.category,
           qty,
           availableStock: maxStock,
+          boxItems: product.boxItems || null,
+          isCustomBox: Boolean(product.isCustomBox),
+          description: product.description || "",
         },
       ];
     });
@@ -143,7 +149,7 @@ export function CartProvider({ children }) {
       const data = await request("/api/products/validate-stock", {
         method: "POST",
         body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, qty: i.qty })),
+          items: items.map((i) => ({ id: i.isCustomBox ? "custom_box" : i.id, qty: i.qty })),
         }),
       });
 

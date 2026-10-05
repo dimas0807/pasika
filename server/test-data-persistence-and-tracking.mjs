@@ -1,7 +1,9 @@
+process.env.NODE_ENV = "test";
+
 import fs from "node:fs";
 import Database from "better-sqlite3";
-import { initDatabase, db, normalizePhone } from "./db.js";
-import {
+const { initDatabase, db, normalizePhone } = await import("./db.js");
+const {
   createOrder,
   getFullOrder,
   updateOrderStatus,
@@ -9,13 +11,13 @@ import {
   softDeleteOrder,
   restoreOrder,
   getAdminOrders,
-} from "./orders.js";
-import { getAdminCustomers, getAdminCustomerById } from "./customers.js";
-import { getDashboardStats } from "./products.js";
-import { createBackupFile, listBackups } from "./backup.js";
+} = await import("./orders.js");
+const { getAdminCustomers, getAdminCustomerById } = await import("./customers.js");
+const { getDashboardStats } = await import("./products.js");
+const { createBackupFile, listBackups } = await import("./backup.js");
 
 console.log("==================================================================");
-console.log("🐝 PASIKA DATA PERSISTENCE, DEDUPLICATION & TRACKING TEST SUITE");
+console.log("🥩 GALINKA DATA PERSISTENCE, DEDUPLICATION & TRACKING TEST SUITE");
 console.log("==================================================================\n");
 
 initDatabase();
@@ -53,7 +55,7 @@ async function runTests() {
     branch: "Відділення №5",
     providerKey: "np",
     paymentMethod: "cod",
-    items: [{ id: "p1", qty: 2 }],
+    items: [{ id: "prod_dk_1", qty: 2 }],
   });
   const res1 = mockRes();
   await createOrder(req1, res1);
@@ -86,7 +88,7 @@ async function runTests() {
     branch: "Відділення №1",
     providerKey: "np",
     paymentMethod: "cod",
-    items: [{ id: "p1", qty: 1 }],
+    items: [{ id: "prod_dk_1", qty: 1 }],
   });
   const resDedupA = mockRes();
   await createOrder(reqDedupA, resDedupA);
@@ -101,7 +103,7 @@ async function runTests() {
     branch: "Відділення №2",
     providerKey: "np",
     paymentMethod: "cod",
-    items: [{ id: "p2", qty: 1 }],
+    items: [{ id: "prod_km_1", qty: 1 }],
   });
   const resDedupB = mockRes();
   await createOrder(reqDedupB, resDedupB);

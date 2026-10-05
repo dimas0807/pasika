@@ -427,7 +427,7 @@ export default function CategoriesAdmin() {
                 <input
                   type="text"
                   required
-                  placeholder="наприклад, Квітковий мед"
+                  placeholder="наприклад, Копченості"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   className="input min-h-[44px]"

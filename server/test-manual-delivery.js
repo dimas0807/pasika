@@ -83,7 +83,7 @@ try {
     city: "Коростень (Житомирська)",
     branch: "Відділення №5",
     paymentMethod: "cod",
-    items: [{ id: "p1", qty: 1 }],
+    items: [{ id: "prod_dk_1", qty: 1 }],
     idempotencyKey: `test_np_${Date.now()}`,
     checkoutToken: `chk_np_${Date.now()}`,
   };
@@ -121,7 +121,7 @@ try {
     city: "Коростень (Житомирська)",
     branch: "Відділення 11500",
     paymentMethod: "cod",
-    items: [{ id: "p2", qty: 1 }],
+    items: [{ id: "prod_km_1", qty: 1 }],
     idempotencyKey: `test_up_${Date.now()}`,
     checkoutToken: `chk_up_${Date.now()}`,
   };

@@ -1,7 +1,7 @@
 import React from "react";
 
 /**
- * 🐝 PASIKA VECTOR ICON SYSTEM
+ * 🥩 GALINKA VECTOR ICON SYSTEM
  * Professional, clean SVG icons replacing emojis across the store interface.
  * Includes official brand marks for Nova Poshta & Ukrposhta.
  */

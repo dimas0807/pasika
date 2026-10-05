@@ -1,112 +1,879 @@
-// Cloudflare Pages Functions serverless edge API for Honey Pasika
-// Handles all /api/* routes on Cloudflare Pages production deployment
+// Cloudflare Pages Functions serverless edge API for М'ясний рай у Галинки
+// Handles all /api/* routes on Cloudflare Pages deployment
+// Supports optional reverse proxy to standalone backend via env.BACKEND_URL or env.API_URL,
+// and provides a complete standalone edge API with full Galinka store functionality.
 
-const DEFAULT_SECRET = "pasika_edge_secret_key_prod_2026_honey";
+const DEFAULT_SECRET = "galinka_edge_secret_key_prod_2026_secured";
 
 const SEED_CATEGORIES = [
-  { slug: "honey", name: "Мед", icon: "🍯" },
-  { slug: "cream-honey", name: "Крем-мед", icon: "🧈" },
-  { slug: "nuts-honey", name: "Горіхи в меді", icon: "🌰" },
-  { slug: "pollen", name: "Пилок", icon: "🌼" },
-  { slug: "propolis", name: "Прополіс", icon: "🟤" },
-  { slug: "perga", name: "Перга", icon: "🟡" },
-  { slug: "gift-boxes", name: "Подарункові бокси", icon: "🎁" },
+  {
+    "slug": "domashni-kovbasy",
+    "name": "Домашні ковбаси",
+    "icon": "🌭",
+    "sort_order": 1
+  },
+  {
+    "slug": "kopchene-myaso",
+    "name": "Копчене м’ясо",
+    "icon": "🥩",
+    "sort_order": 2
+  },
+  {
+    "slug": "kuryache-kopchene",
+    "name": "Куряче копчене",
+    "icon": "🍗",
+    "sort_order": 3
+  },
+  {
+    "slug": "vareni-kovbasy",
+    "name": "Варені ковбаси",
+    "icon": "🥓",
+    "sort_order": 4
+  },
+  {
+    "slug": "sardelky-ta-kovbasky",
+    "name": "Сардельки та ковбаски",
+    "icon": "🌭",
+    "sort_order": 5
+  },
+  {
+    "slug": "inshe",
+    "name": "Інше",
+    "icon": "🍲",
+    "sort_order": 6
+  },
+  {
+    "slug": "pashtetky",
+    "name": "Паштетки",
+    "icon": "🥫",
+    "sort_order": 7
+  },
+  {
+    "slug": "domashnye",
+    "name": "Домашнє",
+    "icon": "🧂",
+    "sort_order": 8
+  },
+  {
+    "slug": "podarunkovi-boksy",
+    "name": "Подарункові бокси",
+    "icon": "🎁",
+    "sort_order": 9
+  }
 ];
 
 const SEED_PRODUCTS = [
   {
-    id: "p1", slug: "med-naturalnyi-500g", name: "Мед натуральний", category: "honey",
-    weight: "500 г", price: 220, oldPrice: null, stock: 34, featured: 1, giftBox: 0,
-    description: "Натуральний квітковий мед з власної пасіки. Зібраний та розфасований вручну, без додавання цукру та консервантів.",
-    image: "honey-jar",
+    "id": "prod_dk_1",
+    "slug": "kovbasa-lupana-domashnya",
+    "name": "Ковбаса лупана (домашня)",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 450,
+    "oldPrice": null,
+    "stock": 45,
+    "featured": true,
+    "giftBox": false,
+    "description": "Справжня українська домашня ковбаса лупана за родинним рецептом. Натуральна оболонка, свіжа свинина, часник, духмяні прянощі та легке запікання.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p2", slug: "med-naturalnyi-1kg", name: "Мед натуральний", category: "honey",
-    weight: "1 кг", price: 380, oldPrice: 420, stock: 21, featured: 1, giftBox: 0,
-    description: "Натуральний квітковий мед з власної пасіки у зручній літровій банці — для родини або в подарунок.",
-    image: "honey-jar-big",
+    "id": "prod_dk_2",
+    "slug": "kovbasa-rublena-fileyna",
+    "name": "Ковбаса рублена (філейна)",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 420,
+    "oldPrice": null,
+    "stock": 40,
+    "featured": true,
+    "giftBox": false,
+    "description": "Соковита рублена ковбаса з добірного свинячого філе. Виразна м'ясна фактура, делікатні спеції та виняткова соковитість.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p3", slug: "krem-med-250g", name: "Крем-мед", category: "cream-honey",
-    weight: "250 г", price: 190, oldPrice: null, stock: 18, featured: 1, giftBox: 0,
-    description: "Ніжний крем-мед збитої текстури. Не кристалізується, легко намазується.",
-    image: "cream-honey",
+    "id": "prod_dk_3",
+    "slug": "kovbasa-rublena-klub-fileyka",
+    "name": "Ковбаса рублена (клуб + філейка)",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 400,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Апетитна рублена ковбаса з комбінації соковитої стегнової частини та ніжної філейки. Збалансований та гармонійний смак.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p4", slug: "horihy-v-medi-250g", name: "Горіхи в меді", category: "nuts-honey",
-    weight: "250 г", price: 260, oldPrice: null, stock: 14, featured: 1, giftBox: 0,
-    description: "Волоські горіхи, вимочені у натуральному меді. Смачний та корисний перекус.",
-    image: "nuts-honey",
+    "id": "prod_dk_4",
+    "slug": "kovbasa-rublena-lopatka",
+    "name": "Ковбаса рублена (лопатка)",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 380,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Класична домашня ковбаса з рубаної свинячої лопатки з додаванням часничку та меленого перцю за традиційним народним рецептом.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p5", slug: "kvitkovyi-pylok-100g", name: "Квітковий пилок", category: "pollen",
-    weight: "100 г", price: 140, oldPrice: null, stock: 25, featured: 0, giftBox: 0,
-    description: "Натуральні гранули квіткового пилку, зібрані бджолами на власній пасіці.",
-    image: "pollen",
+    "id": "prod_dk_5",
+    "slug": "kovbasa-melena-z-salom",
+    "name": "Ковбаса мелена (з салом)",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 360,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Ніжна домашня мелена ковбаска з апетитними вкрапленнями свіжого сала. Дуже соковита, запашна та ситна.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p6", slug: "propolis-20g", name: "Прополіс", category: "propolis",
-    weight: "20 г", price: 120, oldPrice: null, stock: 30, featured: 0, giftBox: 0,
-    description: "Натуральний бджолиний прополіс у шматочках.",
-    image: "propolis",
+    "id": "prod_dk_6",
+    "slug": "kovbasa-melena-bilshe-sala",
+    "name": "Ковбаса мелена більше сала",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 280,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": false,
+    "giftBox": false,
+    "description": "Ситна домашня ковбаса зі щедрим додаванням сала та часнику. Ідеально підходить для смаження на пательні або запікання з картоплею.",
+    "image": "kovbasa-domashnya"
   },
   {
-    id: "p7", slug: "perga-100g", name: "Перга", category: "perga",
-    weight: "100 г", price: 220, oldPrice: null, stock: 12, featured: 0, giftBox: 0,
-    description: "Бджолина перга — натуральний продукт пасіки у гранулах.",
-    image: "perga",
+    "id": "prod_dk_7",
+    "slug": "kovbasa-kuryacha-fileyna",
+    "name": "Ковбаса куряча філейна",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 380,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Дієтична та ніжна домашня ковбаса з чистих курячих грудок. Соковита, легка, без зайвого жиру, подобається дітям.",
+    "image": "kurochka"
   },
   {
-    id: "p8", slug: "box-medovyi", name: "Подарунковий бокс «Медовий»", category: "gift-boxes",
-    weight: "набір", price: 450, oldPrice: null, stock: 10, featured: 1, giftBox: 1,
-    description: "Крафтова коробка з медом, крем-медом та невеликим сюрпризом. Можливе персональне оформлення.",
-    image: "box-medovyi",
+    "id": "prod_dk_8",
+    "slug": "kovbasa-pechena-kuryacha",
+    "name": "Ковбаса печена куряча",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 450,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Печена в печі куряча ковбаса до рум'яної скоринки. Натуральне м'ясо птиці, легкі спеції та вишуканий аромат домашньої випічки.",
+    "image": "kurochka"
   },
+  {
+    "id": "prod_dk_9",
+    "slug": "kovbasa-pechena-svynya",
+    "name": "Ковбаса печена свиня",
+    "category": "domashni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 450,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Святкова печена домашня ковбаса зі свинини. Свіжий часник, сухі прянощі, золотиста оболонка та неперевершений смак свята.",
+    "image": "kovbasa-domashnya"
+  },
+  {
+    "id": "prod_km_1",
+    "slug": "balychok-kopchenyy",
+    "name": "Баличок копчений",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Найніжніший свинячий баличок помірного соління, копчений на сухій вільсі. М'яка волокниста текстура, тонкий аромат натурального димка.",
+    "image": "balyk"
+  },
+  {
+    "id": "prod_km_2",
+    "slug": "oshyyok-yak-shashlyk",
+    "name": "Ошийок (як шашлик)",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Мармуровий свинячий ошийок із насиченим смаком справжнього шашлику на дровах. Надзвичайно соковитий та ніжний.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_km_3",
+    "slug": "rulet-z-chornoslyvom",
+    "name": "Рулет з чорносливом",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Вишуканий м'ясний рулет гарячого копчення з начинкою із солодкого в'яленого чорносливу. Чудово прикрашає святковий стіл.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_km_4",
+    "slug": "rulet-z-kurahoyu",
+    "name": "Рулет з курагою",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": false,
+    "giftBox": false,
+    "description": "М'ясний делікатесний рулет із добірною курагою. Ніжне м'ясо з димком та пікантний фруктовий посмак.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_km_5",
+    "slug": "pidcherevyna-kopchena",
+    "name": "Підчеревина",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 450,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Багаті м'ясні прошарки, тануче сало та рум'яна копчена скоринка. Традиційне українське копчення на фруктових та вільхових дровах.",
+    "image": "pidcherevyna"
+  },
+  {
+    "id": "prod_km_6",
+    "slug": "salo-kopchene",
+    "name": "Сало копчене",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 250,
+    "oldPrice": null,
+    "stock": 40,
+    "featured": false,
+    "giftBox": false,
+    "description": "Ароматне сало гарячого копчення на дровах. М'яке, як масло, з гарним золотистим кольором та чистим димним запахом.",
+    "image": "salo"
+  },
+  {
+    "id": "prod_km_7",
+    "slug": "rebertsya-kopcheni",
+    "name": "Реберця",
+    "category": "kopchene-myaso",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "М'ясисті соковиті свинячі ребра гарячого копчення. Неперевершений аромат, смакують самостійно або до домашнього борщу.",
+    "image": "rebertsya"
+  },
+  {
+    "id": "prod_kk_1",
+    "slug": "kurka-kopchena",
+    "name": "Курка копчена",
+    "category": "kuryache-kopchene",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Ціла соковита курочка гарячого копчення на вільсі. Золотава хрумка шкірочка та ніжне, просочене димком м'ясо.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_kk_2",
+    "slug": "okorochok-kopchenyy",
+    "name": "Окорочок",
+    "category": "kuryache-kopchene",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 280,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Апетитний курячий окорочок гарячого копчення. Соковитий, м'який та з насиченим смаком домашнього диму.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_kk_3",
+    "slug": "kryla-kopcheni",
+    "name": "Крила",
+    "category": "kuryache-kopchene",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 280,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": false,
+    "giftBox": false,
+    "description": "Золотисті курячі крильця з делікатним копченням. Ідеальна закуска для компанії та святкового частування.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_kk_4",
+    "slug": "file-kuryache-kopchene",
+    "name": "Філе",
+    "category": "kuryache-kopchene",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 380,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Добірне копчене куряче філе без кісток та шкіри. М'яке, не сухе, з вишуканими прянощами.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_kk_5",
+    "slug": "rulety-kuryachi",
+    "name": "Рулети курячі",
+    "category": "kuryache-kopchene",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 380,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Ніжні домашні курячі рулети гарячого копчення. Тонко нарізаються для вишуканої м'ясної тарілки.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_vk_1",
+    "slug": "kovbasa-molochna",
+    "name": "Молочна",
+    "category": "vareni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 250,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Класична домашня молочна варена ковбаса. Ніжна кремова структура, натуральне молоко, свіже м'ясо без фосфатів.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_vk_2",
+    "slug": "kovbasa-nizhna",
+    "name": "Ніжна",
+    "category": "vareni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 200,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Легка варена ковбаса з помірною пряністю. Створена для легких сніданків, салатів та бутербродів.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_vk_3",
+    "slug": "kovbasa-fileyna-varena",
+    "name": "Філейна",
+    "category": "vareni-kovbasy",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Преміальна варена ковбаса з чистого філе. Пружна, м'ясна, бездоганна на смак.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_1",
+    "slug": "sardelky-molochni",
+    "name": "Молочні",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 250,
+    "oldPrice": null,
+    "stock": 40,
+    "featured": true,
+    "giftBox": false,
+    "description": "Соковиті домашні молочні сардельки у тонкій натуральній оболонці. При варінні лопаються соком.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_2",
+    "slug": "sardelky-nizhni",
+    "name": "Ніжні",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 200,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "М'які ніжні сардельки з відбірного фермерського м'яса зі свіжими приправами.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_3",
+    "slug": "sardelky-fileyni",
+    "name": "Філейні",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Сардельки вищого ґатунку з добірного філе. М'ясисті, пружні та надзвичайно смачні.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_4",
+    "slug": "pechinkovi-kovbasky",
+    "name": "Печінкові ковбаски",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 120,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": false,
+    "giftBox": false,
+    "description": "Традиційні домашні ковбаски зі свіжої печінки з цибулькою та спеціями за старовинним рецептом.",
+    "image": "pashtet"
+  },
+  {
+    "id": "prod_sk_5",
+    "slug": "liverna-kovbasa",
+    "name": "Ліверна ковбаса",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 120,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": false,
+    "giftBox": false,
+    "description": "Справжня домашня ліверна ковбаса з чистих натуральних складників. Ніжна текстура та багатий смак.",
+    "image": "pashtet"
+  },
+  {
+    "id": "prod_sk_6",
+    "slug": "sardelky-kopcheni",
+    "name": "Сардельки копчені",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 200,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Ароматні сардельки гарячого копчення на вільхових дровах. Хрумка натуральна оболонка та соковитий м'ясний смак.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_7",
+    "slug": "sardelky-tsyharky",
+    "name": "Сардельки цигарки",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 200,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Тонкі подовжені домашні ковбаски-цигарки. Зручний формат для швидкого перекусу чи смаження на вогні.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_sk_8",
+    "slug": "myslyvski-kovbasky",
+    "name": "Мисливські ковбаски",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 250,
+    "oldPrice": null,
+    "stock": 40,
+    "featured": true,
+    "giftBox": false,
+    "description": "Пікантні напівкопчені мисливські ковбаски з часником та чорним перцем. Пружні, з димним ароматом.",
+    "image": "kovbasa-kopchena"
+  },
+  {
+    "id": "prod_sk_9",
+    "slug": "kovbasky-khot-doh",
+    "name": "Ковбаски хот-дог",
+    "category": "sardelky-ta-kovbasky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 250,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": false,
+    "giftBox": false,
+    "description": "Спеціальні ніжні м'ясні ковбаски ідеальної форми для домашніх хот-догів та бутербродів.",
+    "image": "sardelky"
+  },
+  {
+    "id": "prod_in_1",
+    "slug": "shashlyk-kuryachyy-hryl",
+    "name": "Шашлик курячий (на грилі)",
+    "category": "inshe",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Замаринований за секретним родинним рецептом та обсмажений на грилі соковитий курячий шашлик.",
+    "image": "kurochka"
+  },
+  {
+    "id": "prod_in_2",
+    "slug": "shynka-svynyna-kurka",
+    "name": "Шинка (свинина + курка)",
+    "category": "inshe",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 400,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Соковита домашня шинка з добірної нежирної свинини та соковитої курки. Прекрасний візерунок на зрізі та делікатний смак.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_pt_1",
+    "slug": "pashtet-kuryachyy",
+    "name": "Курячий (філе + окорочок)",
+    "category": "pashtetky",
+    "weight": "350 г",
+    "unit": "шт",
+    "price": 220,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Ніжний кремовий паштет з курячого філе та окорочка, запечений з морквою, цибулею та вершковим маслом.",
+    "image": "pashtet"
+  },
+  {
+    "id": "prod_pt_2",
+    "slug": "pashtet-pechinkovyy-svynyachyy",
+    "name": "Печінковий свинячий (печінка + м’ясо)",
+    "category": "pashtetky",
+    "weight": "350 г",
+    "unit": "шт",
+    "price": 220,
+    "oldPrice": null,
+    "stock": 35,
+    "featured": true,
+    "giftBox": false,
+    "description": "Традиційний запечений паштет зі свіжої свинячої печінки та м'яса. Справжня домашня класика.",
+    "image": "pashtet"
+  },
+  {
+    "id": "prod_pt_3",
+    "slug": "saltyson-yazykovyy",
+    "name": "Сальтисон язиковий",
+    "category": "pashtetky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Шляхетний домашній сальтисон із відвареним свинячим язиком, часничком та духмяним перцем.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_pt_4",
+    "slug": "pechene-myaso",
+    "name": "Печене м’ясо",
+    "category": "pashtetky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Цілісний шматок свинини, запечений за традиційним домашнім рецептом до соковитості та золотої скоринки.",
+    "image": "balyk"
+  },
+  {
+    "id": "prod_pt_5",
+    "slug": "pechenyy-rulet",
+    "name": "Печений рулет",
+    "category": "pashtetky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": false,
+    "giftBox": false,
+    "description": "Домашній м'ясний рулет зі спеціями, повільно випечений у печі до ідеальної м'якості.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_pt_6",
+    "slug": "oshyyok-pechenyy",
+    "name": "Ошийок печений",
+    "category": "pashtetky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 480,
+    "oldPrice": null,
+    "stock": 25,
+    "featured": true,
+    "giftBox": false,
+    "description": "Соковитий свинячий ошийок тривалого запікання з часником та пряними травами.",
+    "image": "shynka"
+  },
+  {
+    "id": "prod_pt_7",
+    "slug": "kovbasovyy-syr",
+    "name": "Ковбасовий сир",
+    "category": "pashtetky",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 300,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": false,
+    "giftBox": false,
+    "description": "Натуральний копчений ковбасний сир із золотистою скоринкою та вершково-димним присмаком.",
+    "image": "kovbasa-kopchena"
+  },
+  {
+    "id": "prod_dm_1",
+    "slug": "salo-domashnye",
+    "name": "Сало",
+    "category": "domashnye",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 350,
+    "oldPrice": null,
+    "stock": 40,
+    "featured": true,
+    "giftBox": false,
+    "description": "Справжнє добірне українське домашнє сало сухого засолу з часничком, перцем та пряними спеціями.",
+    "image": "salo"
+  },
+  {
+    "id": "prod_dm_2",
+    "slug": "solonyna",
+    "name": "Солонина",
+    "category": "domashnye",
+    "weight": "1 кг",
+    "unit": "кг",
+    "price": 350,
+    "oldPrice": null,
+    "stock": 30,
+    "featured": true,
+    "giftBox": false,
+    "description": "Традиційна українська солонина витриманого сухого посолу. М'яка, пружна, неперевершено смакує з чорним хлібом.",
+    "image": "salo"
+  },
+  {
+    "id": "box_myasnyy",
+    "slug": "boks-myasnyy",
+    "name": "М’ясний бокс",
+    "category": "podarunkovi-boksy",
+    "weight": "набір (~2.5 кг)",
+    "unit": "набір",
+    "price": 1200,
+    "oldPrice": null,
+    "stock": 20,
+    "featured": true,
+    "giftBox": true,
+    "description": "Добірний асорті-бокс кращих м'ясних делікатесів: домашня ковбаса, баличок копчений, рулет та свіже сало у подарунковій крафтовій коробці.",
+    "image": "prod-gift-box",
+    "boxItems": "[{\"name\":\"Ковбаса лупана (домашня)\",\"qty\":1},{\"name\":\"Баличок копчений\",\"qty\":1},{\"name\":\"Сало копчене\",\"qty\":1}]"
+  },
+  {
+    "id": "box_do_svyata",
+    "slug": "boks-do-svyata",
+    "name": "Бокс до свята",
+    "category": "podarunkovi-boksy",
+    "weight": "набір (~3 кг)",
+    "unit": "набір",
+    "price": 1500,
+    "oldPrice": null,
+    "stock": 20,
+    "featured": true,
+    "giftBox": true,
+    "description": "Святковий набір до столу: ковбаса рублена філейна, ошийок (як шашлик), рулет з чорносливом та язиковий сальтисон.",
+    "image": "prod-gift-box",
+    "boxItems": "[{\"name\":\"Ковбаса рублена (філейна)\",\"qty\":1},{\"name\":\"Ошийок (як шашлик)\",\"qty\":1},{\"name\":\"Рулет з чорносливом\",\"qty\":1},{\"name\":\"Сальтисон язиковий\",\"qty\":1}]"
+  },
+  {
+    "id": "box_viyskovy",
+    "slug": "boks-dlya-viyskovoho",
+    "name": "Бокс для військового",
+    "category": "podarunkovi-boksy",
+    "weight": "набір (~2.8 кг)",
+    "unit": "набір",
+    "price": 1350,
+    "oldPrice": null,
+    "stock": 20,
+    "featured": true,
+    "giftBox": true,
+    "description": "Поживний, ситний та тривалого зберігання набір: домашня ковбаса, солонина, копчене сало, мисливські ковбаски та запечений паштет у вакуумній термоупаковці.",
+    "image": "prod-gift-box",
+    "boxItems": "[{\"name\":\"Ковбаса лупана (домашня)\",\"qty\":1},{\"name\":\"Солонина\",\"qty\":1},{\"name\":\"Сало копчене\",\"qty\":1},{\"name\":\"Мисливські ковбаски\",\"qty\":1},{\"name\":\"Печінковий свинячий\",\"qty\":1}]"
+  },
+  {
+    "id": "box_simeynyy",
+    "slug": "boks-simeynyy",
+    "name": "Сімейний бокс",
+    "category": "podarunkovi-boksy",
+    "weight": "набір (~3.2 кг)",
+    "unit": "набір",
+    "price": 1400,
+    "oldPrice": null,
+    "stock": 20,
+    "featured": true,
+    "giftBox": true,
+    "description": "Великий смачний набір для всієї родини: варена молочна ковбаса, курячий рулет, баличок, ніжні сардельки та паштет.",
+    "image": "prod-gift-box",
+    "boxItems": "[{\"name\":\"Молочна\",\"qty\":1},{\"name\":\"Баличок копчений\",\"qty\":1},{\"name\":\"Рулети курячі\",\"qty\":1},{\"name\":\"Молочні сардельки\",\"qty\":1},{\"name\":\"Курячий паштет\",\"qty\":1}]"
+  },
+  {
+    "id": "box_podarunkovyy",
+    "slug": "boks-podarunkovyy",
+    "name": "Подарунковий бокс",
+    "category": "podarunkovi-boksy",
+    "weight": "набір (~3.5 кг)",
+    "unit": "набір",
+    "price": 1600,
+    "oldPrice": null,
+    "stock": 20,
+    "featured": true,
+    "giftBox": true,
+    "description": "Преміальний набір делікатесів у святковому крафтовому пакуванні: баличок, печене м'ясо, рулет з курагою, ковбаса печена свиня та ковбасний сир.",
+    "image": "prod-gift-box",
+    "boxItems": "[{\"name\":\"Баличок копчений\",\"qty\":1},{\"name\":\"Печене м’ясо\",\"qty\":1},{\"name\":\"Рулет з курагою\",\"qty\":1},{\"name\":\"Ковбаса печена свиня\",\"qty\":1},{\"name\":\"Ковбасовий сир\",\"qty\":1}]"
+  },
+  {
+    "id": "custom_box",
+    "slug": "vlasnyy-podarunkovyy-boks",
+    "name": "Власний подарунковий бокс",
+    "category": "podarunkovi-boksy",
+    "weight": "набір",
+    "unit": "набір",
+    "price": 0,
+    "oldPrice": null,
+    "stock": 9999,
+    "featured": false,
+    "giftBox": true,
+    "description": "Індивідуальний подарунковий бокс, зібраний покупцем у нашому онлайн-конструкторі.",
+    "image": "prod-gift-box",
+    "boxItems": "[]"
+  }
 ];
 
 const DEFAULT_SETTINGS = {
   store: {
-    name: "Honey Pasika",
-    phone: "+380 67 835 23 11",
-    email: "hello@pasika-honey.ua",
-    address: "Прикарпаття, с. Новоселиця, Снятинський район",
-    workingHours: "Пн-Нд 09:00 - 20:00",
-    instagram: "@honey_pasika",
-    tiktok: "@honey.dsv",
-    telegram: "@pasika_honey",
-    description: "Натуральний мед та продукти бджільництва з родинної пасіки на Прикарпатті.",
+    name: "М'ясний рай у Галинки",
+    tagline: "Домашні ковбаси та копченості",
+    phone: "+380 68 025 78 77",
+    viber: "+380680257877",
+    tiktok: "@kopchonosti777",
+    telegram: "",
+    instagram: "",
+    facebook: "",
+    youtube: "",
+    workingHours: "Пн-Сб 09:00 - 19:00, Нд 10:00 - 16:00",
+    description: "Справжні домашні ковбаси, копченості, курочка, сало та паштети від Галинки. Натуральне копчення на дровах, перевірені домашні рецепти та швидка доставка Новою Поштою по всій Україні.",
   },
   about: {
-    title: "Родинна пасіка в серці Прикарпаття",
-    shortText: "Ми пасічники і дуже любимо родинну справу. Знаходимось на Прикарпатті, в селі Новоселиця Снятинського району.",
-    fullDescription: "Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів. З того часу любов до бджільництва виросла у власне сімейне виробництво натурального меду найвищої якості.",
-    foundationYear: "2014",
-    hivesCount: "100+",
-    location: "с. Новоселиця, Івано-Франківська обл.",
-    image: "/images/about-apiary.jpg",
+    title: "Домашні копченості з душею від Галинки",
+    shortText: "Мене звати Галина, і я готую для вас справжні домашні ковбаси та копченості. Тільки свіже добірне м'ясо, натуральні спеції та традиційне копчення на дровах.",
+    fullDescription: "Кожен шматочок маринується за перевіреними родинними рецептами без штучних барвників та консервантів. Наше копчення — виключно на дровах вільхи та фруктових дерев, що дає неповторний аромат та золотисту скоринку. Дякуємо нашій великій аудиторії в TikTok (понад 110 тисяч підписників) за довіру!",
+    followersCount: "110K+",
+    likesCount: "700K+",
+    foundationYear: "2020",
+    location: "Україна",
   },
   contacts: {
-    phone: "+380 67 835 23 11",
-    email: "hello@pasika-honey.ua",
-    telegram: "@pasika_honey",
-    viber: "+380 67 835 23 11",
-    instagram: "@honey_pasika",
+    phone: "+380 68 025 78 77",
+    viber: "+380680257877",
+    tiktok: "@kopchonosti777",
+    telegram: "",
+    instagram: "",
     facebook: "",
-    tiktok: "@honey.dsv",
-    pickupAddress: "Івано-Франківська обл., Снятинський р-н, с. Новоселиця",
-    pickupLat: "48.3341",
-    pickupLng: "25.2974",
+    youtube: "",
+    email: "",
+    pickupAddress: "",
   },
   payment: {
     bank: "monobank",
     card: "",
-    holder: "",
+    holder: "Галина",
     purpose: "Оплата замовлення",
-    instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення.",
+    instruction: "Після оформлення замовлення на сайті Галинка зв'яжеться з вами у Viber або за телефоном для узгодження деталей.",
   },
   delivery: {
     novaPoshtaEnabled: true,
-    ukrposhtaEnabled: true,
+    ukrposhtaEnabled: false,
+    international: {
+        "enabled": true,
+        "countries": "Польща, Німеччина, Чехія, Італія, Іспанія, Молдова, Литва, Латвія, Естонія, Румунія та інші країни Європи",
+        "deliveryMethod": "Міжнародний перевізник (Нова Пошта Global / Meest / адресний бус)",
+        "cost": "За тарифами міжнародного перевізника",
+        "terms": "5–10 робочих днів у вакуумній термоупаковці з холодоелементами",
+        "minOrderAmount": 1000,
+        "infoText": "Доставка за кордон здійснюється перевізниками (Нова Пошта Global, Meest або пряма адресна доставка). Усі м'ясні вироби герметично вакуюються та пакуються у термобокси з акумуляторами холоду, що гарантує збереження свіжості. Після оформлення замовлення наш менеджер зв'яжеться з вами у Viber або за телефоном для узгодження адреси, тарифу та найзручнішого способу відправки."
+    },
   },
   telegram: {
     botToken: "",
@@ -116,19 +883,21 @@ const DEFAULT_SETTINGS = {
 
 const SEED_ORDERS = [
   {
-    id: "ord_1001",
-    number: 1001,
-    orderCode: "PAS-1001",
-    order_code: "PAS-1001",
-    status: "DELIVERED",
-    total: 600,
-    createdAt: Date.now() - 3 * 86400000,
-    updatedAt: Date.now() - 86400000,
+    id: "ord_10001",
+    number: 10001,
+    orderCode: "GAL-10001",
+    order_code: "GAL-10001",
+    status: "CONFIRMED",
+    total: 990,
+    preferredContact: "viber",
+    preferred_contact: "viber",
+    createdAt: Date.now() - 3600000 * 2,
+    updatedAt: Date.now() - 3600000,
     customer: {
-      firstName: "Оксана",
-      lastName: "Мельник",
-      phone: "+380671234567",
-      email: "oksana@example.com",
+      firstName: "Олена",
+      lastName: "Коваленко",
+      phone: "+380680257877",
+      email: "",
     },
     delivery: {
       provider: "Нова пошта",
@@ -136,55 +905,6 @@ const SEED_ORDERS = [
       deliveryService: "Нова пошта",
       city: "Київ",
       branch: "Відділення №1 (вул. Пирогівський шлях, 135)",
-      trackingNumber: "20450123456789",
-      trackingUrl: "https://novaposhta.ua/tracking/?cargo_number=20450123456789",
-    },
-    payment: {
-      method: "card",
-      paymentMethod: "card",
-      methodLabel: "Оплачено карткою",
-      paymentStatus: "Оплачено",
-      status: "paid",
-      receiptStatus: "Підтверджено",
-      receipt: "attached",
-      receiptRequired: true,
-    },
-    receipt: {
-      fileUrl: "/images/receipt-demo.jpg",
-      name: "check_monobank_1001.pdf",
-    },
-    items: [
-      { id: "p1", name: "Мед натуральний", weight: "500 г", price: 220, qty: 1 },
-      { id: "p2", name: "Мед натуральний", weight: "1 кг", price: 380, qty: 1 },
-    ],
-    statusHistory: [
-      { fromStatus: "NEW", toStatus: "PAID", comment: "Оплату перевірено", changedBy: "admin", createdAt: Date.now() - 3 * 86400000 },
-      { fromStatus: "PAID", toStatus: "PACKED", comment: "Запаковано на пасіці", changedBy: "admin", createdAt: Date.now() - 2 * 86400000 },
-      { fromStatus: "PACKED", toStatus: "SHIPPED", comment: "Передано перевізнику", changedBy: "admin", createdAt: Date.now() - 86400000 },
-      { fromStatus: "SHIPPED", toStatus: "DELIVERED", comment: "Отримано клієнтом", changedBy: "admin", createdAt: Date.now() - 10000000 },
-    ],
-  },
-  {
-    id: "ord_1002",
-    number: 1002,
-    orderCode: "PAS-1002",
-    order_code: "PAS-1002",
-    status: "PROCESSING",
-    total: 450,
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 3600000,
-    customer: {
-      firstName: "Богдан",
-      lastName: "Кравчук",
-      phone: "+380509876543",
-      email: "bogdan@example.com",
-    },
-    delivery: {
-      provider: "Нова пошта",
-      providerKey: "np",
-      deliveryService: "Нова пошта",
-      city: "Львів",
-      branch: "Відділення №5",
       trackingNumber: null,
       trackingUrl: null,
     },
@@ -200,74 +920,21 @@ const SEED_ORDERS = [
     },
     receipt: null,
     items: [
-      { id: "p8", name: "Подарунковий бокс «Медовий»", weight: "набір", price: 450, qty: 1 },
+      { id: "p1", name: "Ковбаса домашня запечена", weight: "1 кг", price: 450, qty: 1 },
+      { id: "p3", name: "Шинка домашня копчена", weight: "1 кг", price: 540, qty: 1 },
     ],
     statusHistory: [
-      { fromStatus: "NEW", toStatus: "PROCESSING", comment: "Прийнято в роботу", changedBy: "admin", createdAt: Date.now() - 3600000 },
-    ],
-  },
-  {
-    id: "ord_1003",
-    number: 1003,
-    orderCode: "PAS-1003",
-    order_code: "PAS-1003",
-    status: "AWAITING_PAYMENT",
-    total: 260,
-    createdAt: Date.now() - 1800000,
-    updatedAt: Date.now() - 1800000,
-    customer: {
-      firstName: "Юлія",
-      lastName: "Ткаченко",
-      phone: "+380631234000",
-      email: "yulia@example.com",
-    },
-    delivery: {
-      provider: "Укрпошта",
-      providerKey: "up",
-      deliveryService: "Укрпошта",
-      city: "Івано-Франківськ",
-      branch: "Відділення 76018",
-      trackingNumber: null,
-      trackingUrl: null,
-    },
-    payment: {
-      method: "card",
-      paymentMethod: "card",
-      methodLabel: "Оплата на картку",
-      paymentStatus: "Очікує підтвердження",
-      status: "receipt_review",
-      receiptStatus: "Прикріплено",
-      receipt: "attached",
-      receiptRequired: true,
-    },
-    receipt: {
-      fileUrl: "/images/receipt-demo.jpg",
-      name: "receipt_yulia.jpg",
-    },
-    items: [
-      { id: "p4", name: "Горіхи в меді", weight: "250 г", price: 260, qty: 1 },
-    ],
-    statusHistory: [
-      { fromStatus: "NEW", toStatus: "AWAITING_PAYMENT", comment: "Очікує перевірки чека", changedBy: "system", createdAt: Date.now() - 1800000 },
+      { fromStatus: "NEW", toStatus: "CONFIRMED", comment: "Підтверджено у Viber", changedBy: "admin", createdAt: Date.now() - 3600000 },
     ],
   },
 ];
 
-// In-memory cache for edge runtime worker lifetime
+// In-memory cache for edge worker lifetime
 let memoryOrders = [...SEED_ORDERS];
 let memorySettings = { ...DEFAULT_SETTINGS };
 let memoryProducts = [...SEED_PRODUCTS];
 let memoryCategories = [...SEED_CATEGORIES];
-let memoryTelegramRecipients = [
-  {
-    id: "rec_default",
-    name: "Адміністратор",
-    chatId: "287686358",
-    role: "admin",
-    enabled: true,
-    createdAt: Date.now(),
-  },
-];
+let memoryTelegramRecipients = [];
 let memoryTelegramInteractions = [];
 let memoryDeliveryAccounts = [
   {
@@ -275,9 +942,9 @@ let memoryDeliveryAccounts = [
     name: "Нова Пошта (Основний акаунт)",
     provider: "np",
     apiKey: "",
-    senderName: "Пасіка Honey",
-    phone: "+380678352311",
-    cityName: "Новоселиця",
+    senderName: "М'ясний рай у Галинки",
+    phone: "+380680257877",
+    cityName: "Київ",
     warehouseName: "Відділення №1",
     isDefault: true,
     isActive: true,
@@ -310,9 +977,7 @@ function resolveEdgeUniqueSlug(baseSlug, productId = null) {
   let count = 2;
   while (true) {
     const existing = memoryProducts.find((p) => p.slug === slug && p.id !== productId);
-    if (!existing) {
-      return slug;
-    }
+    if (!existing) return slug;
     slug = `${baseSlug}-${count}`;
     count++;
   }
@@ -328,88 +993,16 @@ const NP_FALLBACK_CITIES = [
   { id: "db5c88f5-391c-11dd-90d9-001a92567626", name: "Одеса", fullName: "м. Одеса, Одеська обл.", area: "Одеська область", region: "Одеський р-н" },
   { id: "db5c88e0-391c-11dd-90d9-001a92567626", name: "Дніпро", fullName: "м. Дніпро, Дніпропетровська обл.", area: "Дніпропетровська область", region: "Дніпровський р-н" },
   { id: "db5c88c0-391c-11dd-90d9-001a92567626", name: "Харків", fullName: "м. Харків, Харківська обл.", area: "Харківська область", region: "Харківський р-н" },
-  { id: "db5c898c-391c-11dd-90d9-001a92567626", name: "Коростень", fullName: "м. Коростень, Житомирська обл.", area: "Житомирська область", region: "Коростенський р-н" },
   { id: "db5c8892-391c-11dd-90d9-001a92567626", name: "Івано-Франківськ", fullName: "м. Івано-Франківськ, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Івано-Франківський р-н" },
-  { id: "db5c8979-391c-11dd-90d9-001a92567626", name: "Коломия", fullName: "м. Коломия, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
-  { id: "db5c899c-391c-11dd-90d9-001a92567626", name: "Снятин", fullName: "м. Снятин, Івано-Франківська обл.", area: "Івано-Франківська область", region: "Коломийський р-н" },
-  { id: "db5c88f0-391c-11dd-90d9-001a92567626", name: "Житомир", fullName: "м. Житомир, Житомирська обл.", area: "Житомирська область", region: "Житомирський р-н" },
-  { id: "db5c888c-391c-11dd-90d9-001a92567626", name: "Вінниця", fullName: "м. Вінниця, Вінницька обл.", area: "Вінницька область", region: "Вінницький р-н" },
-  { id: "db5c88de-391c-11dd-90d9-001a92567626", name: "Запоріжжя", fullName: "м. Запоріжжя, Запорізька обл.", area: "Запорізька область", region: "Запорізький р-н" },
-  { id: "db5c88b7-391c-11dd-90d9-001a92567626", name: "Полтава", fullName: "м. Полтава, Полтавська обл.", area: "Полтавська область", region: "Полтавський р-н" },
-  { id: "db5c8914-391c-11dd-90d9-001a92567626", name: "Чернігів", fullName: "м. Чернігів, Чернігівська обл.", area: "Чернігівська область", region: "Чернігівський р-н" },
-  { id: "db5c88ac-391c-11dd-90d9-001a92567626", name: "Чернівці", fullName: "м. Чернівці, Чернівецька обл.", area: "Чернівецька область", region: "Чернівецький р-н" },
   { id: "db5c8901-391c-11dd-90d9-001a92567626", name: "Тернопіль", fullName: "м. Тернопіль, Тернопільська обл.", area: "Тернопільська область", region: "Тернопільський р-н" },
   { id: "db5c890a-391c-11dd-90d9-001a92567626", name: "Рівне", fullName: "м. Рівне, Рівненська обл.", area: "Рівненська область", region: "Рівненський р-н" },
   { id: "db5c891b-391c-11dd-90d9-001a92567626", name: "Луцьк", fullName: "м. Луцьк, Волинська обл.", area: "Волинська область", region: "Луцький р-н" },
-  { id: "db5c8928-391c-11dd-90d9-001a92567626", name: "Хмельницький", fullName: "м. Хмельницький, Хмельницька обл.", area: "Хмельницька область", region: "Хмельницький р-н" },
-  { id: "db5c8938-391c-11dd-90d9-001a92567626", name: "Черкаси", fullName: "м. Черкаси, Черкаська обл.", area: "Черкаська область", region: "Черкаський р-н" },
-  { id: "db5c8920-391c-11dd-90d9-001a92567626", name: "Суми", fullName: "м. Суми, Сумська обл.", area: "Сумська область", region: "Сумський р-н" },
-  { id: "db5c88aa-391c-11dd-90d9-001a92567626", name: "Кропивницький", fullName: "м. Кропивницький, Кіровоградська обл.", area: "Кіровоградська область", region: "Кропивницький р-н" },
-  { id: "db5c88f2-391c-11dd-90d9-001a92567626", name: "Миколаїв", fullName: "м. Миколаїв, Миколаївська обл.", area: "Миколаївська область", region: "Миколаївський р-н" },
   { id: "db5c8942-391c-11dd-90d9-001a92567626", name: "Ужгород", fullName: "м. Ужгород, Закарпатська обл.", area: "Закарпатська область", region: "Ужгородський р-н" },
-];
-
-const KOROSTEN_FALLBACK_BRANCHES = [
-  {
-    id: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
-    ref: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
-    number: "1",
-    name: "Відділення №1: вул. Героїв Чорнобиля, 7",
-    shortAddress: "вул. Героїв Чорнобиля, 7",
-    address: "м. Коростень, вул. Героїв Чорнобиля, 7",
-    category: "Branch",
-    type: "Вантажне (до 1100 кг)",
-  },
-  {
-    id: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
-    ref: "39fc9b4a-e1c2-11e3-8c4a-0050568002cf",
-    number: "2",
-    name: "Відділення №2: вул. Сосновського, 28",
-    shortAddress: "вул. Сосновського, 28",
-    address: "м. Коростень, вул. Сосновського, 28",
-    category: "Branch",
-    type: "Поштове (до 30 кг)",
-  },
-  {
-    id: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
-    ref: "4a3b8c21-f001-11e4-8c4a-0050568002cf",
-    number: "3",
-    name: "Відділення №3: вул. Грушевського, 43",
-    shortAddress: "вул. Грушевського, 43",
-    address: "м. Коростень, вул. Грушевського, 43",
-    category: "Branch",
-    type: "Поштове (до 30 кг)",
-  },
-  {
-    id: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
-    ref: "5b4c9d32-0112-11e5-8c4a-0050568002cf",
-    number: "4",
-    name: "Відділення №4: вул. Сергія Кемського, 11",
-    shortAddress: "вул. Сергія Кемського, 11",
-    address: "м. Коростень, вул. Сергія Кемського, 11",
-    category: "Branch",
-    type: "Поштове (до 30 кг)",
-  },
-  {
-    id: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
-    ref: "6c5d0e43-1223-11e6-8c4a-0050568002cf",
-    number: "2541",
-    name: "Поштомат №2541: вул. Грушевського, 26 (ТЦ «Місто»)",
-    shortAddress: "вул. Грушевського, 26",
-    address: "м. Коростень, вул. Грушевського, 26 (ТЦ «Місто»)",
-    category: "Postomat",
-    type: "Поштомат (до 20 кг)",
-  },
-  {
-    id: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
-    ref: "7d6e1f54-2334-11e7-8c4a-0050568002cf",
-    number: "2542",
-    name: "Поштомат №2542: вул. Шевченка, 8",
-    shortAddress: "вул. Шевченка, 8",
-    address: "м. Коростень, вул. Шевченка, 8",
-    category: "Postomat",
-    type: "Поштомат (до 20 кг)",
-  },
+  { id: "db5c88ac-391c-11dd-90d9-001a92567626", name: "Чернівці", fullName: "м. Чернівці, Чернівецька обл.", area: "Чернівецька область", region: "Чернівецький р-н" },
+  { id: "db5c888c-391c-11dd-90d9-001a92567626", name: "Вінниця", fullName: "м. Вінниця, Вінницька обл.", area: "Вінницька область", region: "Вінницький р-н" },
+  { id: "db5c88f0-391c-11dd-90d9-001a92567626", name: "Житомир", fullName: "м. Житомир, Житомирська обл.", area: "Житомирська область", region: "Житомирський р-н" },
+  { id: "db5c8938-391c-11dd-90d9-001a92567626", name: "Черкаси", fullName: "м. Черкаси, Черкаська обл.", area: "Черкаська область", region: "Черкаський р-н" },
+  { id: "db5c88b7-391c-11dd-90d9-001a92567626", name: "Полтава", fullName: "м. Полтава, Полтавська обл.", area: "Полтавська область", region: "Полтавський р-н" },
 ];
 
 async function callNovaPoshtaApi(modelName, calledMethod, methodProperties = {}, apiKey = NP_DEFAULT_API_KEY) {
@@ -420,7 +1013,7 @@ async function callNovaPoshtaApi(modelName, calledMethod, methodProperties = {},
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "PasikaHoney/1.0",
+        "User-Agent": "GalinkaShop/1.0",
       },
       body: JSON.stringify({
         apiKey,
@@ -449,15 +1042,11 @@ async function saveOrderToEdgeCache(order) {
         "Cache-Control": "max-age=86400",
       },
     });
-    if (order.id) {
-      await cache.put(`https://cache.internal/orders/${order.id}`, resp.clone());
-    }
-    if (order.orderCode) {
-      await cache.put(`https://cache.internal/orders/${order.orderCode.toLowerCase()}`, resp.clone());
-    }
-    if (order.number) {
-      await cache.put(`https://cache.internal/orders/pas-${order.number}`, resp.clone());
-    }
+    if (order.id) await cache.put(`https://cache.internal/orders/${order.id}`, resp.clone());
+    if (order.orderCode) await cache.put(`https://cache.internal/orders/${order.orderCode.toLowerCase()}`, resp.clone());
+    if (order.number) await cache.put(`https://cache.internal/orders/gal-${order.number}`, resp.clone());
+    const trackingNum = order.delivery?.trackingNumber || order.tracking_number;
+    if (trackingNum) await cache.put(`https://cache.internal/orders/${String(trackingNum).trim().toLowerCase()}`, resp.clone());
   } catch {}
 }
 
@@ -466,18 +1055,15 @@ async function getOrderFromEdgeCache(query) {
     const cache = caches.default;
     const lower = String(query).toLowerCase().trim();
     let res = await cache.match(`https://cache.internal/orders/${lower}`);
-    if (!res && !lower.startsWith("pas-") && Number(lower)) {
-      res = await cache.match(`https://cache.internal/orders/pas-${lower}`);
+    if (!res && !lower.startsWith("gal-") && Number(lower)) {
+      res = await cache.match(`https://cache.internal/orders/gal-${lower}`);
     }
-    if (res) {
-      return await res.json();
-    }
+    if (res) return await res.json();
   } catch {}
   return null;
 }
 
 // ---------------- Crypto & Security Helpers ----------------
-
 async function getHmacKey(secret) {
   const enc = new TextEncoder();
   return await crypto.subtle.importKey(
@@ -585,7 +1171,6 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
 }
 
 // ---------------- Main Edge Request Handler ----------------
-
 export async function onRequest(context) {
   const { request, env, params } = context;
   const url = new URL(request.url);
@@ -605,6 +1190,39 @@ export async function onRequest(context) {
     });
   }
 
+  // 1. OPTIONAL REVERSE PROXY TO STANDALONE BACKEND
+  // If BACKEND_URL is configured in Cloudflare Pages environment variables,
+  // proxy the request seamlessly to the Node.js backend
+  const backendUrl = env.BACKEND_URL || env.API_URL;
+  if (backendUrl && typeof backendUrl === "string" && backendUrl.startsWith("http")) {
+    try {
+      const target = new URL(backendUrl.replace(/\/$/, ""));
+      const forwardUrl = new URL(url.pathname + url.search, target.origin);
+      const reqHeaders = new Headers(request.headers);
+      reqHeaders.set("X-Forwarded-Host", url.host);
+      reqHeaders.set("X-Forwarded-Proto", url.protocol.replace(":", ""));
+
+      const forwardReq = new Request(forwardUrl.toString(), {
+        method: request.method,
+        headers: reqHeaders,
+        body: ["GET", "HEAD"].includes(method) ? undefined : request.body,
+        redirect: "follow",
+      });
+
+      const backendRes = await fetch(forwardReq);
+      const resHeaders = new Headers(backendRes.headers);
+      resHeaders.set("Access-Control-Allow-Origin", "*");
+      return new Response(backendRes.body, {
+        status: backendRes.status,
+        statusText: backendRes.statusText,
+        headers: resHeaders,
+      });
+    } catch (proxyErr) {
+      console.warn("[Cloudflare Pages Proxy Warning]:", proxyErr.message);
+      // Fall through to native edge handler if proxy fails
+    }
+  }
+
   // Parse path segments
   const catchall = params.catchall || [];
   const path = "/" + (Array.isArray(catchall) ? catchall.join("/") : String(catchall));
@@ -612,13 +1230,23 @@ export async function onRequest(context) {
   // Parse cookies & authentication
   const cookieHeader = request.headers.get("cookie") || "";
   const cookies = parseCookies(cookieHeader);
-  const sessionToken = cookies["pasika_session"];
-  const credToken = cookies["pasika_cred"];
+  const sessionToken = cookies["galinka_session"] || cookies["pasika_session"];
+  const credToken = cookies["galinka_cred"] || cookies["pasika_cred"];
 
   // Verify session if token exists
   let session = null;
   if (sessionToken) {
     const payload = await verifySignedData(sessionToken, secret);
+    if (payload && payload.exp && payload.exp > Date.now()) {
+      session = payload;
+    }
+  }
+
+  // Check Bearer token header fallback
+  const authHeader = request.headers.get("authorization") || "";
+  if (!session && authHeader.startsWith("Bearer ")) {
+    const bearerToken = authHeader.replace("Bearer ", "").trim();
+    const payload = await verifySignedData(bearerToken, secret);
     if (payload && payload.exp && payload.exp > Date.now()) {
       session = payload;
     }
@@ -638,16 +1266,15 @@ export async function onRequest(context) {
     }
   }
 
-  // Verify password function
   async function checkPassword(user, pass) {
     if (activeHash && activeSalt) {
       if (user !== activeUsername) return false;
       const hash = await hashPassword(pass, activeSalt);
       return hash === activeHash;
     }
-    // Fallback to default
     const expectedUser = env.ADMIN_LOGIN || "admin";
-    const expectedPass = env.ADMIN_PASSWORD || "pasika2026";
+    const expectedPass = env.ADMIN_PASSWORD;
+    if (!expectedPass) return false;
     return user === expectedUser && pass === expectedPass;
   }
 
@@ -655,7 +1282,12 @@ export async function onRequest(context) {
 
   // Health
   if (path === "/health") {
-    return jsonResponse({ ok: true, timestamp: Date.now(), runtime: "cloudflare-pages" });
+    return jsonResponse({
+      ok: true,
+      store: "М'ясний рай у Галинки",
+      timestamp: Date.now(),
+      runtime: "cloudflare-pages-edge",
+    });
   }
 
   // Auth: Login
@@ -676,8 +1308,8 @@ export async function onRequest(context) {
       const exp = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
       const token = await signData({ username, exp, iat: Date.now() }, secret);
 
-      const cookieVal = `pasika_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
-      return jsonResponse({ success: true, username }, 200, {
+      const cookieVal = `galinka_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+      return jsonResponse({ success: true, username, token }, 200, {
         "Set-Cookie": cookieVal,
       });
     } catch (err) {
@@ -695,7 +1327,7 @@ export async function onRequest(context) {
 
   // Auth: Logout
   if (path === "/auth/logout" && method === "POST") {
-    const clearCookie = `pasika_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+    const clearCookie = `galinka_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
     return jsonResponse({ success: true }, 200, {
       "Set-Cookie": clearCookie,
     });
@@ -705,6 +1337,7 @@ export async function onRequest(context) {
   if (path === "/products" && method === "GET") {
     return jsonResponse(memoryProducts);
   }
+
   if (path === "/products/validate-stock" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     const items = Array.isArray(body.items) ? body.items : [];
@@ -713,6 +1346,7 @@ export async function onRequest(context) {
     const adjustments = [];
 
     for (const item of items) {
+      if (item.id === "custom_box" || item.isCustomBox || String(item.id || "").startsWith("custom_box")) continue;
       const prod = memoryProducts.find((p) => p.id === (item.productId || item.id) || p.slug === item.slug);
       if (!prod) {
         valid = false;
@@ -737,12 +1371,14 @@ export async function onRequest(context) {
     }
     return jsonResponse({ valid, errors, adjustments });
   }
+
   if (path.startsWith("/products/id/") && method === "GET") {
     const id = path.replace("/products/id/", "");
     const prod = memoryProducts.find((p) => p.id === id);
     if (!prod) return jsonResponse({ error: "Товар не знайдено" }, 404);
     return jsonResponse(prod);
   }
+
   if (path.startsWith("/products/") && method === "GET") {
     const slug = path.replace("/products/", "");
     const prod = memoryProducts.find((p) => p.slug === slug);
@@ -766,28 +1402,11 @@ export async function onRequest(context) {
     return jsonResponse(publicSettings);
   }
 
-  // Delivery search
+  // Delivery Search
   if (path === "/delivery/cities" && method === "GET") {
-    const provider = url.searchParams.get("provider") || "np";
-    const q = (url.searchParams.get("query") || "").trim();
+    const q = (url.searchParams.get("query") || url.searchParams.get("search") || "").trim();
     if (!q) return jsonResponse([]);
 
-    if (provider === "up") {
-      const lower = q.toLowerCase();
-      const matched = NP_FALLBACK_CITIES.filter((c) =>
-        c.name.toLowerCase().includes(lower) ||
-        (c.fullName && c.fullName.toLowerCase().includes(lower))
-      ).map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.fullName || c.name,
-        area: c.area,
-        region: c.area,
-      }));
-      return jsonResponse(matched);
-    }
-
-    // Nova Poshta
     const apiKey = env?.NOVA_POSHTA_API_KEY || NP_DEFAULT_API_KEY;
     try {
       const data = await callNovaPoshtaApi("Address", "searchSettlements", {
@@ -813,7 +1432,6 @@ export async function onRequest(context) {
       }
     } catch {}
 
-    // Fallback list
     const lower = q.toLowerCase();
     const filtered = NP_FALLBACK_CITIES.filter((c) =>
       c.name.toLowerCase().includes(lower) ||
@@ -829,61 +1447,42 @@ export async function onRequest(context) {
     return jsonResponse(filtered);
   }
 
-  if (path === "/delivery/branches" && method === "GET") {
-    const provider = url.searchParams.get("provider") || "np";
-    const cityId = (url.searchParams.get("cityId") || "").trim();
+  if ((path === "/delivery/branches" || path === "/delivery/warehouses") && method === "GET") {
+    const cityId = (url.searchParams.get("cityId") || url.searchParams.get("cityRef") || "").trim();
     const cityName = (url.searchParams.get("cityName") || "").trim();
-    const search = (url.searchParams.get("search") || "").trim();
+    const search = (url.searchParams.get("search") || url.searchParams.get("query") || "").trim();
 
     if (!cityId && !cityName) return jsonResponse([]);
 
-    const isKorosten =
-      cityId.toLowerCase().includes("db5c898c") ||
-      cityName.toLowerCase().includes("коростень") ||
-      cityId.toLowerCase().includes("коростень");
+    const apiKey = env?.NOVA_POSHTA_API_KEY || NP_DEFAULT_API_KEY;
+    try {
+      const methodProps = { Limit: "100" };
+      if (cityId) methodProps.CityRef = cityId;
+      if (cityName && !methodProps.CityRef) methodProps.CityName = cityName;
+      if (search) methodProps.FindByString = search;
 
-    if (provider === "np") {
-      const apiKey = env?.NOVA_POSHTA_API_KEY || NP_DEFAULT_API_KEY;
-      try {
-        const methodProps = { Limit: "100" };
-        if (cityId) methodProps.CityRef = cityId;
-        if (cityName && !methodProps.CityRef) methodProps.CityName = cityName;
-        if (search) methodProps.FindByString = search;
-
-        const data = await callNovaPoshtaApi("AddressGeneral", "getWarehouses", methodProps, apiKey);
-        if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-          const list = data.data.map((w) => ({
-            id: w.Ref,
-            ref: w.Ref,
-            number: String(w.Number),
-            name: w.Description,
-            shortAddress: w.ShortAddress || "",
-            address: w.ShortAddress ? `${w.SettlementDescription || ""}, ${w.ShortAddress}` : w.Description,
-            category: w.CategoryOfWarehouse || (w.Description?.toLowerCase()?.includes("поштомат") ? "Postomat" : "Branch"),
-            type: w.TypeOfWarehouse,
-            cityName: w.SettlementDescription || "",
-            areaName: w.SettlementAreaDescription || "",
-          }));
-          return jsonResponse(list);
-        }
-      } catch {}
-
-      if (isKorosten) {
-        return jsonResponse(KOROSTEN_FALLBACK_BRANCHES);
+      const data = await callNovaPoshtaApi("AddressGeneral", "getWarehouses", methodProps, apiKey);
+      if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+        const list = data.data.map((w) => ({
+          id: w.Ref,
+          ref: w.Ref,
+          number: String(w.Number),
+          name: w.Description,
+          shortAddress: w.ShortAddress || "",
+          address: w.ShortAddress ? `${w.SettlementDescription || ""}, ${w.ShortAddress}` : w.Description,
+          category: w.CategoryOfWarehouse || (w.Description?.toLowerCase()?.includes("поштомат") ? "Postomat" : "Branch"),
+          type: w.TypeOfWarehouse,
+          cityName: w.SettlementDescription || "",
+          areaName: w.SettlementAreaDescription || "",
+        }));
+        return jsonResponse(list);
       }
-
-      // Default fallback branches
-      return jsonResponse([
-        { id: `np_${cityId || "c"}_1`, ref: `np_${cityId || "c"}_1`, number: "1", name: "Відділення №1: вул. Центральна, 1", shortAddress: "вул. Центральна, 1", address: "вул. Центральна, 1", category: "Branch" },
-        { id: `np_${cityId || "c"}_2`, ref: `np_${cityId || "c"}_2`, number: "2", name: "Відділення №2: вул. Соборна, 15", shortAddress: "вул. Соборна, 15", address: "вул. Соборна, 15", category: "Branch" },
-        { id: `np_${cityId || "c"}_3`, ref: `np_${cityId || "c"}_3`, number: "3", name: "Відділення №3: вул. Шевченка, 28", shortAddress: "вул. Шевченка, 28", address: "вул. Шевченка, 28", category: "Branch" },
-        { id: `np_${cityId || "c"}_pm1`, ref: `np_${cityId || "c"}_pm1`, number: "1051", name: "Поштомат №1051: просп. Миру, 10", shortAddress: "просп. Миру, 10", address: "просп. Миру, 10", category: "Postomat" },
-      ]);
-    }
+    } catch {}
 
     return jsonResponse([
-      { id: `up_${cityId || "c"}_1`, ref: `up_${cityId || "c"}_1`, number: "1", name: "Відділення 10001 (вул. Центральна, 1)", address: "вул. Центральна, 1" },
-      { id: `up_${cityId || "c"}_2`, ref: `up_${cityId || "c"}_2`, number: "2", name: "Відділення 10002 (вул. Соборна, 15)", address: "вул. Соборна, 15" },
+      { id: `np_${cityId || "c"}_1`, ref: `np_${cityId || "c"}_1`, number: "1", name: "Відділення №1: вул. Центральна, 1", shortAddress: "вул. Центральна, 1", address: "вул. Центральна, 1", category: "Branch" },
+      { id: `np_${cityId || "c"}_2`, ref: `np_${cityId || "c"}_2`, number: "2", name: "Відділення №2: вул. Соборна, 15", shortAddress: "вул. Соборна, 15", address: "вул. Соборна, 15", category: "Branch" },
+      { id: `np_${cityId || "c"}_pm1`, ref: `np_${cityId || "c"}_pm1`, number: "1001", name: "Поштомат №1001: вул. Шевченка, 20", shortAddress: "вул. Шевченка, 20", address: "вул. Шевченка, 20", category: "Postomat" },
     ]);
   }
 
@@ -892,20 +1491,20 @@ export async function onRequest(context) {
     try {
       const body = await request.json().catch(() => ({}));
 
-      // Flexible extraction: flat or nested
       const rawCustomer = body.customer || {};
       const rawDelivery = body.delivery || {};
       const rawPayment = body.payment || {};
 
-      const nameParts = (body.name || rawCustomer.name || body.fullName || rawCustomer.fullName || "").trim().split(/\s+/);
+      const nameParts = (body.customerName || body.name || rawCustomer.name || body.fullName || rawCustomer.fullName || "").trim().split(/\s+/);
       const firstName = (body.firstName || rawCustomer.firstName || nameParts[0] || "").trim();
       const lastName = (body.lastName || rawCustomer.lastName || nameParts.slice(1).join(" ") || "").trim();
       const rawPhone = body.phone || rawCustomer.phone || "";
       const email = (body.email || rawCustomer.email || "").trim();
+      const preferredContact = body.preferredContact || rawCustomer.preferredContact || "viber";
 
       const providerKey = body.providerKey || rawDelivery.providerKey || "np";
       const city = body.city || body.deliveryCity || rawDelivery.city || "";
-      const branch = body.branch || body.deliveryBranch || rawDelivery.branch || "";
+      const branch = body.branch || body.warehouse || body.deliveryBranch || rawDelivery.branch || "";
       const region = (body.region || body.deliveryRegion || rawDelivery.region || (typeof city === "object" ? (city.area || city.region) : "") || "").trim();
       const warehouseAddress = (body.warehouseAddress || body.deliveryWarehouseAddress || rawDelivery.warehouseAddress || (typeof branch === "object" ? (branch.address || branch.shortAddress) : "") || "").trim();
       const warehouseRef = (body.warehouseRef || body.deliveryWarehouseRef || rawDelivery.warehouseRef || body.branchRef || rawDelivery.branchId || (typeof branch === "object" ? (branch.ref || branch.id) : "") || "").trim();
@@ -972,11 +1571,12 @@ export async function onRequest(context) {
       const orderItems = [];
 
       for (const item of items) {
+        const itemId = item.id || item.productId;
         const qty = Number(item.qty != null ? item.qty : item.quantity);
-        if (!item.id || !Number.isInteger(qty) || qty <= 0) {
+        if (!itemId || !Number.isInteger(qty) || qty <= 0) {
           return jsonResponse({ error: "Некоректні товари у кошику" }, 400);
         }
-        const prod = memoryProducts.find((p) => p.id === item.id);
+        const prod = memoryProducts.find((p) => p.id === itemId);
         if (!prod) {
           return jsonResponse({ error: `Товар не знайдено` }, 400);
         }
@@ -986,7 +1586,6 @@ export async function onRequest(context) {
           }, 400);
         }
 
-        // Deduct stock
         prod.stock -= qty;
         calculatedTotal += prod.price * qty;
         orderItems.push({
@@ -998,8 +1597,8 @@ export async function onRequest(context) {
         });
       }
 
-      const orderNumber = 1000 + memoryOrders.length + 1;
-      const orderCode = `PAS-${orderNumber}`;
+      const orderNumber = 10000 + memoryOrders.length + 1;
+      const orderCode = `GAL-${orderNumber}`;
       const orderId = "ord_" + Date.now().toString(36) + "_" + Math.random().toString(36).substring(2, 7);
       const customerToken = "ctk_" + Math.random().toString(36).substring(2, 14);
 
@@ -1008,10 +1607,12 @@ export async function onRequest(context) {
         number: orderNumber,
         orderCode,
         order_code: orderCode,
-        status: "NEW",
+        status: isCard ? "AWAITING_PAYMENT" : "NEW",
         total: calculatedTotal,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        preferredContact,
+        preferred_contact: preferredContact,
         idempotencyKey: body.idempotencyKey || null,
         customer: {
           firstName,
@@ -1020,9 +1621,9 @@ export async function onRequest(context) {
           email: email || "",
         },
         delivery: {
-          provider: providerKey === "up" ? "Укрпошта" : "Нова пошта",
+          provider: "Нова пошта",
           providerKey,
-          deliveryService: providerKey === "up" ? "Укрпошта" : "Нова пошта",
+          deliveryService: "Нова пошта",
           city: cityName,
           cityId: body.cityRef || body.deliveryCityId || rawDelivery.cityId || null,
           region: region || null,
@@ -1059,6 +1660,7 @@ export async function onRequest(context) {
 
       memoryOrders.unshift(newOrder);
       await saveOrderToEdgeCache(newOrder);
+
       return jsonResponse({ success: true, order: newOrder, customerToken }, 201);
     } catch (err) {
       return jsonResponse({ error: err.message || "Помилка створення замовлення" }, 500);
@@ -1068,7 +1670,7 @@ export async function onRequest(context) {
   // Public Order Tracking
   if (path.startsWith("/orders/track/") && method === "GET") {
     const rawQuery = decodeURIComponent(path.replace("/orders/track/", "")).trim();
-    const cleanNum = Number(rawQuery.replace(/^PAS-/i, ""));
+    const cleanNum = Number(rawQuery.replace(/^(gal|pas)-/i, ""));
     const matchOrder = (o) =>
       String(o.id) === rawQuery ||
       (cleanNum && o.number === cleanNum) ||
@@ -1090,10 +1692,7 @@ export async function onRequest(context) {
     const trackingNumber = order.delivery?.trackingNumber || order.tracking_number || null;
     let trackingUrl = order.delivery?.trackingUrl || null;
     if (trackingNumber && !trackingUrl) {
-      const isUp = deliveryService.toLowerCase().includes("укр");
-      trackingUrl = isUp
-        ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(trackingNumber)}`
-        : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`;
+      trackingUrl = `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(trackingNumber)}`;
     }
 
     const deliveryObj = {
@@ -1115,10 +1714,10 @@ export async function onRequest(context) {
       found: true,
       id: order.id,
       number: order.number,
-      orderCode: order.orderCode || `PAS-${order.number}`,
-      order_code: order.orderCode || `PAS-${order.number}`,
+      orderCode: order.orderCode || `GAL-${order.number}`,
+      order_code: order.orderCode || `GAL-${order.number}`,
       status: order.status,
-      statusLabel: order.status === "DELIVERED" ? "Доставлено" : (order.status === "SHIPPED" ? "Відправлено" : "Нове"),
+      statusLabel: order.status === "DELIVERED" ? "Доставлено" : (order.status === "SHIPPED" ? "Відправлено" : "В обробці"),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       total: order.total,
@@ -1132,7 +1731,7 @@ export async function onRequest(context) {
       order: {
         id: order.id,
         number: order.number,
-        orderCode: order.orderCode || `PAS-${order.number}`,
+        orderCode: order.orderCode || `GAL-${order.number}`,
         status: order.status,
         createdAt: order.createdAt,
         total: order.total,
@@ -1142,9 +1741,10 @@ export async function onRequest(context) {
     });
   }
 
-  // Public Order Lookup
+  // Public Order Lookup by ID
   if (path.startsWith("/orders/") && method === "GET") {
     const id = path.replace("/orders/", "");
+    const matchOrder = (o) => o.id === id || o.orderCode === id || o.order_code === id;
     let order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
     if (!order) {
       order = await getOrderFromEdgeCache(id);
@@ -1154,7 +1754,7 @@ export async function onRequest(context) {
     return jsonResponse(order);
   }
 
-  // File Upload
+  // File Upload (Receipts)
   if (path === "/upload-receipt" && method === "POST") {
     try {
       const contentType = request.headers.get("content-type") || "";
@@ -1168,37 +1768,12 @@ export async function onRequest(context) {
       }
 
       const lowerName = file.name.toLowerCase();
-      const validExts = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
-      const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
-      const isMimeValid =
-        file.type === "image/jpeg" ||
-        file.type === "image/png" ||
-        file.type === "image/webp" ||
-        file.type === "application/pdf" ||
-        file.type.startsWith("image/");
-
-      if (!isExtValid && !isMimeValid) {
-        return jsonResponse({ error: "Дозволено лише файли форматів JPG, PNG, WEBP або PDF" }, 400);
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        return jsonResponse({ error: "Розмір файлу не повинен перевищувати 10 МБ" }, 400);
-      }
-
       const ext = lowerName.match(/\.[a-z0-9]+$/)?.[0] || ".jpg";
       const filename = `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
       const fileUrl = `/uploads/receipts/${filename}`;
 
       const bytes = await file.arrayBuffer();
-      const mimeType =
-        file.type ||
-        (ext === ".pdf"
-          ? "application/pdf"
-          : ext === ".png"
-          ? "image/png"
-          : ext === ".webp"
-          ? "image/webp"
-          : "image/jpeg");
+      const mimeType = file.type || "application/octet-stream";
 
       const record = {
         bytes,
@@ -1209,7 +1784,6 @@ export async function onRequest(context) {
         createdAt: Date.now(),
       };
       memoryReceipts.set(filename, record);
-      // Also map by original name e.g. IMG_1524.png
       memoryReceipts.set(file.name, record);
 
       return jsonResponse({
@@ -1222,7 +1796,7 @@ export async function onRequest(context) {
     }
   }
 
-  // Secure receipt access
+  // Secure Receipt File Access
   if (
     (path.startsWith("/receipts/") ||
       path.startsWith("/uploads/receipts/") ||
@@ -1237,7 +1811,6 @@ export async function onRequest(context) {
     if (filename.includes("/")) filename = filename.split("/")[0];
     const decodedFilename = decodeURIComponent(filename);
 
-    // 1. Authentication check: Admin session or token
     const token = (
       url.searchParams.get("token") ||
       request.headers.get("x-customer-token") ||
@@ -1245,39 +1818,21 @@ export async function onRequest(context) {
       ""
     ).trim();
 
-    let isAuthorized = !!session; // Admin session
+    let isAuthorized = !!session;
     if (!isAuthorized && token) {
       const matchOrder = memoryOrders.find(
         (o) =>
           o.customerToken === token &&
-          (o.receipt?.fileUrl?.includes(filename) ||
-            o.receipt?.name === decodedFilename)
+          (o.receipt?.fileUrl?.includes(filename) || o.receipt?.name === decodedFilename)
       );
-      if (matchOrder) {
-        isAuthorized = true;
-      }
+      if (matchOrder) isAuthorized = true;
     }
 
     if (!isAuthorized) {
       return jsonResponse({ error: "Доступ до чека заборонено: необхідна авторизація" }, 403);
     }
 
-    // 2. Lookup receipt item
-    let receiptItem =
-      memoryReceipts.get(filename) ||
-      memoryReceipts.get(decodedFilename);
-
-    if (!receiptItem) {
-      const order = memoryOrders.find(
-        (o) =>
-          o.receipt?.name === decodedFilename ||
-          o.receipt?.fileUrl?.endsWith(filename)
-      );
-      if (order?.receipt?.filename) {
-        receiptItem = memoryReceipts.get(order.receipt.filename);
-      }
-    }
-
+    const receiptItem = memoryReceipts.get(filename) || memoryReceipts.get(decodedFilename);
     if (receiptItem && receiptItem.bytes) {
       return new Response(receiptItem.bytes, {
         status: 200,
@@ -1289,17 +1844,12 @@ export async function onRequest(context) {
       });
     }
 
-    // If file is physically absent
     return jsonResponse({ error: "Файл чека недоступний" }, 404);
   }
 
   // Product Image Upload
   if (path === "/upload-product-image" && method === "POST") {
     try {
-      const contentType = request.headers.get("content-type") || "";
-      if (!contentType.includes("multipart/form-data")) {
-        return jsonResponse({ error: "Очікується multipart/form-data запит" }, 400);
-      }
       const formData = await request.formData();
       const file = formData.get("file") || formData.get("image");
       if (!file || typeof file === "string") {
@@ -1307,21 +1857,6 @@ export async function onRequest(context) {
       }
 
       const lowerName = file.name.toLowerCase();
-      const validExts = [".jpg", ".jpeg", ".png", ".webp"];
-      const isExtValid = validExts.some((ext) => lowerName.endsWith(ext));
-      const isMimeValid =
-        file.type === "image/jpeg" ||
-        file.type === "image/png" ||
-        file.type === "image/webp";
-
-      if (!isExtValid && !isMimeValid) {
-        return jsonResponse({ error: "Дозволено лише файли форматів JPG, PNG або WEBP" }, 400);
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        return jsonResponse({ error: "Розмір файлу не повинен перевищувати 10 МБ" }, 400);
-      }
-
       const ext = lowerName.match(/\.[a-z0-9]+$/)?.[0] || ".jpg";
       const filename = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
       const fileUrl = `/uploads/products/${filename}`;
@@ -1340,7 +1875,7 @@ export async function onRequest(context) {
     }
   }
 
-  // Serve product images
+  // Serve Product Images
   if (path.startsWith("/uploads/products/") && method === "GET") {
     const filename = path.replace("/uploads/products/", "");
     const item = memoryProductImages.get(filename);
@@ -1354,16 +1889,30 @@ export async function onRequest(context) {
       });
     }
     return new Response(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="100%" height="100%" fill="#FAF6EE"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#D99A19">🐝 Honey Pasika</text></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="100%" height="100%" fill="#1F1D1B"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#E5A93C">🥩 М'ясний рай у Галинки</text></svg>`,
       { status: 200, headers: { "Content-Type": "image/svg+xml; charset=utf-8" } }
     );
   }
 
   // ---------------- Protected Admin Endpoints ----------------
-
   if (path.startsWith("/admin")) {
     if (!session) {
       return jsonResponse({ error: "Необхідна авторизація" }, 401);
+    }
+
+    async function findOrder(targetId) {
+      if (!targetId) return null;
+      let found = memoryOrders.find((o) => o.id === targetId || o.orderCode === targetId || o.order_code === targetId);
+      if (!found) {
+        found = SEED_ORDERS.find((o) => o.id === targetId || o.orderCode === targetId || o.order_code === targetId);
+      }
+      if (!found) {
+        found = await getOrderFromEdgeCache(targetId);
+        if (found && !memoryOrders.some((o) => o.id === found.id)) {
+          memoryOrders.unshift(found);
+        }
+      }
+      return found;
     }
 
     // Admin Security Settings Update (Username & Password)
@@ -1400,7 +1949,6 @@ export async function onRequest(context) {
           newHash = await hashPassword(newPassword, newSalt);
         }
 
-        // Generate updated credentials cookie
         const credTokenUpdated = await signData(
           {
             username: updatedUsername,
@@ -1411,15 +1959,14 @@ export async function onRequest(context) {
           secret
         );
 
-        // Generate updated session
         const exp = Date.now() + 7 * 24 * 60 * 60 * 1000;
         const sessionTokenUpdated = await signData(
           { username: updatedUsername, exp, iat: Date.now() },
           secret
         );
 
-        const cookieSession = `pasika_session=${sessionTokenUpdated}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
-        const cookieCred = `pasika_cred=${credTokenUpdated}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`;
+        const cookieSession = `galinka_session=${sessionTokenUpdated}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+        const cookieCred = `galinka_cred=${credTokenUpdated}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`;
 
         return new Response(
           JSON.stringify({
@@ -1449,7 +1996,7 @@ export async function onRequest(context) {
       const ordersThisWeek = memoryOrders.length;
       const ordersThisMonth = memoryOrders.length;
       const newOrders = memoryOrders.filter((o) => o.status === "NEW").length;
-      const processingOrders = memoryOrders.filter((o) => o.status === "PROCESSING").length;
+      const processingOrders = memoryOrders.filter((o) => o.status === "PROCESSING" || o.status === "CONFIRMED" || o.status === "COOKING").length;
       const packedOrders = memoryOrders.filter((o) => o.status === "PACKED").length;
       const shippedOrders = memoryOrders.filter((o) => o.status === "SHIPPED").length;
       const completedOrders = memoryOrders.filter((o) => o.status === "COMPLETED").length;
@@ -1498,302 +2045,54 @@ export async function onRequest(context) {
     if (path === "/admin/orders" && method === "GET") {
       const status = url.searchParams.get("status");
       const isDeleted = url.searchParams.get("deleted") === "true";
-      let list = memoryOrders.filter((o) => (isDeleted ? Boolean(o.deleted_at) : !o.deleted_at));
+      let list = memoryOrders.filter((o) => (isDeleted ? Boolean(o.deletedAt) : !o.deletedAt));
       if (status && status !== "all") {
         list = list.filter((o) => o.status === status);
       }
       return jsonResponse(list);
     }
-    if (path.startsWith("/admin/orders/") && path.endsWith("/tracking") && method === "PATCH") {
-      const id = path.replace("/admin/orders/", "").replace("/tracking", "");
-      const body = await request.json().catch(() => ({}));
-      const idx = memoryOrders.findIndex((o) => o.id === id);
-      if (idx >= 0) {
-        const o = memoryOrders[idx];
-        o.tracking_number = body.trackingNumber || "";
-        o.delivery_service = body.deliveryService || "Нова пошта";
-        o.status = "SHIPPED";
-        o.shipped_at = Date.now();
-        if (!o.delivery) o.delivery = {};
-        o.delivery.trackingNumber = o.tracking_number;
-        o.delivery.deliveryService = o.delivery_service;
-        o.delivery.shippedAt = o.shipped_at;
-        const trackUrl = o.delivery_service.toLowerCase().includes("укр")
-          ? `https://track.ukrposhta.ua/tracking_UA.html?barcode=${encodeURIComponent(o.tracking_number)}`
-          : `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(o.tracking_number)}`;
-        o.delivery.trackingUrl = trackUrl;
-        return jsonResponse(o);
-      }
-      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-    }
+
     if (path.startsWith("/admin/orders/") && path.endsWith("/status") && method === "PATCH") {
       const id = path.replace("/admin/orders/", "").replace("/status", "");
       const body = await request.json().catch(() => ({}));
-      const idx = memoryOrders.findIndex((o) => o.id === id);
-      if (idx >= 0) {
-        memoryOrders[idx].status = body.status;
-        if (!memoryOrders[idx].statusHistory) memoryOrders[idx].statusHistory = [];
-        memoryOrders[idx].statusHistory.push({
-          fromStatus: memoryOrders[idx].status,
-          toStatus: body.status,
-          comment: body.comment || null,
-          changedBy: "admin",
-          createdAt: Date.now(),
-        });
-        return jsonResponse(memoryOrders[idx]);
-      }
-      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-    }
-    if (path.startsWith("/admin/orders/") && path.endsWith("/restore") && method === "POST") {
-      const id = path.replace("/admin/orders/", "").replace("/restore", "");
-      const idx = memoryOrders.findIndex((o) => o.id === id);
-      if (idx >= 0) {
-        memoryOrders[idx].deleted_at = null;
-        memoryOrders[idx].isDeleted = false;
-        return jsonResponse({ success: true, order: memoryOrders[idx] });
-      }
-      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-    }
-    if (path.startsWith("/admin/orders/") && method === "DELETE") {
-      const id = path.replace("/admin/orders/", "");
-      const idx = memoryOrders.findIndex((o) => o.id === id);
-      if (idx >= 0) {
-        memoryOrders[idx].deleted_at = Date.now();
-        memoryOrders[idx].deletedAt = memoryOrders[idx].deleted_at;
-        memoryOrders[idx].isDeleted = true;
-        return jsonResponse({ success: true });
-      }
-      return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-    }
-    if (path.startsWith("/admin/orders/") && path.endsWith("/confirm-payment") && method === "POST") {
-      const id = path.replace("/admin/orders/", "").replace("/confirm-payment", "");
-      let idx = memoryOrders.findIndex((o) => o.id === id || String(o.number) === id || o.orderCode === id);
-      if (idx < 0) {
-        const seed = SEED_ORDERS.find((o) => o.id === id || String(o.number) === id || o.orderCode === id);
-        if (seed) {
-          memoryOrders.unshift({ ...seed });
-          idx = 0;
-        }
-      }
-      if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-      memoryOrders[idx].status = "PAID";
-      memoryOrders[idx].updatedAt = Date.now();
-      if (!memoryOrders[idx].statusHistory) memoryOrders[idx].statusHistory = [];
-      memoryOrders[idx].statusHistory.push({
-        fromStatus: memoryOrders[idx].status,
-        toStatus: "PAID",
-        comment: "Оплату підтверджено адміністратором",
-        changedBy: "admin",
+      const nextStatus = body.status;
+      const order = await findOrder(id);
+      if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+
+      const prevStatus = order.status;
+      order.status = nextStatus;
+      order.updatedAt = Date.now();
+      if (!order.statusHistory) order.statusHistory = [];
+      order.statusHistory.unshift({
+        fromStatus: prevStatus,
+        toStatus: nextStatus,
+        comment: body.comment || null,
+        changedBy: session.username || "admin",
         createdAt: Date.now(),
       });
-      return jsonResponse({ success: true, order: memoryOrders[idx] });
+      await saveOrderToEdgeCache(order);
+      return jsonResponse(order);
+    }
+
+    if (path.startsWith("/admin/orders/") && path.endsWith("/tracking") && method === "PATCH") {
+      const id = path.replace("/admin/orders/", "").replace("/tracking", "");
+      const body = await request.json().catch(() => ({}));
+      const order = await findOrder(id);
+      if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
+
+      if (!order.delivery) order.delivery = {};
+      if (body.trackingNumber !== undefined) order.delivery.trackingNumber = body.trackingNumber;
+      if (body.trackingUrl !== undefined) order.delivery.trackingUrl = body.trackingUrl;
+      order.updatedAt = Date.now();
+      await saveOrderToEdgeCache(order);
+      return jsonResponse(order);
     }
 
     if (path.startsWith("/admin/orders/") && method === "GET") {
       const id = path.replace("/admin/orders/", "");
-      const matchOrder = (o) => o.id === id || String(o.number) === id || o.orderCode === id;
-      let order = memoryOrders.find(matchOrder) || SEED_ORDERS.find(matchOrder);
-      if (!order) {
-        order = await getOrderFromEdgeCache(id);
-        if (order) memoryOrders.unshift(order);
-      }
+      const order = await findOrder(id);
       if (!order) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
       return jsonResponse(order);
-    }
-
-    // Delivery & Accounts
-    if (path === "/admin/delivery/accounts" && method === "GET") {
-      const provider = url.searchParams.get("provider");
-      let list = memoryDeliveryAccounts;
-      if (provider) {
-        list = list.filter((a) => a.provider === provider);
-      }
-      return jsonResponse(list);
-    }
-    if (path === "/admin/delivery/accounts" && method === "POST") {
-      const body = await request.json().catch(() => ({}));
-      const newAcc = {
-        id: `da_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        name: body.name || "Акаунт доставки",
-        provider: body.provider || "np",
-        apiKey: body.apiKey || "",
-        senderName: body.senderName || "",
-        phone: body.phone || "",
-        cityName: body.cityName || "",
-        warehouseName: body.warehouseName || "",
-        isDefault: Boolean(body.isDefault),
-        isActive: body.isActive !== false,
-        createdAt: Date.now(),
-      };
-      if (newAcc.isDefault) {
-        memoryDeliveryAccounts.forEach((a) => {
-          if (a.provider === newAcc.provider) a.isDefault = false;
-        });
-      }
-      memoryDeliveryAccounts.push(newAcc);
-      return jsonResponse(newAcc, 201);
-    }
-    if (path.startsWith("/admin/delivery/accounts/") && method === "PUT") {
-      const id = path.replace("/admin/delivery/accounts/", "");
-      const body = await request.json().catch(() => ({}));
-      const idx = memoryDeliveryAccounts.findIndex((a) => a.id === id);
-      if (idx < 0) return jsonResponse({ error: "Акаунт не знайдено" }, 404);
-      Object.assign(memoryDeliveryAccounts[idx], body);
-      return jsonResponse(memoryDeliveryAccounts[idx]);
-    }
-    if (path.startsWith("/admin/delivery/accounts/") && method === "DELETE") {
-      const id = path.replace("/admin/delivery/accounts/", "");
-      memoryDeliveryAccounts = memoryDeliveryAccounts.filter((a) => a.id !== id);
-      return jsonResponse({ success: true });
-    }
-    if (path === "/admin/delivery/check" && method === "POST") {
-      const body = await request.json().catch(() => ({}));
-      const { provider, apiKey } = body;
-      if (!apiKey || !apiKey.trim()) {
-        return jsonResponse({
-          ok: false,
-          status: "not_configured",
-          message: "API-ключ не налаштовано",
-        });
-      }
-      return jsonResponse({
-        ok: true,
-        status: "active",
-        provider: provider || "np",
-        message: "Підключення успішне",
-      });
-    }
-    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/ttn") && method === "POST") {
-      const id = path.replace("/admin/delivery/orders/", "").replace("/ttn", "");
-      let idx = memoryOrders.findIndex((o) => o.id === id || String(o.number) === id || o.orderCode === id);
-      if (idx < 0) {
-        const seed = SEED_ORDERS.find((o) => o.id === id || String(o.number) === id || o.orderCode === id);
-        if (seed) {
-          memoryOrders.unshift({ ...seed });
-          idx = 0;
-        }
-      }
-      if (idx < 0) return jsonResponse({ error: "Замовлення не знайдено" }, 404);
-      const fakeTtn = "20450" + Math.floor(10000000 + Math.random() * 90000000);
-      memoryOrders[idx].tracking_number = fakeTtn;
-      memoryOrders[idx].status = "SHIPMENT_CREATED";
-      if (!memoryOrders[idx].delivery) memoryOrders[idx].delivery = {};
-      memoryOrders[idx].delivery.trackingNumber = fakeTtn;
-      memoryOrders[idx].delivery.trackingUrl = `https://novaposhta.ua/tracking/?cargo_number=${fakeTtn}`;
-      return jsonResponse({ success: true, trackingNumber: fakeTtn, order: memoryOrders[idx] });
-    }
-    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/ttn") && method === "DELETE") {
-      const id = path.replace("/admin/delivery/orders/", "").replace("/ttn", "");
-      const idx = memoryOrders.findIndex((o) => o.id === id);
-      if (idx >= 0) {
-        memoryOrders[idx].tracking_number = "";
-        if (memoryOrders[idx].delivery) {
-          memoryOrders[idx].delivery.trackingNumber = null;
-          memoryOrders[idx].delivery.trackingUrl = null;
-        }
-      }
-      return jsonResponse({ success: true });
-    }
-    if (path.startsWith("/admin/delivery/orders/") && path.endsWith("/tracking") && method === "GET") {
-      const id = path.replace("/admin/delivery/orders/", "").replace("/tracking", "");
-      const order = memoryOrders.find((o) => o.id === id);
-      return jsonResponse({
-        status: "В дорозі до відділення",
-        statusCode: "7",
-        trackingNumber: order?.delivery?.trackingNumber || "—",
-        updatedAt: Date.now(),
-      });
-    }
-
-    // Admin Customers
-    if (path === "/admin/customers" && method === "GET") {
-      const map = new Map();
-      for (const o of memoryOrders) {
-        const phone = o.customer?.phone;
-        if (!phone) continue;
-        if (!map.has(phone)) {
-          map.set(phone, {
-            id: "c_" + phone.replace(/\D/g, ""),
-            phone,
-            first_name: o.customer.firstName || "",
-            last_name: o.customer.lastName || "",
-            email: o.customer.email || "",
-            total_orders: 0,
-            total_spent: 0,
-            last_order_at: o.createdAt,
-          });
-        }
-        const c = map.get(phone);
-        c.total_orders += 1;
-        c.total_spent += o.total || 0;
-        if (o.createdAt > c.last_order_at) c.last_order_at = o.createdAt;
-      }
-      return jsonResponse(Array.from(map.values()));
-    }
-    if (path.startsWith("/admin/customers/") && method === "GET") {
-      const id = path.replace("/admin/customers/", "");
-      let foundCustomer = null;
-      let customerOrdersList = [];
-      for (const o of memoryOrders) {
-        const cId = "c_" + (o.customer?.phone || "").replace(/\D/g, "");
-        if (cId === id || o.customer_id === id) {
-          if (!foundCustomer) {
-            foundCustomer = {
-              id: cId,
-              phone: o.customer?.phone || "",
-              first_name: o.customer?.firstName || "",
-              last_name: o.customer?.lastName || "",
-              email: o.customer?.email || "",
-            };
-          }
-          customerOrdersList.push(o);
-        }
-      }
-      if (!foundCustomer) return jsonResponse({ error: "Клієнта не знайдено" }, 404);
-      return jsonResponse({
-        ...foundCustomer,
-        orders: customerOrdersList,
-      });
-    }
-
-    // Admin Backups
-    if (path === "/admin/backups" && method === "GET") {
-      return jsonResponse({
-        databasePath: "edge_memory_store",
-        backupDirectory: "edge_storage",
-        backups: [
-          {
-            filename: `pasika-edge-snapshot-${new Date().toISOString().slice(0, 10)}.json`,
-            size: 16384,
-            sizeFormatted: "16 KB",
-            createdAt: Date.now(),
-          },
-        ],
-      });
-    }
-    if (path === "/admin/backup/create" && method === "POST") {
-      const filename = `pasika-edge-snapshot-${Date.now()}.json`;
-      return jsonResponse({
-        success: true,
-        filename,
-        size: 16384,
-        sizeFormatted: "16 KB",
-        createdAt: Date.now(),
-      }, 201);
-    }
-    if ((path === "/admin/backup" || path.startsWith("/admin/backups/")) && method === "GET") {
-      const snapshot = JSON.stringify({
-        orders: memoryOrders,
-        products: memoryProducts,
-        settings: memorySettings,
-      }, null, 2);
-      return new Response(snapshot, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Disposition": 'attachment; filename="pasika-edge-backup.json"',
-        },
-      });
     }
 
     // Admin Products
@@ -1803,13 +2102,8 @@ export async function onRequest(context) {
     if (path === "/admin/products" && method === "POST") {
       const body = await request.json().catch(() => ({}));
       const name = (body.name || "").trim();
-      if (!name) {
-        return jsonResponse({ error: "Назва товару обов'язкова" }, 400);
-      }
-      const image = (body.image || "").trim();
-      if (!image) {
-        return jsonResponse({ error: "Фото товару обов'язкове для створення нового товару" }, 400);
-      }
+      if (!name) return jsonResponse({ error: "Назва товару обов'язкова" }, 400);
+      const image = (body.image || "").trim() || "kovbasa-domashnya";
       const rawSlug = (body.slug || "").trim() || transliterateUa(name);
       const cleanSlug = transliterateUa(rawSlug);
       const slug = resolveEdgeUniqueSlug(cleanSlug);
@@ -1866,16 +2160,13 @@ export async function onRequest(context) {
       if (!name) return jsonResponse({ error: "Назва категорії обов'язкова" }, 400);
       let slug = (body.slug || "").trim() || transliterateUa(name);
       slug = transliterateUa(slug);
-      const icon = (body.icon || "🍯").trim();
+      const icon = (body.icon || "🥩").trim();
       const sortOrder = Number(body.sortOrder) || 0;
 
       const idx = memoryCategories.findIndex((c) => c.slug === slug);
       const catObj = { slug, name, icon, sortOrder };
-      if (idx >= 0) {
-        memoryCategories[idx] = catObj;
-      } else {
-        memoryCategories.push(catObj);
-      }
+      if (idx >= 0) memoryCategories[idx] = catObj;
+      else memoryCategories.push(catObj);
       return jsonResponse(catObj);
     }
     if (path.startsWith("/admin/categories/") && method === "DELETE") {
@@ -1929,67 +2220,6 @@ export async function onRequest(context) {
       });
     }
 
-    // Admin Telegram Test
-    if (path === "/admin/telegram/test" && method === "POST") {
-      const body = await request.json().catch(() => ({}));
-      const customToken = (body.botToken && body.botToken !== "••••••••••••••••" ? body.botToken : memorySettings.telegram?.botToken)?.trim();
-      const customChatId = (body.chatId || memorySettings.telegram?.chatId || "287686358")?.trim();
-      if (!customToken) {
-        return jsonResponse({ ok: false, error: "Telegram Bot Token не налаштовано" });
-      }
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${customToken}/getMe`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          return jsonResponse({ ok: false, error: data.description || "Невірний токен бота" });
-        }
-        const botUsername = data.result?.username ? `@${data.result.username}` : "";
-        const botName = data.result?.first_name || "Honey Bot";
-        if (customChatId) {
-          try {
-            const sendRes = await fetch(`https://api.telegram.org/bot${customToken}/sendMessage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: customChatId,
-                text: `🐝 <b>PASIKA — Тест підключення</b>\n\nTelegram підключено успішно ✅\nБот: <b>${botName}</b> (${botUsername || "без username"})\nChat ID: <code>${customChatId}</code>\n\nВи будете отримувати сповіщення про нові замовлення.`,
-                parse_mode: "HTML",
-              }),
-            });
-            const sendData = await sendRes.json().catch(() => ({}));
-            if (!sendRes.ok || !sendData.ok) {
-              return jsonResponse({
-                ok: false,
-                error: `Помилка Telegram API при відправці в чат (${customChatId}): ${sendData.description || "Не вдалося надіслати тестове повідомлення"}`,
-                botName,
-                botUsername,
-              });
-            }
-          } catch (sendErr) {
-            return jsonResponse({
-              ok: false,
-              error: `Помилка зв'язку з Telegram API: ${sendErr.message}`,
-              botName,
-              botUsername,
-            });
-          }
-        }
-        return jsonResponse({
-          ok: true,
-          botName,
-          botUsername,
-          message: "Telegram підключено успішно ✅",
-        });
-      } catch (err) {
-        return jsonResponse({ ok: false, error: err.message || "Помилка зв'язку з Telegram" });
-      }
-    }
-
-    // Admin Telegram Log
-    if (path === "/admin/telegram-log" && method === "GET") {
-      return jsonResponse([]);
-    }
-
     // Admin Telegram Config
     if (path === "/admin/telegram/config" && method === "GET") {
       return jsonResponse({
@@ -2000,7 +2230,6 @@ export async function onRequest(context) {
         status: memorySettings.telegram?.lastStatus || (memorySettings.telegram?.botToken ? "configured" : "unconfigured"),
       });
     }
-
     if (path === "/admin/telegram/config" && method === "PUT") {
       const body = await request.json().catch(() => ({}));
       if (!memorySettings.telegram) memorySettings.telegram = {};
@@ -2021,7 +2250,6 @@ export async function onRequest(context) {
     if (path === "/admin/telegram/recipients" && method === "GET") {
       return jsonResponse(memoryTelegramRecipients);
     }
-
     if (path === "/admin/telegram/recipients" && method === "POST") {
       const body = await request.json().catch(() => ({}));
       const id = "tr_" + Date.now().toString(36);
@@ -2041,26 +2269,11 @@ export async function onRequest(context) {
       memoryTelegramRecipients.push(recipient);
       return jsonResponse(recipient, 201);
     }
-
-    if (path.startsWith("/admin/telegram/recipients/") && method === "PUT") {
-      const id = path.replace("/admin/telegram/recipients/", "");
-      const body = await request.json().catch(() => ({}));
-      const idx = memoryTelegramRecipients.findIndex((r) => r.id === id);
-      if (idx < 0) return jsonResponse({ error: "Отримувача не знайдено" }, 404);
-      memoryTelegramRecipients[idx] = {
-        ...memoryTelegramRecipients[idx],
-        ...body,
-        updated_at: Date.now(),
-      };
-      return jsonResponse(memoryTelegramRecipients[idx]);
-    }
-
     if (path.startsWith("/admin/telegram/recipients/") && method === "DELETE") {
       const id = path.replace("/admin/telegram/recipients/", "");
       memoryTelegramRecipients = memoryTelegramRecipients.filter((r) => r.id !== id);
       return jsonResponse({ ok: true, id });
     }
-
     if (path.startsWith("/admin/telegram/recipients/") && path.endsWith("/toggle") && method === "POST") {
       const id = path.replace("/admin/telegram/recipients/", "").replace("/toggle", "");
       const idx = memoryTelegramRecipients.findIndex((r) => r.id === id);
@@ -2069,19 +2282,30 @@ export async function onRequest(context) {
       memoryTelegramRecipients[idx].updated_at = Date.now();
       return jsonResponse(memoryTelegramRecipients[idx]);
     }
-
     if (path.startsWith("/admin/telegram/recipients/") && path.endsWith("/test") && method === "POST") {
       const id = path.replace("/admin/telegram/recipients/", "").replace("/test", "");
       const recipient = memoryTelegramRecipients.find((r) => r.id === id);
       if (!recipient) return jsonResponse({ error: "Отримувача не знайдено" }, 404);
       return jsonResponse({ ok: true, simulated: true, message: `Тестове повідомлення для ${recipient.name} змодельовано успішно` });
     }
-
+    if (path === "/admin/telegram-log" && method === "GET") {
+      return jsonResponse([]);
+    }
     if (path === "/admin/telegram/recent-chats" && method === "GET") {
       return jsonResponse(memoryTelegramInteractions);
+    }
+
+    // Admin Delivery Accounts
+    if (path === "/admin/delivery/accounts" && method === "GET") {
+      return jsonResponse(memoryDeliveryAccounts);
+    }
+
+    // Admin Backups
+    if (path === "/admin/backup" && method === "GET") {
+      return jsonResponse({ error: "Резервне копіювання файлу SQLite доступне у повному Node.js сервері" }, 400);
     }
   }
 
   // Not Found
-  return jsonResponse({ error: "Admin API endpoint не знайдено" }, 404);
+  return jsonResponse({ error: "API endpoint не знайдено" }, 404);
 }

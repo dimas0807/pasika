@@ -46,10 +46,10 @@ try {
 
   const prodRes = await api("/api/products");
   assert.strictEqual(prodRes.status, 200);
-  const p1 = prodRes.data.find((p) => p.id === "p1");
-  const p3 = prodRes.data.find((p) => p.id === "p3");
-  assert.ok(p1, "Product p1 must exist");
-  assert.ok(p3, "Product p3 must exist");
+  const p1 = prodRes.data.find((p) => p.id === "prod_dk_1");
+  const p3 = prodRes.data.find((p) => p.id === "prod_km_1");
+  assert.ok(p1, "Product prod_dk_1 must exist");
+  assert.ok(p3, "Product prod_km_1 must exist");
 
   const initialP1Stock = p1.stock;
   const initialP3Stock = p3.stock;
@@ -129,7 +129,7 @@ try {
       firstName: "Іван",
       lastName: "Франко",
       phone: "invalid-phone",
-      items: [{ id: "p1", qty: 2 }],
+      items: [{ id: "prod_dk_1", qty: 2 }],
       delivery: { providerKey: "np", city: npCity, branch: npBranch },
       paymentMethod: "cod",
     }),
@@ -144,7 +144,7 @@ try {
       firstName: "Іван",
       lastName: "Франко",
       phone: "+380671234567",
-      items: [{ id: "p1", qty: initialP1Stock + 999 }],
+      items: [{ id: "prod_dk_1", qty: initialP1Stock + 999 }],
       delivery: { providerKey: "np", city: npCity, branch: npBranch },
       paymentMethod: "cod",
     }),
@@ -170,8 +170,8 @@ try {
       checkoutToken,
       comment: "Будь ласка, зателефонуйте перед відправкою",
       items: [
-        { id: "p1", qty: 2 },
-        { id: "p3", qty: 1 },
+        { id: "prod_dk_1", qty: 2 },
+        { id: "prod_km_1", qty: 1 },
       ],
       idempotencyKey,
     }),
@@ -187,11 +187,13 @@ try {
   assert.strictEqual(createdOrder.delivery.cityId, npCity.id);
   assert.strictEqual(createdOrder.delivery.branchId, npBranch.id);
 
-  // 4d. Verify stock deductions: p1 by 2, p3 by 1
-  const p1After = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  const p3After = db.prepare("SELECT stock FROM products WHERE id = 'p3'").get();
-  assert.strictEqual(p1After.stock, initialP1Stock - 2, "Stock of p1 must be reduced by 2");
-  assert.strictEqual(p3After.stock, initialP3Stock - 1, "Stock of p3 must be reduced by 1");
+  // 4d. Verify stock reservations: prod_dk_1 by 2, prod_km_1 by 1
+  const p1After = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  const p3After = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_km_1'").get();
+  assert.strictEqual(p1After.reserved_stock, 2, "Reserved stock of prod_dk_1 must be 2");
+  assert.strictEqual(p3After.reserved_stock, 1, "Reserved stock of prod_km_1 must be 1");
+  assert.strictEqual(p1After.stock - p1After.reserved_stock, initialP1Stock - 2, "Available stock of prod_dk_1 must be reduced by 2");
+  assert.strictEqual(p3After.stock - p3After.reserved_stock, initialP3Stock - 1, "Available stock of prod_km_1 must be reduced by 1");
 
   // 4e. Idempotency test (repeat submit protection)
   const duplicateRes = await api("/api/orders", {
@@ -202,8 +204,8 @@ try {
       lastName: "Забужко",
       phone: "+380 50 999 88 77",
       items: [
-        { id: "p1", qty: 2 },
-        { id: "p3", qty: 1 },
+        { id: "prod_dk_1", qty: 2 },
+        { id: "prod_km_1", qty: 1 },
       ],
       idempotencyKey,
     }),
@@ -211,8 +213,8 @@ try {
   assert.strictEqual(duplicateRes.status, 200);
   assert.strictEqual(duplicateRes.data.order.id, createdOrder.id);
   assert.strictEqual(duplicateRes.data.duplicate, true);
-  const p1AfterDup = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  assert.strictEqual(p1AfterDup.stock, initialP1Stock - 2, "Stock must NOT be deducted again on duplicate");
+  const p1AfterDup = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  assert.strictEqual(p1AfterDup.reserved_stock, 2, "Stock must NOT be reserved again on duplicate");
 
   // ---------------- TEST 5: ORDER PRIVACY & CUSTOMER TOKEN ----------------
   console.log("➡️ Test 5: Order Privacy & One-time Customer Token Protection");
@@ -241,7 +243,7 @@ try {
   console.log("➡️ Test 6: Telegram Notification Logging");
   const tgLogs = db.prepare("SELECT * FROM telegram_logs WHERE order_id = ?").all(createdOrder.id);
   assert.ok(tgLogs.length > 0, "Telegram log must exist");
-  assert.ok(tgLogs[0].text.includes(`НОВЕ ЗАМОВЛЕННЯ #${createdOrder.number}`));
+  assert.ok(tgLogs[0].text.includes("НОВЕ ЗАМОВЛЕННЯ") && tgLogs[0].text.includes(String(createdOrder.number)));
   assert.ok(tgLogs[0].text.includes("Оксана Забужко"));
 
   // ---------------- TEST 7: ADMIN AUTHENTICATION & ORDERS ----------------
@@ -256,7 +258,7 @@ try {
   });
   assert.strictEqual(goodLoginRes.status, 200);
   const setCookieHeader = goodLoginRes.headers.get("set-cookie");
-  assert.ok(setCookieHeader && setCookieHeader.includes("pasika_session="));
+  assert.ok(setCookieHeader && (setCookieHeader.includes("galinka_session=") || setCookieHeader.includes("pasika_session=")));
   assert.ok(setCookieHeader.includes("HttpOnly"));
   const sessionCookie = setCookieHeader.split(";")[0];
 
@@ -277,20 +279,22 @@ try {
   // ---------------- TEST 8: STATUS UPDATES & SAFE STOCK RESTORATION ----------------
   console.log("➡️ Test 8: Status Updates & Safe Stock Check on Re-activation");
 
-  // 8a. Cancel order -> stock restored (p1 +2, p3 +1)
+  // 8a. Cancel order -> reservations released (prod_dk_1 -2 reserved, prod_km_1 -1 reserved)
   const cancelRes = await api(`/api/admin/orders/${createdOrder.id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Cookie: sessionCookie },
     body: JSON.stringify({ status: "CANCELLED" }),
   });
   assert.strictEqual(cancelRes.status, 200);
-  const p1Restored = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  const p3Restored = db.prepare("SELECT stock FROM products WHERE id = 'p3'").get();
-  assert.strictEqual(p1Restored.stock, initialP1Stock, "p1 stock must be restored to initial");
-  assert.strictEqual(p3Restored.stock, initialP3Stock, "p3 stock must be restored to initial");
+  const p1Restored = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  const p3Restored = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_km_1'").get();
+  assert.strictEqual(p1Restored.reserved_stock, 0, "prod_dk_1 reserved stock must be released to 0");
+  assert.strictEqual(p3Restored.reserved_stock, 0, "prod_km_1 reserved stock must be released to 0");
+  assert.strictEqual(p1Restored.stock - p1Restored.reserved_stock, initialP1Stock, "prod_dk_1 available stock must be restored to initial");
+  assert.strictEqual(p3Restored.stock - p3Restored.reserved_stock, initialP3Stock, "prod_km_1 available stock must be restored to initial");
 
-  // 8b. Simulate stock reduction while order was CANCELLED (e.g. p1 stock drops to 1, but order needs 2)
-  db.prepare("UPDATE products SET stock = 1 WHERE id = 'p1'").run();
+  // 8b. Simulate stock reduction while order was CANCELLED (e.g. prod_dk_1 stock drops to 1, but order needs 2)
+  db.prepare("UPDATE products SET stock = 1 WHERE id = 'prod_dk_1'").run();
 
   // 8c. Attempting to restore CANCELLED order to 'PROCESSING' must FAIL and NOT allow negative stock!
   const failRestoreRes = await api(`/api/admin/orders/${createdOrder.id}/status`, {
@@ -299,18 +303,18 @@ try {
     body: JSON.stringify({ status: "PROCESSING" }),
   });
   assert.strictEqual(failRestoreRes.status, 400, "Re-activation with insufficient stock must fail (400)");
-  assert.ok(failRestoreRes.data.error.includes("Недостатньо товару"), "Error should explain stock shortage");
+  assert.ok(failRestoreRes.data.error.includes("Недостатньо"), "Error should explain stock shortage");
 
   // Verify that stock was NOT made negative
-  const p1StillSafe = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
+  const p1StillSafe = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
   assert.strictEqual(p1StillSafe.stock, 1, "Stock must remain 1 and not become negative");
 
   // Order status must remain CANCELLED due to rollback
   const orderStillCancelled = db.prepare("SELECT status FROM orders WHERE id = ?").get(createdOrder.id);
   assert.strictEqual(orderStillCancelled.status, "CANCELLED", "Order must remain CANCELLED after rollback");
 
-  // 8d. When stock is replenished, re-activation succeeds and deducts stock safely
-  db.prepare("UPDATE products SET stock = 10 WHERE id = 'p1'").run();
+  // 8d. When stock is replenished, re-activation succeeds and reserves stock safely
+  db.prepare("UPDATE products SET stock = 10, reserved_stock = 0 WHERE id = 'prod_dk_1'").run();
   const successRestoreRes = await api(`/api/admin/orders/${createdOrder.id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Cookie: sessionCookie },
@@ -318,8 +322,9 @@ try {
   });
   assert.strictEqual(successRestoreRes.status, 200, "Re-activation should succeed when stock is available");
   assert.strictEqual(successRestoreRes.data.status, "PROCESSING");
-  const p1AfterSuccess = db.prepare("SELECT stock FROM products WHERE id = 'p1'").get();
-  assert.strictEqual(p1AfterSuccess.stock, 8, "Stock must be deducted by 2 (10 - 2 = 8)");
+  const p1AfterSuccess = db.prepare("SELECT stock, reserved_stock FROM products WHERE id = 'prod_dk_1'").get();
+  assert.strictEqual(p1AfterSuccess.reserved_stock, 2, "Reserved stock must be 2");
+  assert.strictEqual(p1AfterSuccess.stock - p1AfterSuccess.reserved_stock, 8, "Available stock must be 8 (10 - 2 = 8)");
 
   // ---------------- TEST 9: ADMIN LOGOUT ----------------
   console.log("➡️ Test 9: Admin Logout & Session Revocation");

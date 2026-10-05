@@ -3,10 +3,18 @@ import { getSession } from "./auth.js";
 import { db } from "./db.js";
 import { sendOrderTelegramNotification, notifyOrderStatusChange } from "./telegram.js";
 
-// Normalize Ukrainian phone numbers
-export function normalizePhone(raw) {
+// Normalize Ukrainian and international phone numbers
+export function normalizePhone(raw, isInternational = false) {
   if (!raw) return null;
-  const digits = String(raw).replace(/\D/g, "");
+  const str = String(raw).trim();
+  const digits = str.replace(/\D/g, "");
+
+  if (isInternational) {
+    if (digits.length >= 7 && digits.length <= 16) {
+      return "+" + digits;
+    }
+  }
+
   if (digits.length === 10 && digits.startsWith("0")) {
     return "+38" + digits;
   }
@@ -14,6 +22,9 @@ export function normalizePhone(raw) {
     return "+3" + digits;
   }
   if (digits.length === 12 && digits.startsWith("380")) {
+    return "+" + digits;
+  }
+  if (digits.length >= 7 && digits.length <= 16 && str.startsWith("+")) {
     return "+" + digits;
   }
   return null;
@@ -80,8 +91,9 @@ export function getFullOrder(orderId, customerToken = null) {
   return {
     id: order.id,
     number: order.number,
-    orderCode: order.order_code || `PAS-${order.number}`,
-    order_code: order.order_code || `PAS-${order.number}`,
+    orderCode: order.order_code || `GAL-${order.number}`,
+    order_code: order.order_code || `GAL-${order.number}`,
+    preferredContact: order.preferred_contact || "viber",
     status: order.status,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
@@ -110,6 +122,9 @@ export function getFullOrder(orderId, customerToken = null) {
       trackingNumber: order.tracking_number || null,
       deliveryService: order.delivery_service || order.delivery_provider || "Нова Пошта",
       trackingUrl,
+      isInternational: Boolean(order.is_international),
+      country: order.delivery_country || null,
+      postalCode: order.postal_code || null,
       shippedAt: order.shipped_at || null,
       completedAt: order.completed_at || null,
     },
@@ -175,6 +190,7 @@ export async function createOrder(req, res) {
     const lastName = req.body?.lastName || rawCustomer.lastName || (nameParts.slice(1).join(" ") || "");
     const phone = req.body?.phone || rawCustomer.phone;
     const email = req.body?.email || rawCustomer.email;
+    const preferredContact = (req.body?.preferredContact || req.body?.preferred_contact || rawCustomer?.preferredContact || "viber").toLowerCase();
 
     const providerKey = req.body?.providerKey || rawDelivery.providerKey;
     const city = req.body?.city || rawDelivery.city;
@@ -187,7 +203,16 @@ export async function createOrder(req, res) {
     const receiptName = req.body?.receiptName || req.body?.receipt?.name;
     const items = req.body?.items;
     const idempotencyKey = req.body?.idempotencyKey;
-    const checkoutToken = (req.body?.checkoutToken || req.headers["x-checkout-token"] || "").trim();
+    const checkoutToken = (req.body?.checkoutToken || req.headers?.["x-checkout-token"] || "").trim();
+
+    const isInternational = Boolean(
+      req.body?.isInternational ||
+      rawDelivery?.isInternational ||
+      req.body?.is_international ||
+      providerKey === "international" ||
+      rawDelivery?.providerKey === "international" ||
+      req.body?.deliveryCountry
+    );
 
     // 1. Idempotency Check
     if (idempotencyKey) {
@@ -210,10 +235,12 @@ export async function createOrder(req, res) {
       return res.status(400).json({ error: "Вкажіть ім'я та прізвище" });
     }
 
-    const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = normalizePhone(phone, isInternational);
     if (!normalizedPhone) {
       return res.status(400).json({
-        error: "Введіть коректний номер телефону України (наприклад, +380 67 123 45 67)",
+        error: isInternational
+          ? "Введіть коректний міжнародний номер телефону (наприклад, +48 123 456 789)"
+          : "Введіть коректний номер телефону України (наприклад, +380 67 123 45 67)",
       });
     }
 
@@ -242,21 +269,35 @@ export async function createOrder(req, res) {
     }
 
     // 3. Validate Delivery
-    const cleanProviderKey = providerKey === "up" ? "up" : "np";
-    const providerName = cleanProviderKey === "up" ? "Укрпошта" : "Нова пошта";
+    const deliveryCountry = (req.body?.deliveryCountry || req.body?.country || rawDelivery.country || "").trim();
+    const postalCode = (req.body?.postalCode || req.body?.postal_code || rawDelivery.postalCode || "").trim();
 
-    const cityName = typeof city === "object" ? city.name : city;
+    const cleanProviderKey = isInternational ? "international" : (providerKey === "up" ? "up" : "np");
+    const providerName = isInternational ? "Міжнародна доставка" : (cleanProviderKey === "up" ? "Укрпошта" : "Нова пошта");
+
+    const cityName = typeof city === "object" ? city.name : (city || req.body?.deliveryCity || rawDelivery?.deliveryCity);
     const cityId = typeof city === "object" ? city.id : (req.body?.cityRef || req.body?.deliveryCityId || rawDelivery.cityId || null);
-    const branchName = typeof branch === "object" ? branch.name : branch;
+    const branchName = typeof branch === "object" ? branch.name : (branch || req.body?.deliveryAddress || rawDelivery?.deliveryAddress || req.body?.deliveryBranch);
     const branchId = typeof branch === "object" ? (branch.id || branch.ref) : (req.body?.branchRef || req.body?.deliveryBranchId || rawDelivery.branchId || null);
 
-    const deliveryRegion = req.body?.deliveryRegion || req.body?.region || rawDelivery.region || (typeof city === "object" ? (city.area || city.region) : null) || null;
-    const deliveryWarehouseAddress = req.body?.deliveryWarehouseAddress || req.body?.warehouseAddress || rawDelivery.warehouseAddress || (typeof branch === "object" ? (branch.address || branch.shortAddress) : null) || null;
+    const deliveryRegion = isInternational
+      ? (deliveryCountry || null)
+      : (req.body?.deliveryRegion || req.body?.region || rawDelivery.region || (typeof city === "object" ? (city.area || city.region) : null) || null);
+    const deliveryWarehouseAddress = req.body?.deliveryWarehouseAddress || req.body?.warehouseAddress || rawDelivery.warehouseAddress || (typeof branch === "object" ? (branch.address || branch.shortAddress) : null) || branchName || null;
     const deliveryWarehouseRef = req.body?.deliveryWarehouseRef || req.body?.warehouseRef || rawDelivery.warehouseRef || branchId || null;
     const deliveryBranchNumber = req.body?.deliveryBranchNumber || req.body?.branchNumber || rawDelivery.branchNumber || (typeof branch === "object" ? branch.number : null) || null;
 
-    if (!cityName || !branchName) {
-      return res.status(400).json({ error: "Оберіть місто та відділення доставки" });
+    if (isInternational) {
+      if (!cityName || !branchName) {
+        return res.status(400).json({ error: "Вкажіть місто та адресу для міжнародної доставки" });
+      }
+      if (!deliveryCountry) {
+        return res.status(400).json({ error: "Вкажіть країну доставки" });
+      }
+    } else {
+      if (!cityName || !branchName) {
+        return res.status(400).json({ error: "Оберіть місто та відділення доставки" });
+      }
     }
 
     // 4. Validate Payment
@@ -301,12 +342,47 @@ export async function createOrder(req, res) {
     const now = Date.now();
     let calculatedTotal = 0;
     let newOrderNumber = 10001;
-    let newOrderCode = "PAS-10001";
+    let newOrderCode = "GAL-10001";
 
     const createTx = db.transaction(() => {
       // Check available stock & lock items
       const resolvedItems = [];
       for (const item of items) {
+        const isCustomBox = item.isCustomBox || item.id === "custom_box" || (typeof item.id === "string" && item.id.startsWith("custom_box_"));
+        if (isCustomBox && Array.isArray(item.boxItems) && item.boxItems.length > 0) {
+          let customBoxUnitPrice = 0;
+          const subItemsResolved = [];
+          for (const subItem of item.boxItems) {
+            const subProd = db.prepare("SELECT * FROM products WHERE id = ?").get(subItem.id);
+            if (!subProd) {
+              throw new Error(`Товар з боксу (код ${subItem.id}) не знайдено`);
+            }
+            const subQty = Number(subItem.qty) || 1;
+            const totalStock = Number(subProd.stock) || 0;
+            const reservedStock = Number(subProd.reserved_stock) || 0;
+            const availableStock = Math.max(0, totalStock - reservedStock);
+            if (availableStock < subQty * Number(item.qty)) {
+              throw new Error(`Недостатньо товару "${subProd.name}" для боксу (доступно ${availableStock} шт.)`);
+            }
+            customBoxUnitPrice += subProd.price * subQty;
+            subItemsResolved.push({ product: subProd, qty: subQty * Number(item.qty) });
+          }
+
+          calculatedTotal += customBoxUnitPrice * Number(item.qty);
+          const boxDesc = item.boxItems.map((b) => `${b.name} (${b.qty} шт)`).join(", ");
+          resolvedItems.push({
+            product: {
+              id: "custom_box",
+              name: `Власний бокс: ${boxDesc}`,
+              weight: "набір",
+              price: customBoxUnitPrice,
+            },
+            qty: Number(item.qty),
+            subItems: subItemsResolved,
+          });
+          continue;
+        }
+
         const product = db.prepare("SELECT * FROM products WHERE id = ?").get(item.id);
         if (!product) {
           throw new Error(`Товар з кодом ${item.id} не знайдено`);
@@ -328,19 +404,25 @@ export async function createOrder(req, res) {
         });
       }
 
-      // Next sequential order number (PAS-10001 format)
+      // Next sequential order number (GAL-10001 format)
       const numRow = db.prepare("SELECT COALESCE(MAX(number), 10000) AS max_num FROM orders").get();
       newOrderNumber = Math.max(Number(numRow?.max_num || 10000) + 1, 10001);
-      newOrderCode = `PAS-${newOrderNumber}`;
+      newOrderCode = `GAL-${newOrderNumber}`;
 
-      // Reserve stock (stock stays unchanged until packed/shipped, reserved_stock increases)
+      // Reserve stock
       const updateReservedStmt = db.prepare(`
         UPDATE products
         SET reserved_stock = reserved_stock + ?, updated_at = ?
         WHERE id = ?
       `);
       for (const entry of resolvedItems) {
-        updateReservedStmt.run(entry.qty, now, entry.product.id);
+        if (entry.subItems && Array.isArray(entry.subItems)) {
+          for (const sub of entry.subItems) {
+            updateReservedStmt.run(sub.qty, now, sub.product.id);
+          }
+        } else {
+          updateReservedStmt.run(entry.qty, now, entry.product.id);
+        }
       }
 
       // Customer deduplication & persistent profile linking by normalized phone
@@ -401,7 +483,7 @@ export async function createOrder(req, res) {
 
       const initialStatus = cleanPayment === "card" ? "AWAITING_PAYMENT" : "NEW";
 
-      // Insert order with customer_id, delivery_service and order_code
+      // Insert order with customer_id, delivery_service, order_code, preferred_contact, and international info
       db.prepare(`
         INSERT INTO orders (
           id, number, order_code, status, customer_first_name, customer_last_name,
@@ -410,8 +492,8 @@ export async function createOrder(req, res) {
           delivery_branch_id, delivery_branch_name, delivery_service, payment_method,
           comment, receipt_url, receipt_name, idempotency_key, customer_token,
           delivery_region, delivery_warehouse_address, delivery_warehouse_ref, delivery_branch_number,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          preferred_contact, is_international, delivery_country, postal_code, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         newOrderNumber,
@@ -440,6 +522,10 @@ export async function createOrder(req, res) {
         deliveryWarehouseAddress,
         deliveryWarehouseRef,
         deliveryBranchNumber,
+        preferredContact,
+        isInternational ? 1 : 0,
+        deliveryCountry || null,
+        postalCode || null,
         now,
         now
       );
@@ -450,8 +536,15 @@ export async function createOrder(req, res) {
         VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
       `);
       for (const entry of resolvedItems) {
-        const resId = "sr_" + crypto.randomBytes(8).toString("hex");
-        insertResStmt.run(resId, orderId, entry.product.id, entry.qty, now, now + 48 * 3600 * 1000);
+        if (entry.subItems && Array.isArray(entry.subItems)) {
+          for (const sub of entry.subItems) {
+            const resId = "sr_" + crypto.randomBytes(8).toString("hex");
+            insertResStmt.run(resId, orderId, sub.product.id, sub.qty, now, now + 48 * 3600 * 1000);
+          }
+        } else {
+          const resId = "sr_" + crypto.randomBytes(8).toString("hex");
+          insertResStmt.run(resId, orderId, entry.product.id, entry.qty, now, now + 48 * 3600 * 1000);
+        }
       }
 
 
@@ -547,7 +640,7 @@ export function getPublicOrder(req, res) {
   }
 
   // Check admin session
-  let adminToken = req.cookies?.pasika_session;
+  let adminToken = req.cookies?.galinka_session || req.cookies?.pasika_session;
   if (!adminToken && req.headers.authorization?.startsWith("Bearer ")) {
     adminToken = req.headers.authorization.substring(7).trim();
   }
@@ -641,6 +734,8 @@ export function updateOrderStatus(req, res) {
 
     const ALLOWED_STATUSES = [
       "NEW",
+      "CONFIRMED",
+      "COOKING",
       "PROCESSING",
       "AWAITING_PAYMENT",
       "PAID",

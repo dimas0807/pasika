@@ -4,12 +4,25 @@ import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CATEGORIES as OFFICIAL_CATEGORIES, PRODUCTS as OFFICIAL_PRODUCTS, DEFAULT_INTERNATIONAL_SETTINGS } from "./catalog-data.js";
 
 // Load environment variables early if not already loaded
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, "../pasika.db");
+
+export function getDatabasePath() {
+  const isTest = process.env.NODE_ENV === "test";
+  if (isTest) {
+    if (process.env.DB_PATH && !process.env.DB_PATH.endsWith("galinka.db")) {
+      return process.env.DB_PATH;
+    }
+    return path.resolve(__dirname, "../test-galinka.db");
+  }
+  return process.env.DB_PATH || path.resolve(__dirname, "../galinka.db");
+}
+
+export const DB_PATH = getDatabasePath();
 
 // Ensure persistent directory exists
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -337,6 +350,10 @@ export function initDatabase() {
   } catch {}
 
   try {
+    db.exec("ALTER TABLE orders ADD COLUMN preferred_contact TEXT DEFAULT 'viber'");
+  } catch {}
+
+  try {
     db.exec("ALTER TABLE products ADD COLUMN reserved_stock INTEGER NOT NULL DEFAULT 0");
   } catch {}
 
@@ -346,6 +363,22 @@ export function initDatabase() {
 
   try {
     db.exec("ALTER TABLE products ADD COLUMN features TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE products ADD COLUMN box_items TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN is_international INTEGER DEFAULT 0");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN delivery_country TEXT");
+  } catch {}
+
+  try {
+    db.exec("ALTER TABLE orders ADD COLUMN postal_code TEXT");
   } catch {}
 
   try {
@@ -489,11 +522,11 @@ function migrateDataPersistence() {
     console.warn("[Status history backfill warning]:", err.message);
   }
 
-  // 4. Backfill order_code with PAS- prefix if null
+  // 4. Backfill order_code with GAL- prefix if null
   try {
     db.prepare(`
       UPDATE orders
-      SET order_code = 'PAS-' || number
+      SET order_code = 'GAL-' || number
       WHERE order_code IS NULL
     `).run();
   } catch (err) {
@@ -559,10 +592,10 @@ function migrateDataPersistence() {
         "Нова Пошта — Основний",
         npKey,
         null,
-        "Пасіка Honey Pasika",
-        "+380678352311",
+        "М'ясний рай у Галинки",
+        "+380680257877",
         null,
-        "с. Новоселиця",
+        "Україна",
         null,
         "Відділення №1",
         1,
@@ -583,14 +616,14 @@ function migrateDataPersistence() {
         "Укрпошта — Основний",
         upKey,
         null,
-        "Пасіка Honey Pasika",
-        "+380678352311",
+        "М'ясний рай у Галинки",
+        "+380680257877",
         null,
-        "с. Новоселиця",
+        "Україна",
         null,
         "Відділення №1",
-        1,
-        1,
+        0,
+        0,
         now,
         now
       );
@@ -643,140 +676,156 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
 }
 
 function seedInitialData() {
-  // 1. Seed categories
-  const catCount = db.prepare("SELECT COUNT(*) AS count FROM categories").get().count;
-  if (catCount === 0) {
-    const insertCat = db.prepare(
-      "INSERT INTO categories (slug, name, icon, sort_order) VALUES (?, ?, ?, ?)"
-    );
-    const initialCategories = [
-      { slug: "honey", name: "Мед", icon: "🍯", sort_order: 1 },
-      { slug: "cream-honey", name: "Крем-мед", icon: "🧈", sort_order: 2 },
-      { slug: "nuts-honey", name: "Горіхи в меді", icon: "🌰", sort_order: 3 },
-      { slug: "pollen", name: "Пилок", icon: "🌼", sort_order: 4 },
-      { slug: "propolis", name: "Прополіс", icon: "🟤", sort_order: 5 },
-      { slug: "perga", name: "Перга", icon: "🟡", sort_order: 6 },
-      { slug: "gift-boxes", name: "Подарункові бокси", icon: "🎁", sort_order: 7 },
-    ];
-    const tx = db.transaction(() => {
-      for (const c of initialCategories) {
-        insertCat.run(c.slug, c.name, c.icon, c.sort_order);
-      }
-    });
-    tx();
-  }
+  const now = Date.now();
 
-  // 2. Seed products
-  const prodCount = db.prepare("SELECT COUNT(*) AS count FROM products").get().count;
-  if (prodCount === 0) {
-    const insertProd = db.prepare(`
-      INSERT INTO products (
-        id, slug, name, category, weight, price, old_price, stock,
-        featured, gift_box, description, image, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  // 1. Sync Categories & migrate legacy slugs
+  try {
+    const upsertCat = db.prepare(`
+      INSERT INTO categories (slug, name, icon, sort_order)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET
+        name = excluded.name,
+        icon = excluded.icon,
+        sort_order = excluded.sort_order
     `);
 
-    const initialProducts = [
-      {
-        id: "p1", slug: "med-naturalnyi-500g", name: "Мед натуральний", category: "honey",
-        weight: "500 г", price: 220, oldPrice: null, stock: 34, featured: 1, giftBox: 0,
-        description: "Натуральний квітковий мед з власної пасіки. Зібраний та розфасований вручну, без додавання цукру та консервантів.",
-        image: "honey-jar",
-      },
-      {
-        id: "p2", slug: "med-naturalnyi-1kg", name: "Мед натуральний", category: "honey",
-        weight: "1 кг", price: 380, oldPrice: 420, stock: 21, featured: 1, giftBox: 0,
-        description: "Натуральний квітковий мед з власної пасіки у зручній літровій банці — для родини або в подарунок.",
-        image: "honey-jar-big",
-      },
-      {
-        id: "p3", slug: "krem-med-250g", name: "Крем-мед", category: "cream-honey",
-        weight: "250 г", price: 190, oldPrice: null, stock: 18, featured: 1, giftBox: 0,
-        description: "Ніжний крем-мед збитої текстури. Не кристалізується, легко намазується.",
-        image: "cream-honey",
-      },
-      {
-        id: "p4", slug: "horihy-v-medi-250g", name: "Горіхи в меді", category: "nuts-honey",
-        weight: "250 г", price: 260, oldPrice: null, stock: 14, featured: 1, giftBox: 0,
-        description: "Волоські горіхи, вимочені у натуральному меді. Смачний та корисний перекус.",
-        image: "nuts-honey",
-      },
-      {
-        id: "p5", slug: "kvitkovyi-pylok-100g", name: "Квітковий пилок", category: "pollen",
-        weight: "100 г", price: 140, oldPrice: null, stock: 25, featured: 0, giftBox: 0,
-        description: "Натуральні гранули квіткового пилку, зібрані бджолами на власній пасіці.",
-        image: "pollen",
-      },
-      {
-        id: "p6", slug: "propolis-20g", name: "Прополіс", category: "propolis",
-        weight: "20 г", price: 120, oldPrice: null, stock: 30, featured: 0, giftBox: 0,
-        description: "Натуральний бджолиний прополіс у шматочках.",
-        image: "propolis",
-      },
-      {
-        id: "p7", slug: "perga-100g", name: "Перга", category: "perga",
-        weight: "100 г", price: 220, oldPrice: null, stock: 12, featured: 0, giftBox: 0,
-        description: "Бджолина перга — натуральний продукт пасіки у гранулах.",
-        image: "perga",
-      },
-      {
-        id: "p8", slug: "box-medovyi", name: "Подарунковий бокс «Медовий»", category: "gift-boxes",
-        weight: "набір", price: 450, oldPrice: null, stock: 10, featured: 1, giftBox: 1,
-        description: "Крафтова коробка з медом, крем-медом та невеликим сюрпризом. Можливе персональне оформлення.",
-        image: "box-medovyi",
-      },
-      {
-        id: "p9", slug: "box-karpatskyi", name: "Подарунковий бокс «Карпатський»", category: "gift-boxes",
-        weight: "набір", price: 590, oldPrice: null, stock: 8, featured: 1, giftBox: 1,
-        description: "Розширений набір: мед, прополіс, пилок та горіхи в меді у крафтовій упаковці зі стрічкою.",
-        image: "box-karpatskyi",
-      },
-      {
-        id: "p10", slug: "box-osoblyvyi-den", name: "Подарунковий бокс «Особливий день»", category: "gift-boxes",
-        weight: "набір", price: 790, oldPrice: null, stock: 6, featured: 1, giftBox: 1,
-        description: "Преміальний бокс для весілля чи особливої події: мед, крем-мед, перга, квіти та індивідуальна етикетка.",
-        image: "box-osoblyvyi",
-      },
-    ];
+    // A. Insert official categories first so new FK references are valid
+    const catTx = db.transaction(() => {
+      for (const c of OFFICIAL_CATEGORIES) {
+        upsertCat.run(c.slug, c.name, c.icon, c.sort_order);
+      }
+    });
+    catTx();
 
-    const now = Date.now();
-    const tx = db.transaction(() => {
-      for (const p of initialProducts) {
-        insertProd.run(
-          p.id, p.slug, p.name, p.category, p.weight, p.price, p.oldPrice,
-          p.stock, p.featured, p.giftBox, p.description, p.image, now, now
+    // B. Migrate old category slugs in existing products
+    const legacyCategoryMap = {
+      kurochka: "kuryache-kopchene",
+      kopchenosti: "kopchene-myaso",
+      sardelky: "sardelky-ta-kovbasky",
+      pashtety: "pashtetky",
+      salo: "domashnye",
+    };
+    for (const [oldSlug, newSlug] of Object.entries(legacyCategoryMap)) {
+      db.prepare("UPDATE products SET category = ? WHERE category = ?").run(newSlug, oldSlug);
+    }
+
+    // C. Prune obsolete legacy categories
+    db.prepare(`DELETE FROM categories WHERE slug NOT IN (${OFFICIAL_CATEGORIES.map((c) => `'${c.slug}'`).join(",")})`).run();
+  } catch (err) {
+    console.warn("[Categories sync warning]:", err.message);
+  }
+
+  // 2. Sync Products
+  try {
+    const upsertProd = db.prepare(`
+      INSERT INTO products (
+        id, slug, name, category, weight, price, old_price, stock, reserved_stock,
+        is_active, featured, gift_box, description, image, box_items, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(slug) DO UPDATE SET
+        name = excluded.name,
+        category = excluded.category,
+        weight = excluded.weight,
+        price = excluded.price,
+        old_price = excluded.old_price,
+        stock = CASE WHEN products.stock <= 0 THEN excluded.stock ELSE products.stock END,
+        featured = excluded.featured,
+        gift_box = excluded.gift_box,
+        description = excluded.description,
+        box_items = excluded.box_items,
+        updated_at = excluded.updated_at
+    `);
+
+    const prodTx = db.transaction(() => {
+      for (const p of OFFICIAL_PRODUCTS) {
+        const boxItemsStr = p.boxItems ? (typeof p.boxItems === "string" ? p.boxItems : JSON.stringify(p.boxItems)) : null;
+        upsertProd.run(
+          p.id,
+          p.slug,
+          p.name,
+          p.category,
+          p.weight || "1 кг",
+          p.price,
+          p.oldPrice || null,
+          p.stock !== undefined ? p.stock : 35,
+          p.featured ? 1 : 0,
+          p.giftBox ? 1 : 0,
+          p.description || "",
+          p.image || "kovbasa-domashnya",
+          boxItemsStr,
+          now,
+          now
         );
       }
     });
-    tx();
+    prodTx();
+
+    // Clean up obsolete legacy products (like p1..p10 from previous initial mocks)
+    const officialIds = new Set(OFFICIAL_PRODUCTS.map((p) => p.id));
+    const officialSlugs = new Set(OFFICIAL_PRODUCTS.map((p) => p.slug));
+    const allExisting = db.prepare("SELECT id, slug FROM products").all();
+    for (const ex of allExisting) {
+      if (!officialIds.has(ex.id) && !officialSlugs.has(ex.slug)) {
+        const hasOrder = db.prepare("SELECT 1 FROM order_items WHERE product_id = ? LIMIT 1").get(ex.id);
+        if (hasOrder) {
+          db.prepare("UPDATE products SET is_active = 0 WHERE id = ?").run(ex.id);
+        } else {
+          db.prepare("DELETE FROM products WHERE id = ?").run(ex.id);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Products sync warning]:", err.message);
   }
 
-  // 3. Seed settings
+  // 3. Seed / Update settings with international delivery
   const settingsRow = db.prepare("SELECT value FROM settings WHERE key = 'app_settings'").get();
   if (!settingsRow) {
     const defaultSettings = {
-      contacts: {
-        phone: "+380 67 835 23 11",
-        email: "hello@pasika-honey.ua",
-        telegram: "@pasika_honey",
-        viber: "+380 67 835 23 11",
-        instagram: "@honey_pasika",
+      store: {
+        name: "М'ясний рай у Галинки",
+        tagline: "Домашні ковбаси та копченості",
+        phone: "+380 68 025 78 77",
+        viber: "+380680257877",
+        tiktok: "@kopchonosti777",
+        telegram: "",
+        instagram: "",
         facebook: "",
-        tiktok: "@honey.dsv",
-        pickupAddress: "Прикарпаття, с. Новоселиця, Снятинський район",
-        pickupLat: "48.4523",
-        pickupLng: "25.5684",
+        youtube: "",
+        workingHours: "Пн-Сб 09:00 - 19:00, Нд 10:00 - 16:00",
+        description: "Справжні домашні ковбаси, копченості, курочка, сало та паштети від Галинки. Натуральне копчення на дровах, перевірені домашні рецепти та швидка доставка Новою Поштою по всій Україні та за кордон.",
+      },
+      contacts: {
+        phone: "+380 68 025 78 77",
+        viber: "+380680257877",
+        tiktok: "@kopchonosti777",
+        telegram: "",
+        instagram: "",
+        facebook: "",
+        youtube: "",
+        email: "",
+        pickupAddress: "",
+      },
+      about: {
+        title: "Домашні копченості з душею від Галинки",
+        shortText: "Мене звати Галина, і я готую для вас справжні домашні ковбаси та копченості. Тільки свіже добірне м'ясо, натуральні спеції та традиційне копчення на дровах.",
+        fullDescription: "Кожен шматочок маринується за перевіреними родинними рецептами без штучних барвників та консервантів. Наше копчення — виключно на дровах вільхи та фруктових дерев, що дає неповторний аромат та золотисту скоринку. Дякуємо нашій великій аудиторії в TikTok (понад 110 тисяч підписників) за довіру!",
+        followersCount: "110K+",
+        likesCount: "700K+",
+        foundationYear: "2020",
+        location: "Україна",
       },
       payment: {
         bank: "monobank",
         card: "4441 1111 2222 3333",
-        holder: "Олена Петріна",
+        holder: "Галина",
         purpose: "Оплата замовлення",
-        instruction: "Після оплати завантажте фото або файл чека — ми підтвердимо замовлення.",
+        instruction: "Після оформлення замовлення на сайті Галинка зв'яжеться з вами у Viber або за телефоном для узгодження деталей.",
       },
       delivery: {
         novaPoshtaEnabled: true,
-        ukrposhtaEnabled: true,
+        ukrposhtaEnabled: false,
+        international: DEFAULT_INTERNATIONAL_SETTINGS,
       },
     };
     db.prepare("INSERT INTO settings (key, value) VALUES ('app_settings', ?)").run(
@@ -785,8 +834,23 @@ function seedInitialData() {
   } else {
     try {
       const parsed = JSON.parse(settingsRow.value);
+      let changed = false;
       if (parsed.payment && !parsed.payment.purpose) {
         parsed.payment.purpose = "Оплата замовлення";
+        changed = true;
+      }
+      if (!parsed.delivery) {
+        parsed.delivery = {
+          novaPoshtaEnabled: true,
+          ukrposhtaEnabled: false,
+          international: DEFAULT_INTERNATIONAL_SETTINGS,
+        };
+        changed = true;
+      } else if (!parsed.delivery.international) {
+        parsed.delivery.international = DEFAULT_INTERNATIONAL_SETTINGS;
+        changed = true;
+      }
+      if (changed) {
         db.prepare("UPDATE settings SET value = ? WHERE key = 'app_settings'").run(JSON.stringify(parsed));
       }
     } catch {}
@@ -796,7 +860,15 @@ function seedInitialData() {
   const adminCount = db.prepare("SELECT COUNT(*) AS count FROM admin_users").get().count;
   if (adminCount === 0) {
     const username = process.env.ADMIN_LOGIN || "admin";
-    const plainPassword = process.env.ADMIN_PASSWORD || "pasika2026";
+    let plainPassword = process.env.ADMIN_PASSWORD;
+    if (!plainPassword) {
+      if (process.env.NODE_ENV === "production") {
+        plainPassword = crypto.randomBytes(16).toString("hex");
+        console.warn(`[SECURITY WARNING] No ADMIN_PASSWORD provided in production! Generated temporary admin password: ${plainPassword}`);
+      } else {
+        plainPassword = "admin_dev_password_change_in_prod";
+      }
+    }
     const { hash, salt } = hashPassword(plainPassword);
     db.prepare(`
       INSERT INTO admin_users (id, username, password_hash, salt, created_at)
@@ -807,28 +879,15 @@ function seedInitialData() {
   // 5. Migrate or seed telegram chatId into telegram_recipients if recipients table is empty
   const recipientCount = db.prepare("SELECT COUNT(*) AS count FROM telegram_recipients").get().count;
   if (recipientCount === 0) {
-    let existingChatId = (process.env.TELEGRAM_CHAT_ID || "287686358").trim();
-    if (settingsRow) {
-      try {
-        const parsed = JSON.parse(settingsRow.value);
-        if (parsed.telegram?.chatId) {
-          existingChatId = String(parsed.telegram.chatId).trim();
-        } else {
-          if (!parsed.telegram) parsed.telegram = {};
-          parsed.telegram.chatId = existingChatId;
-          db.prepare("UPDATE settings SET value = ? WHERE key = 'app_settings'").run(JSON.stringify(parsed));
-        }
-      } catch {}
-    }
-
+    const existingChatId = (process.env.TELEGRAM_CHAT_ID || "").trim();
     if (existingChatId) {
       db.prepare(`
         INSERT INTO telegram_recipients (id, name, username, chat_id, role, is_active, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         "tr_default_admin",
-        "Адміністратор PASIKA",
-        "@pasika_honey",
+        "Адміністратор Галинка",
+        "@kopchonosti777",
         existingChatId,
         "owner",
         1,

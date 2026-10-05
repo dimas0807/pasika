@@ -35,7 +35,7 @@ export async function createBackupFile(customFilename = null) {
   fs.mkdirSync(BACKUPS_DIR, { recursive: true });
   const now = Date.now();
   const dateStr = new Date(now).toISOString().replace(/[:.]/g, "-");
-  const filename = customFilename || `pasika-backup-${dateStr}.db`;
+  const filename = customFilename || `galinka-backup-${dateStr}.db`;
   const destPath = path.join(BACKUPS_DIR, filename);
 
   try {

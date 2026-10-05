@@ -5,6 +5,8 @@ import { Orders, resolveReceiptUrl, Auth } from "../data/db";
 const ORDER_STATUSES = [
   { key: "all", label: "Всі замовлення" },
   { key: "NEW", label: "Нові" },
+  { key: "CONFIRMED", label: "Підтверджено" },
+  { key: "COOKING", label: "Готується" },
   { key: "PROCESSING", label: "В обробці" },
   { key: "AWAITING_PAYMENT", label: "Очікує оплати" },
   { key: "PAID", label: "Оплачено" },
@@ -18,6 +20,8 @@ const ORDER_STATUSES = [
 
 const STATUS_LABEL = {
   NEW: "Нове",
+  CONFIRMED: "Підтверджено",
+  COOKING: "Готується",
   PROCESSING: "В обробці",
   AWAITING_PAYMENT: "Очікує оплати",
   PAID: "Оплачено",
@@ -30,16 +34,18 @@ const STATUS_LABEL = {
 };
 
 const STATUS_COLOR = {
-  NEW: "bg-slate-100 text-slate-800",
-  PROCESSING: "bg-blue-100 text-blue-800",
-  AWAITING_PAYMENT: "bg-amber-100 text-amber-900 font-semibold",
-  PAID: "bg-emerald-100 text-emerald-800",
-  PACKED: "bg-indigo-100 text-indigo-800",
-  SHIPMENT_CREATED: "bg-purple-100 text-purple-800",
-  SHIPPED: "bg-teal-100 text-teal-800",
-  DELIVERED: "bg-sky-100 text-sky-800",
-  COMPLETED: "bg-green-100 text-green-800 font-semibold",
-  CANCELLED: "bg-red-100 text-red-600",
+  NEW: "bg-blue-950 text-blue-200 border border-blue-500/60 font-semibold",
+  CONFIRMED: "bg-amber-950 text-amber-200 border border-amber-500/60 font-semibold",
+  COOKING: "bg-orange-950 text-orange-200 border border-orange-500/60 font-semibold",
+  PROCESSING: "bg-sky-950 text-sky-200 border border-sky-500/60 font-semibold",
+  AWAITING_PAYMENT: "bg-yellow-950 text-yellow-200 border border-yellow-500/60 font-semibold",
+  PAID: "bg-emerald-950 text-emerald-200 border border-emerald-500/60 font-semibold",
+  PACKED: "bg-purple-950 text-purple-200 border border-purple-500/60 font-semibold",
+  SHIPMENT_CREATED: "bg-violet-950 text-violet-200 border border-violet-500/60 font-semibold",
+  SHIPPED: "bg-indigo-950 text-indigo-200 border border-indigo-500/60 font-semibold",
+  DELIVERED: "bg-teal-950 text-teal-200 border border-teal-500/60 font-semibold",
+  COMPLETED: "bg-emerald-900 text-emerald-100 border border-emerald-400 font-bold",
+  CANCELLED: "bg-red-950 text-red-200 border border-red-500/60 font-semibold",
 };
 
 export default function OrdersAdmin() {
@@ -292,14 +298,14 @@ export default function OrdersAdmin() {
               <button
                 key={s.key}
                 onClick={() => setStatusFilter(s.key)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
                   active
-                    ? "bg-honey text-white shadow-xs font-semibold"
-                    : "bg-cream/60 hover:bg-cream text-ink/70"
+                    ? "bg-bronze text-[#141210] border-gold shadow-xs font-bold"
+                    : "bg-[#221D19] border-[#3E362E] text-[#D1C7BD] hover:text-[#FFFFFF] hover:bg-[#2A241F]"
                 }`}
               >
                 <span>{s.label}</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${active ? "bg-white/20 text-white" : "bg-ink/5 text-ink/50"}`}>
+                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${active ? "bg-[#141210]/20 text-[#141210]" : "bg-[#141210] text-[#E8DFD5] border border-[#332C26]"}`}>
                   {count}
                 </span>
               </button>
@@ -372,7 +378,7 @@ export default function OrdersAdmin() {
                       to={`/admin/orders/${o.id}`}
                       className="font-mono font-bold text-base text-ink hover:text-honey transition-colors bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-0.5"
                     >
-                      {o.orderCode || o.order_code || `PAS-${o.number}`}
+                      {o.orderCode || o.order_code || `GAL-${o.number}`}
                     </Link>
                     <div className="text-[11px] text-ink/50">
                       {new Date(o.createdAt).toLocaleDateString("uk-UA", {
@@ -409,8 +415,13 @@ export default function OrdersAdmin() {
 
                 {/* Client info */}
                 <div className="text-xs space-y-1">
-                  <div className="font-semibold text-ink text-sm">
-                    👤 {o.customer?.firstName} {o.customer?.lastName}
+                  <div className="font-semibold text-ink text-sm flex items-center justify-between">
+                    <span>👤 {o.customer?.firstName} {o.customer?.lastName}</span>
+                    {o.preferredContact && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20">
+                        {o.preferredContact === "viber" ? "🟣 Viber" : o.preferredContact === "telegram" ? "✈️ TG" : "📞 Дзвінок"}
+                      </span>
+                    )}
                   </div>
                   {o.customer?.phone && (
                     <div>
@@ -586,7 +597,7 @@ export default function OrdersAdmin() {
                   >
                     <td className="p-3 font-semibold text-ink">
                       <Link to={`/admin/orders/${o.id}`} className="hover:text-honey transition-colors font-mono text-xs font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block">
-                        {o.orderCode || o.order_code || `PAS-${o.number}`}
+                        {o.orderCode || o.order_code || `GAL-${o.number}`}
                       </Link>
                     </td>
                     <td className="p-3 text-xs text-ink/60 whitespace-nowrap">
@@ -599,8 +610,13 @@ export default function OrdersAdmin() {
                       })}
                     </td>
                     <td className="p-3">
-                      <div className="font-medium text-ink">
-                        {o.customer?.firstName} {o.customer?.lastName}
+                      <div className="font-medium text-ink flex items-center gap-1.5">
+                        <span>{o.customer?.firstName} {o.customer?.lastName}</span>
+                        {o.preferredContact && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-[#7360F2]/10 text-[#7360F2] border border-[#7360F2]/20">
+                            {o.preferredContact === "viber" ? "Viber" : o.preferredContact === "telegram" ? "TG" : "Тел"}
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-ink/50 font-mono">{o.customer?.phone}</div>
                     </td>

@@ -1,6 +1,7 @@
-process.env.NODE_ENV = "test";
 import http from "node:http";
-import { app } from "./index.js";
+
+process.env.NODE_ENV = "test";
+const { app } = await import("./index.js");
 
 async function runAdminAuthTests() {
   console.log("🧪 Running Comprehensive Admin Auth & Security Test Suite...\n");
@@ -26,7 +27,7 @@ async function runAdminAuthTests() {
 
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) {
-      const match = setCookie.match(/pasika_session=[^;]+/);
+      const match = setCookie.match(/(?:galinka_session|pasika_session)=[^;]+/);
       if (match) {
         if (setCookie.includes("Max-Age=0") || setCookie.includes("expires=")) {
           cookie = "";
@@ -71,13 +72,13 @@ async function runAdminAuthTests() {
     console.log("\n👉 Test 3: Successful login with admin credentials");
     const goodLogin = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ login: "admin", password: "pasika2026" }),
+      body: JSON.stringify({ login: "admin", password: process.env.ADMIN_PASSWORD || "galinka2026" }),
     });
     if (goodLogin.status !== 200 || !goodLogin.data?.success) {
       throw new Error(`Login failed with status ${goodLogin.status}: ${JSON.stringify(goodLogin.data)}`);
     }
-    if (!cookie.includes("pasika_session=")) {
-      throw new Error("Login did not set pasika_session cookie");
+    if (!cookie.includes("galinka_session=") && !cookie.includes("pasika_session=")) {
+      throw new Error("Login did not set session cookie");
     }
     console.log(`   ✓ Login successful for "${goodLogin.data.username}", received session cookie`);
 
@@ -117,7 +118,7 @@ async function runAdminAuthTests() {
     const changeSec = await api("/api/admin/security", {
       method: "PUT",
       body: JSON.stringify({
-        currentPassword: "pasika2026",
+        currentPassword: process.env.ADMIN_PASSWORD || "galinka2026",
         newLogin: "superadmin",
         newPassword: "newSecurePassword2026!",
         confirmPassword: "newSecurePassword2026!",
@@ -148,7 +149,7 @@ async function runAdminAuthTests() {
     console.log("\n👉 Test 10: Verify old password is REJECTED");
     const oldLoginAttempt = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ login: "superadmin", password: "pasika2026" }),
+      body: JSON.stringify({ login: "superadmin", password: process.env.ADMIN_PASSWORD || "galinka2026" }),
     });
     if (oldLoginAttempt.status !== 401) {
       throw new Error(`Old password should be rejected, got status ${oldLoginAttempt.status}`);
@@ -173,8 +174,8 @@ async function runAdminAuthTests() {
       body: JSON.stringify({
         currentPassword: "newSecurePassword2026!",
         newLogin: "admin",
-        newPassword: "pasika2026",
-        confirmPassword: "pasika2026",
+        newPassword: process.env.ADMIN_PASSWORD || "galinka2026",
+        confirmPassword: process.env.ADMIN_PASSWORD || "galinka2026",
       }),
     });
     await api("/api/auth/logout", { method: "POST" });

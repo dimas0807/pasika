@@ -195,7 +195,7 @@ export async function testRecipientNotification(recipientId, customText = null) 
   const { token } = getTelegramCredentials();
   const text =
     customText ||
-    `🐝 <b>Тестове сповіщення PASIKA</b>\n\nОтримувач: <b>${recipient.name}</b> (${recipient.role})\nСтатус: Активний ✅\nСистема сповіщень налаштована коректно!`;
+    `🥩 <b>Тестове сповіщення ГАЛИНКА</b>\n\nОтримувач: <b>${recipient.name}</b> (${recipient.role})\nСтатус: Активний ✅\nСистема сповіщень налаштована коректно!`;
 
   if (!token) {
     // Simulated demo mode for environments without a configured bot token

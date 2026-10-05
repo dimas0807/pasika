@@ -1,84 +1,97 @@
 import { useState } from "react";
 import { resolveImageUrl } from "../data/db";
 
-// Mapping from product keys/categories to realistic high-res photographic assets
+// Mapping from meat product keys to realistic photographic assets
 const IMAGE_MAP = {
-  "honey-jar": "/images/prod-honey.jpg",
-  "honey-jar-big": "/images/prod-honey.jpg",
-  "cream-honey": "/images/prod-cream-honey.jpg",
-  "nuts-honey": "/images/prod-nuts-honey.jpg",
-  pollen: "/images/prod-pollen.jpg",
-  propolis: "/images/prod-propolis.jpg",
-  perga: "/images/prod-perga.jpg",
-  "box-medovyi": "/images/prod-gift-box.jpg",
-  "box-karpatskyi": "/images/prod-gift-box.jpg",
-  "box-osoblyvyi": "/images/prod-gift-box.jpg",
+  "kovbasa-domashnya": "/images/kovbasa-domashnya.jpg",
+  "kovbasa-kopchena": "/images/kovbasa-kopchena.jpg",
+  shynka: "/images/shynka.jpg",
+  balyk: "/images/balyk.jpg",
+  pidcherevyna: "/images/pidcherevyna.jpg",
+  salo: "/images/salo.jpg",
+  kurochka: "/images/kurochka.jpg",
+  sardelky: "/images/sardelky.jpg",
+  pashtet: "/images/pashtet.jpg",
+  rebertsya: "/images/rebertsya.jpg",
+  "prod-gift-box": "/images/prod-gift-box.jpg",
+  "gift-box": "/images/prod-gift-box.jpg",
+  box: "/images/prod-gift-box.jpg",
+
+  // Product slugs
+  "balychok-kopchenyy": "/images/balyk.jpg",
+  "oshyyok-yak-shashlyk": "/images/shynka.jpg",
+  "rulet-z-chornoslyvom": "/images/shynka.jpg",
+  "rulet-z-kurahoyu": "/images/shynka.jpg",
+  "salo-kopchene": "/images/salo.jpg",
+  "kurka-kopchena": "/images/kurochka.jpg",
+  okorochok: "/images/kurochka.jpg",
+  kryla: "/images/kurochka.jpg",
+  file: "/images/kurochka.jpg",
+  "rulety-kuryachi": "/images/kurochka.jpg",
+  molochna: "/images/kovbasa-kopchena.jpg",
+  nizhna: "/images/kovbasa-kopchena.jpg",
+  fileyna: "/images/kovbasa-kopchena.jpg",
+  molochni: "/images/sardelky.jpg",
+  nizhni: "/images/sardelky.jpg",
+  fileyni: "/images/sardelky.jpg",
+  "pechinkovi-kovbasky": "/images/sardelky.jpg",
+  "liverna-kovbasa": "/images/kovbasa-domashnya.jpg",
+  "sardelky-kopcheni": "/images/sardelky.jpg",
+  "sardelky-tsyharky": "/images/sardelky.jpg",
+  "myslyvski-kovbasky": "/images/kovbasa-kopchena.jpg",
+  "kovbasky-khot-doh": "/images/sardelky.jpg",
+  "shashlyk-kuryachyy-na-hryli": "/images/rebertsya.jpg",
+  "shynka-svynyna-kurka": "/images/shynka.jpg",
+  "kuryachyy-file-okorochok": "/images/pashtet.jpg",
+  "pechinkovyy-svynyachyy": "/images/pashtet.jpg",
+  "saltyson-yazykovyy": "/images/pashtet.jpg",
+  "pechene-myaso": "/images/shynka.jpg",
+  "pechenyy-rulet": "/images/shynka.jpg",
+  "oshyyok-pechenyy": "/images/shynka.jpg",
+  "kovbasovyy-syr": "/images/pashtet.jpg",
+  solonyna: "/images/salo.jpg",
+
+  // Gift boxes
+  "myasnyy-boks": "/images/prod-gift-box.jpg",
+  "boks-do-svyata": "/images/prod-gift-box.jpg",
+  "boks-dlya-viyskovoho": "/images/prod-gift-box.jpg",
+  "simeynyy-boks": "/images/prod-gift-box.jpg",
+  "podarunkovyy-boks": "/images/prod-gift-box.jpg",
+  "vlasnyy-myasnyy-boks": "/images/prod-gift-box.jpg",
+  "custom-meat-box": "/images/prod-gift-box.jpg",
+  custom_box: "/images/prod-gift-box.jpg",
 };
 
 const CATEGORY_DEFAULT_IMAGE = {
-  honey: "/images/prod-honey.jpg",
-  "cream-honey": "/images/prod-cream-honey.jpg",
-  "nuts-honey": "/images/prod-nuts-honey.jpg",
-  pollen: "/images/prod-pollen.jpg",
-  propolis: "/images/prod-propolis.jpg",
-  perga: "/images/prod-perga.jpg",
-  "gift-boxes": "/images/prod-gift-box.jpg",
+  "domashni-kovbasy": "/images/kovbasa-domashnya.jpg",
+  "kopchene-myaso": "/images/shynka.jpg",
+  "kuryache-kopchene": "/images/kurochka.jpg",
+  "vareni-kovbasy": "/images/kovbasa-kopchena.jpg",
+  "sardelky-ta-kovbasky": "/images/sardelky.jpg",
+  "pashtetky": "/images/pashtet.jpg",
+  "domashnye": "/images/salo.jpg",
+  "inshe": "/images/rebertsya.jpg",
+  "podarunkovi-boksy": "/images/prod-gift-box.jpg",
+  // Legacy categories fallback
+  kopchenosti: "/images/rebertsya.jpg",
+  kurochka: "/images/kurochka.jpg",
+  sardelky: "/images/sardelky.jpg",
+  pashtety: "/images/pashtet.jpg",
+  salo: "/images/salo.jpg",
 };
 
-// Fallback stylized vector illustrations (in case image network fails)
-const PALETTE = {
-  honey: { fill: "#D99A19", cap: "#8A6A2C" },
-  "cream-honey": { fill: "#F3D9A4", cap: "#B9A47A" },
-  "nuts-honey": { fill: "#B5731A", cap: "#6E4A1A" },
-  pollen: { fill: "#F4B928", cap: "#9C7A1C" },
-  propolis: { fill: "#7A5230", cap: "#4A3320" },
-  perga: { fill: "#C98A2E", cap: "#7A5220" },
-};
-
-function SvgFallbackJar({ colorKey }) {
-  const c = PALETTE[colorKey] || PALETTE.honey;
+function SvgFallbackMeat() {
   return (
-    <svg viewBox="0 0 240 240" className="w-full h-full p-4">
-      <ellipse cx="120" cy="205" rx="70" ry="10" fill="#29282111" />
-      <rect x="95" y="35" width="50" height="20" rx="6" fill={c.cap} />
-      <rect x="90" y="50" width="60" height="12" rx="4" fill={c.cap} opacity="0.85" />
-      <path
-        d="M60 65 h120 a10 10 0 0 1 10 10 v100 a30 30 0 0 1 -30 30 H80 a30 30 0 0 1 -30 -30 V75 a10 10 0 0 1 10 -10 z"
-        fill="#FFFDF8"
-        stroke="#29282122"
-        strokeWidth="2"
-      />
-      <path d="M65 80 h110 v90 a25 25 0 0 1 -25 25 H90 a25 25 0 0 1 -25 -25 z" fill={c.fill} />
-      <ellipse cx="120" cy="80" rx="55" ry="8" fill="#FFFFFF" opacity="0.35" />
-      <text
-        x="120"
-        y="130"
-        textAnchor="middle"
-        fontFamily="Playfair Display, serif"
-        fontSize="13"
-        fill="#FFFDF8"
-        opacity="0.9"
-      >
-        Honey
-      </text>
-    </svg>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-[#1F1C19] text-[#C88432] p-6 select-none">
+      <span className="text-5xl mb-2">🥩</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-[#9E9184]">
+        М'ясний рай
+      </span>
+    </div>
   );
 }
 
-function SvgFallbackBox() {
-  return (
-    <svg viewBox="0 0 240 240" className="w-full h-full p-4">
-      <ellipse cx="120" cy="205" rx="80" ry="10" fill="#29282111" />
-      <rect x="40" y="90" width="160" height="100" rx="8" fill="#C9A15E" />
-      <rect x="40" y="80" width="160" height="26" rx="6" fill="#B9895A" />
-      <rect x="108" y="70" width="24" height="120" fill="#D99A19" opacity="0.9" />
-      <rect x="40" y="128" width="160" height="14" fill="#D99A19" opacity="0.9" />
-      <circle cx="120" cy="128" r="14" fill="#D99A19" />
-    </svg>
-  );
-}
-
-export default function ProductImage({ image, category, alt = "Продукт пасіки", className = "" }) {
+export default function ProductImage({ image, category, alt = "Домашній м'ясний делікатес", className = "" }) {
   const [hasError, setHasError] = useState(false);
 
   // Resolve photographic asset path
@@ -94,30 +107,26 @@ export default function ProductImage({ image, category, alt = "Продукт п
     resolvedSrc = IMAGE_MAP[image];
   } else if (category && CATEGORY_DEFAULT_IMAGE[category]) {
     resolvedSrc = CATEGORY_DEFAULT_IMAGE[category];
-  } else if (image?.startsWith("box") || category === "gift-boxes") {
-    resolvedSrc = "/images/prod-gift-box.jpg";
   } else {
-    resolvedSrc = "/images/prod-honey.jpg";
+    resolvedSrc = "/images/kovbasa-domashnya.jpg";
   }
-
-  const isBox = category === "gift-boxes" || image?.startsWith("box");
 
   if (hasError || !resolvedSrc) {
     return (
-      <div className={`bg-[#F9F5EC] flex items-center justify-center rounded-2xl overflow-hidden ${className}`}>
-        {isBox ? <SvgFallbackBox /> : <SvgFallbackJar colorKey={category} />}
+      <div className={`bg-[#1F1C19] flex items-center justify-center rounded-2xl overflow-hidden border border-[#2E2822] ${className}`}>
+        <SvgFallbackMeat />
       </div>
     );
   }
 
   return (
-    <div className={`relative bg-[#FAF6EE] flex items-center justify-center rounded-2xl overflow-hidden ${className}`}>
+    <div className={`relative bg-[#1A1816] flex items-center justify-center rounded-2xl overflow-hidden border border-[#2E2822] ${className}`}>
       <img
         src={resolvedSrc}
         alt={alt}
         loading="lazy"
         onError={() => setHasError(true)}
-        className="w-full h-full object-cover object-center transition-transform duration-500"
+        className="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-105"
       />
     </div>
   );

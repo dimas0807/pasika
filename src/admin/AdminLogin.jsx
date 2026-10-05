@@ -44,9 +44,9 @@ export default function AdminLogin() {
     <div className="min-h-[80vh] flex items-center justify-center bg-cream/40 px-4">
       <form onSubmit={submit} className="card p-6 sm:p-8 w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="text-3xl">🐝</div>
+          <div className="text-3xl">🥩</div>
           <h1 className="font-serif text-2xl font-bold text-ink mt-2">Адмін-панель</h1>
-          <p className="text-xs text-ink/50 mt-1">Honey Pasika</p>
+          <p className="text-xs text-ink/50 mt-1">М'ясний рай у Галинки</p>
         </div>
         <label className="label">Логін</label>
         <input

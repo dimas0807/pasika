@@ -20,7 +20,7 @@ export function executeOrderAction({
   const cleanOrderId = String(orderId || "").trim();
   const cleanChatId = String(senderChatId || "").trim();
 
-  // 1. Authenticate Sender: Must be an ACTIVE registered recipient in PASIKA
+  // 1. Authenticate Sender: Must be an ACTIVE registered recipient in GALINKA
   const recipient = getTelegramRecipientByChatId(cleanChatId);
   if (!recipient || !recipient.is_active) {
     logTelegramEvent({
@@ -34,7 +34,7 @@ export function executeOrderAction({
     return {
       success: false,
       error: "UNAUTHORIZED",
-      message: "⛔ Доступ заборонено: ваш Telegram акаунт не є авторизованим отримувачем PASIKA або деактивований.",
+      message: "⛔ Доступ заборонено: ваш Telegram акаунт не є авторизованим отримувачем або деактивований.",
     };
   }
 
@@ -48,19 +48,19 @@ export function executeOrderAction({
     };
   }
 
-  // 3. Verify Order Existence in PASIKA SQLite
+  // 3. Verify Order Existence in GALINKA SQLite
   const existingOrder = db.prepare("SELECT * FROM orders WHERE id = ?").get(cleanOrderId);
   if (!existingOrder) {
     return {
       success: false,
       error: "ORDER_NOT_FOUND",
-      message: "⚠️ Замовлення не знайдено в базі даних PASIKA.",
+      message: "⚠️ Замовлення не знайдено в базі даних.",
     };
   }
 
   const currentStatus = existingOrder.status;
 
-  // 4. Map Action to Official PASIKA Status
+  // 4. Map Action to Official Status
   // 'accept' -> 'PROCESSING'
   // 'reject' -> 'CANCELLED'
   let targetStatus = null;

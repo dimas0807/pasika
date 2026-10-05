@@ -1,11 +1,10 @@
 import { useEffect } from "react";
-import { Routes, Route, useLocation, Link } from "react-router-dom";
+import { Routes, Route, useLocation, Link, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Catalog from "./pages/Catalog";
 import Product from "./pages/Product";
-import GiftBoxes from "./pages/GiftBoxes";
 import About from "./pages/About";
 import Delivery from "./pages/Delivery";
 import Contacts from "./pages/Contacts";
@@ -13,6 +12,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import TrackOrder from "./pages/TrackOrder";
+import GiftBoxes from "./pages/GiftBoxes";
 
 import AdminLogin from "./admin/AdminLogin";
 import AdminLayout from "./admin/AdminLayout";
@@ -27,18 +27,27 @@ import SettingsAdmin from "./admin/SettingsAdmin";
 import CategoriesAdmin from "./admin/CategoriesAdmin";
 import HelpAdmin from "./admin/HelpAdmin";
 
-import BeeFlightSystem from "./components/BeeFlightSystem";
-
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash) {
+      setTimeout(() => {
+        const el = document.getElementById(hash.slice(1));
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+          return;
+        }
+      }, 100);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname, hash]);
   return null;
 }
 
 function StoreLayout({ children }) {
   return (
-    <div className="min-h-screen flex flex-col relative">
-      <BeeFlightSystem />
+    <div className="min-h-screen flex flex-col relative bg-[#121110] text-[#F4EFEA]">
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />
@@ -88,9 +97,9 @@ export default function App() {
 function NotFound() {
   return (
     <div className="container-p py-24 text-center">
-      <div className="text-4xl mb-3">🍯</div>
-      <h1 className="font-serif text-3xl font-bold text-ink">404</h1>
-      <p className="text-ink/60 mt-2">Сторінку не знайдено.</p>
+      <div className="text-5xl mb-4">🥩</div>
+      <h1 className="font-serif text-3xl font-bold text-[#F4EFEA]">404</h1>
+      <p className="text-[#A3988E] mt-2">Сторінку не знайдено.</p>
       <div className="mt-6">
         <Link to="/" className="btn-primary text-sm">
           Повернутися на головну

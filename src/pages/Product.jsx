@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import ProductImage from "../components/ProductImage";
 import { useCart } from "../context/CartContext";
-import { Products } from "../data/db";
-import { IconHoneyJar, IconSparkles, IconTruck, IconShieldCheck } from "../components/Icons";
+import { Products, Settings } from "../data/db";
+import { getSocialUrl } from "../utils/contacts";
+import { IconTruck, IconShieldCheck, IconViber, IconCheckCircle, IconCart } from "../components/Icons";
 
 export default function Product() {
   const { slug } = useParams();
@@ -15,9 +16,11 @@ export default function Product() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [activeTab, setActiveTab] = useState("desc");
+  const [s, setS] = useState(() => Settings.get());
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    Settings.fetch().then((data) => data && setS(data));
     Products.fetchBySlug(slug)
       .then((p) => {
         if (p) setProduct(p);
@@ -25,13 +28,15 @@ export default function Product() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  const phone = (s?.contacts?.phone || s?.store?.phone || "068 025 78 77").trim();
+  const viberRaw = (s?.contacts?.viber || "0680257877").trim();
+  const viberUrl = getSocialUrl("viber", viberRaw) || "viber://chat?number=%2B380680257877";
+
   if (loading && !product) {
     return (
       <div className="container-p py-24 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-3 animate-spin">
-          <IconHoneyJar className="w-6 h-6" />
-        </div>
-        <p className="text-ink/60 font-medium">Завантаження товару...</p>
+        <div className="text-4xl mb-3 animate-bounce">🥩</div>
+        <p className="text-[#A3988E] font-medium">Завантаження страви...</p>
       </div>
     );
   }
@@ -39,11 +44,9 @@ export default function Product() {
   if (!product) {
     return (
       <div className="container-p py-24 text-center max-w-sm mx-auto">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto flex items-center justify-center text-amber-800 mb-4 shadow-xs">
-          <IconHoneyJar className="w-8 h-8" />
-        </div>
-        <h2 className="font-serif text-2xl font-bold text-ink mb-2">Товар не знайдено</h2>
-        <p className="text-ink/60 text-sm">Можливо, він був розпроданий або переміщений.</p>
+        <div className="text-5xl mb-4">🥩</div>
+        <h2 className="font-serif text-2xl font-bold text-[#F4EFEA] mb-2">Страву не знайдено</h2>
+        <p className="text-[#A3988E] text-sm">Можливо, товар уже розпродано або його назва змінилася.</p>
         <Link to="/catalog" className="btn-primary mt-6 inline-flex text-sm">
           Повернутися до каталогу
         </Link>
@@ -63,7 +66,7 @@ export default function Product() {
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
     if (andCheckout) {
-      navigate("/cart");
+      navigate("/checkout");
     }
   };
 
@@ -74,29 +77,28 @@ export default function Product() {
   return (
     <div className="container-p py-8 md:py-12">
       {/* Breadcrumbs */}
-      <nav className="text-xs text-ink/50 mb-6 flex items-center gap-1.5 flex-wrap">
-        <Link to="/" className="hover:text-honey transition-colors">Головна</Link>
+      <nav className="text-xs text-[#8C8074] mb-6 flex items-center gap-1.5 flex-wrap">
+        <Link to="/" className="hover:text-bronze transition-colors">Головна</Link>
         <span>/</span>
-        <Link to="/catalog" className="hover:text-honey transition-colors">Каталог</Link>
+        <Link to="/catalog" className="hover:text-bronze transition-colors">Каталог</Link>
         <span>/</span>
-        <span className="text-ink/80 font-medium">{product.name}</span>
+        <span className="text-[#F4EFEA] font-medium">{product.name}</span>
       </nav>
 
       {/* Main Product Layout */}
       <div className="grid md:grid-cols-12 gap-8 lg:gap-12">
         {/* Left: Product Image */}
         <div className="md:col-span-6 lg:col-span-5">
-          <div className="glass-card p-3 sm:p-4 rounded-3xl sticky top-24">
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-[#FAF6EE] border border-amber-900/10">
+          <div className="p-3 sm:p-4 rounded-3xl bg-[#1C1815] border border-[#2F2821] shadow-2xl sticky top-24">
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-[#141210] border border-[#332A22]">
               <ProductImage
                 image={product.image}
                 category={product.category}
                 alt={product.name}
                 className="w-full h-full"
               />
-              <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-ink text-xs font-semibold px-3 py-1 rounded-full shadow-xs border border-amber-900/10 flex items-center gap-1.5">
-                <IconSparkles className="w-3.5 h-3.5 text-honey" />
-                <span>100% натурально</span>
+              <span className="absolute top-3 left-3 bg-black/75 backdrop-blur-md text-[#E8DFD5] text-xs font-semibold px-3 py-1 rounded-full shadow-xs border border-white/10 flex items-center gap-1.5">
+                <span>🔥 Натуральне копчення</span>
               </span>
             </div>
           </div>
@@ -106,44 +108,47 @@ export default function Product() {
         <div className="md:col-span-6 lg:col-span-7 flex flex-col">
           <div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-honey bg-cream px-3 py-1 rounded-full">
-                {product.category === "gift-boxes" ? "Подарунковий набір" : "Продукт пасіки"}
+              <span className="text-xs font-semibold uppercase tracking-wider text-bronze bg-[#26201B] border border-bronze/30 px-3 py-1 rounded-full">
+                Домашні делікатеси
               </span>
-              <span className={`badge ${isAvailable ? "bg-leaf/10 text-leaf" : "bg-red-50 text-red-500"}`}>
-                {isAvailable ? `В наявності (${availableStock} шт.)` : "Немає в наявності"}
+              <span className={`badge ${isAvailable ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40" : "bg-red-950/60 text-red-400 border border-red-800/40"}`}>
+                {isAvailable ? `Свіже в наявності` : "Під замовлення"}
               </span>
             </div>
 
-            <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-ink mt-3 leading-tight">
+            <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-[#F4EFEA] mt-3 leading-tight">
               {product.name}
             </h1>
 
-            {/* Reviews summary */}
-            <div className="flex items-center gap-2 mt-2 text-xs sm:text-sm text-ink/65">
-              <div className="text-amber-400">★★★★★</div>
-              <span className="font-semibold text-ink">4.9</span>
-              <span className="text-ink/40">•</span>
-              <span>24 задоволених покупців</span>
+            {/* Badges / Rating */}
+            <div className="flex items-center gap-2 mt-2 text-xs sm:text-sm text-[#A3988E]">
+              <span className="text-bronze">★★★★★</span>
+              <span className="font-bold text-[#F4EFEA]">5.0</span>
+              <span>•</span>
+              <span>100% задоволених покупців</span>
             </div>
 
             {/* Price section */}
-            <div className="mt-5 p-4 rounded-2xl glass-card border border-amber-900/10 flex items-baseline gap-3">
-              <span className="font-serif font-extrabold text-3xl sm:text-4xl text-ink">
-                {product.price} грн
+            <div className="mt-5 p-4 rounded-2xl bg-[#1C1815] border border-[#2F2821] flex items-baseline gap-3">
+              <span className="font-serif font-extrabold text-3xl sm:text-4xl text-[#F4EFEA]">
+                {product.price} <span className="text-xl font-sans font-normal text-bronze">грн</span>
               </span>
               {product.oldPrice && (
-                <span className="text-base text-ink/40 line-through">
+                <span className="text-base text-[#7A7065] line-through">
                   {product.oldPrice} грн
                 </span>
               )}
+              <span className="text-xs text-[#A3988E] ml-auto">
+                {product.weight ? `за ${product.weight}` : "за 1 кг"}
+              </span>
             </div>
 
             {/* Weight / Options */}
             {product.weight && (
               <div className="mt-6">
-                <div className="label">Фасування / Вага:</div>
-                <div className="inline-flex items-center gap-2 p-1 rounded-xl bg-white border border-ink/10">
-                  <span className="px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-honey text-ink shadow-2xs">
+                <div className="label">Фасування / Вага порції:</div>
+                <div className="inline-flex items-center gap-2 p-1.5 rounded-xl bg-[#181614] border border-[#332A22]">
+                  <span className="px-4 py-1 rounded-lg text-xs sm:text-sm font-bold bg-gradient-to-r from-bronze to-gold text-[#141210] shadow-sm">
                     {product.weight}
                   </span>
                 </div>
@@ -151,23 +156,23 @@ export default function Product() {
             )}
 
             {/* Quantity & Add to Cart */}
-            <div className="mt-7 flex flex-wrap items-center gap-4">
-              <div className="flex items-center border border-amber-900/15 rounded-xl bg-white shadow-2xs overflow-hidden h-12">
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <div className="flex items-center border border-[#3A332B] rounded-xl bg-[#181614] shadow-xs overflow-hidden h-12">
                 <button
                   type="button"
-                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center disabled:opacity-30"
+                  className="px-4 text-lg font-bold text-[#D1C7BD] hover:bg-[#25201C] hover:text-white transition-colors h-full flex items-center justify-center disabled:opacity-30"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
                   disabled={qty <= 1}
                   aria-label="Зменшити кількість"
                 >
                   −
                 </button>
-                <span className="px-4 font-bold text-sm text-ink min-w-8 text-center">
+                <span className="px-4 font-bold text-sm text-[#F4EFEA] min-w-8 text-center">
                   {qty}
                 </span>
                 <button
                   type="button"
-                  className="px-4 text-lg font-bold text-ink/70 hover:bg-cream hover:text-ink transition-colors h-full flex items-center justify-center disabled:opacity-30"
+                  className="px-4 text-lg font-bold text-[#D1C7BD] hover:bg-[#25201C] hover:text-white transition-colors h-full flex items-center justify-center disabled:opacity-30"
                   onClick={() => setQty((q) => Math.min(availableStock, q + 1))}
                   disabled={qty >= availableStock}
                   aria-label="Збільшити кількість"
@@ -182,20 +187,19 @@ export default function Product() {
                 disabled={!isAvailable}
                 className={`flex-1 h-12 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
                   added
-                    ? "bg-leaf text-white shadow-md"
+                    ? "bg-emerald-600 text-white shadow-md"
                     : "btn-primary disabled:opacity-40 disabled:pointer-events-none"
                 }`}
               >
                 {added ? (
                   <>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <IconCheckCircle className="w-5 h-5 text-white" />
                     <span>Додано в кошик!</span>
                   </>
                 ) : (
                   <>
-                    <span>В кошик ({qty * product.price} грн)</span>
+                    <IconCart className="w-5 h-5" />
+                    <span>Додати до кошика ({qty * product.price} грн)</span>
                   </>
                 )}
               </button>
@@ -204,40 +208,53 @@ export default function Product() {
                 type="button"
                 onClick={() => handleAddToCart(true)}
                 disabled={!isAvailable}
-                className="btn-secondary h-12 px-5 text-sm whitespace-nowrap"
+                className="btn-secondary h-12 px-5 text-sm whitespace-nowrap font-bold"
               >
-                Купити зараз
+                Оформити
               </button>
             </div>
 
+            {/* Direct Viber CTA */}
+            <div className="mt-4">
+              <a
+                href={viberUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full btn-viber text-sm h-12"
+              >
+                <IconViber className="w-5 h-5 text-white" />
+                <span>Замовити або запитати Галину у Viber</span>
+              </a>
+            </div>
+
             {/* Trust highlights */}
-            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4 p-4 rounded-2xl glass-card border border-amber-900/10 text-center">
+            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4 p-4 rounded-2xl bg-[#1C1815] border border-[#2F2821] text-center">
               <div>
-                <IconTruck className="w-5 h-5 mx-auto text-honey" />
-                <div className="text-xs font-bold text-ink mt-1.5">1–2 дні</div>
-                <div className="text-[11px] text-ink/50">Швидка доставка</div>
+                <IconTruck className="w-5 h-5 mx-auto text-bronze" />
+                <div className="text-xs font-bold text-[#F4EFEA] mt-1.5">1–2 дні</div>
+                <div className="text-[11px] text-[#8C8074]">Нова Пошта</div>
               </div>
-              <div className="border-x border-amber-900/10">
-                <IconShieldCheck className="w-5 h-5 mx-auto text-emerald-600" />
-                <div className="text-xs font-bold text-ink mt-1.5">100% Чистий</div>
-                <div className="text-[11px] text-ink/50">Без домішок</div>
+              <div className="border-x border-[#2F2821]">
+                <IconShieldCheck className="w-5 h-5 mx-auto text-bronze" />
+                <div className="text-xs font-bold text-[#F4EFEA] mt-1.5">На дровах</div>
+                <div className="text-[11px] text-[#8C8074]">Без рідкого диму</div>
               </div>
               <div>
-                <IconHoneyJar className="w-5 h-5 mx-auto text-honey" />
-                <div className="text-xs font-bold text-ink mt-1.5">З пасіки</div>
-                <div className="text-[11px] text-ink/50">Свіжий збір</div>
+                <span className="text-xl block">❄️</span>
+                <div className="text-xs font-bold text-[#F4EFEA] mt-1.5">Термобокс</div>
+                <div className="text-[11px] text-[#8C8074]">Зберігає свіжість</div>
               </div>
             </div>
 
             {/* Information Tabs */}
-            <div className="mt-8 border-t border-ink/10 pt-6">
-              <div className="flex gap-4 border-b border-ink/10 pb-2">
+            <div className="mt-8 border-t border-[#2C2621] pt-6">
+              <div className="flex gap-4 border-b border-[#2C2621] pb-2">
                 <button
                   onClick={() => setActiveTab("desc")}
                   className={`text-sm font-bold pb-2 transition-colors relative ${
                     activeTab === "desc"
-                      ? "text-honey after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey"
-                      : "text-ink/60 hover:text-ink"
+                      ? "text-bronze after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-bronze"
+                      : "text-[#8C8074] hover:text-[#D1C7BD]"
                   }`}
                 >
                   Опис
@@ -246,8 +263,8 @@ export default function Product() {
                   onClick={() => setActiveTab("benefits")}
                   className={`text-sm font-bold pb-2 transition-colors relative ${
                     activeTab === "benefits"
-                      ? "text-honey after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey"
-                      : "text-ink/60 hover:text-ink"
+                      ? "text-bronze after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-bronze"
+                      : "text-[#8C8074] hover:text-[#D1C7BD]"
                   }`}
                 >
                   Склад та зберігання
@@ -256,28 +273,28 @@ export default function Product() {
                   onClick={() => setActiveTab("delivery")}
                   className={`text-sm font-bold pb-2 transition-colors relative ${
                     activeTab === "delivery"
-                      ? "text-honey after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-honey"
-                      : "text-ink/60 hover:text-ink"
+                      ? "text-bronze after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-bronze"
+                      : "text-[#8C8074] hover:text-[#D1C7BD]"
                   }`}
                 >
-                  Доставка
+                  Доставка та оплата
                 </button>
               </div>
 
-              <div className="pt-4 text-sm text-ink/75 leading-relaxed">
+              <div className="pt-4 text-sm text-[#CFC5BA] leading-relaxed">
                 {activeTab === "desc" && (
-                  <p>{product.description || "Натуральний свіжий мед прямо з нашої пасіки. Зібраний у чистій екологічній зоні без додавання консервантів."}</p>
+                  <p>{product.description || "Натуральні домашні делікатеси власного копчення. Приготовані за родинним рецептом на сухих дровах без додавання шкідливих хімічних речовин."}</p>
                 )}
                 {activeTab === "benefits" && (
-                  <ul className="list-disc list-inside space-y-1.5">
-                    <li>Склад: 100% натуральний продукт бджільництва.</li>
-                    <li>Термін придатності: 24 місяці з дати фасування.</li>
-                    <li>Зберігати у сухому темному місці при температурі від +5°C до +25°C.</li>
+                  <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm">
+                    <li>Склад: добірне фермерське м'ясо (свинина / птиця), сіль харчова, свіжий часник, суміш мелених перців.</li>
+                    <li>Без сої, крохмалю, глютамату натрію та рідкого диму.</li>
+                    <li>Термін придатності: у герметичній вакуумній упаковці — до 30 діб при температурі +2°C...+6°C. Після відкриття — до 7 діб.</li>
                   </ul>
                 )}
                 {activeTab === "delivery" && (
                   <p>
-                    Відправляємо Новою Поштою та Укрпоштою по всій Україні у надійному протиударному пакуванні. Можлива оплата при отриманні або на картку.
+                    Відправляємо Новою Поштою по всій території України. Кожне замовлення дбайливо вакуумується та пакується у термоізоляційні коробки з холодоелементами. Оплата: при отриманні у відділенні (накладений платіж) або переказ за реквізитами.
                   </p>
                 )}
               </div>
@@ -288,16 +305,16 @@ export default function Product() {
 
       {/* Related Products */}
       {related.length > 0 && (
-        <section className="mt-16 sm:mt-24 border-t border-ink/10 pt-10">
+        <section className="mt-16 sm:mt-24 border-t border-[#2C2621] pt-10">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-              Вам також може сподобатися
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F4EFEA]">
+              Також смакує разом
             </h2>
-            <Link to="/catalog" className="text-xs sm:text-sm font-semibold text-honey hover:underline">
-              Більше в каталозі →
+            <Link to="/catalog" className="text-xs sm:text-sm font-bold text-bronze hover:underline">
+              Більше страв у каталозі →
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

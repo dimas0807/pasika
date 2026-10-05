@@ -3,12 +3,12 @@ import { Auth, Settings, Telegram, Backups, DeliveryAccounts } from "../data/db"
 
 const TABS = [
   { id: "store", label: "Магазин", icon: "🏪" },
+  { id: "contacts", label: "Контакти та соцмережі", icon: "📞" },
+  { id: "about", label: "Про Галинку", icon: "👩‍🍳" },
+  { id: "delivery", label: "Доставка / Нова Пошта", icon: "🚚" },
   { id: "payment", label: "Оплата", icon: "💳" },
-  { id: "delivery", label: "Доставка", icon: "🚚" },
   { id: "telegram", label: "Telegram", icon: "💬" },
   { id: "backup", label: "Резервні копії", icon: "💾" },
-  { id: "about", label: "Про нас", icon: "🌿" },
-  { id: "contacts", label: "Контакти", icon: "📞" },
   { id: "security", label: "Безпека", icon: "🔒" },
 ];
 
@@ -340,7 +340,7 @@ export default function SettingsAdmin() {
     setTgTestResult(null);
     try {
       const token = settings?.telegram?.botToken;
-      const chatId = settings?.telegram?.chatId || "287686358";
+      const chatId = settings?.telegram?.chatId || "";
       const res = await Telegram.testConnection({ botToken: token, chatId });
       if (res && res.ok) {
         setTgTestResult({
@@ -389,16 +389,16 @@ export default function SettingsAdmin() {
       </div>
 
       {/* Tabs navigation - horizontally scrollable for mobile */}
-      <div className="flex gap-1.5 p-1.5 bg-cream/50 rounded-2xl border border-ink/5 overflow-x-auto no-scrollbar scroll-smooth">
+      <div className="flex gap-1.5 p-1.5 bg-[#181614] rounded-2xl border border-[#3A332B] overflow-x-auto no-scrollbar scroll-smooth">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-medium whitespace-nowrap shrink-0 min-h-[44px] transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold whitespace-nowrap shrink-0 min-h-[44px] transition-all border ${
               activeTab === tab.id
-                ? "bg-white text-ink shadow-xs font-semibold"
-                : "text-ink/65 hover:text-ink hover:bg-white/50"
+                ? "bg-bronze text-[#141210] border-gold shadow-xs font-bold"
+                : "bg-[#221D19] text-[#D1C7BD] border-[#332C26] hover:text-[#FFFFFF] hover:bg-[#2A241F]"
             }`}
           >
             <span className="text-base">{tab.icon}</span>
@@ -457,7 +457,7 @@ export default function SettingsAdmin() {
               <div>
                 <Field
                   label="Слоган / короткий опис"
-                  value={settings?.store?.description ?? settings?.store?.tagline ?? "Натуральний мед та продукти бджільництва з родинної пасіки на Прикарпатті."}
+                  value={settings?.store?.description ?? settings?.store?.tagline ?? "Справжні домашні ковбаси та копченості від Галинки. Натуральне копчення на дровах."}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSettings((s) => {
@@ -877,6 +877,98 @@ export default function SettingsAdmin() {
                       value={settings?.delivery?.notes || ""}
                       onChange={setPath("delivery.notes")}
                       placeholder="Надійно упаковуємо скляні банки у захисний повітряний матеріал та картонні бокси..."
+                      className="input text-base sm:text-sm min-h-[44px]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. INTERNATIONAL DELIVERY SETTINGS */}
+              <div className="card p-5 sm:p-6 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-ink/5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🌍</span>
+                    <div>
+                      <h3 className="font-serif text-lg font-bold text-ink">
+                        Міжнародна доставка
+                      </h3>
+                      <p className="text-xs text-ink/50">
+                        Налаштування умов, країн, перевізників та тарифів для замовлень за кордон
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs font-bold cursor-pointer bg-cream/50 px-3 py-1.5 rounded-xl border border-ink/10">
+                    <input
+                      type="checkbox"
+                      checked={settings?.delivery?.international?.enabled ?? true}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setSettings((prev) => ({
+                          ...prev,
+                          delivery: {
+                            ...prev?.delivery,
+                            international: {
+                              ...prev?.delivery?.international,
+                              enabled: val,
+                            },
+                          },
+                        }));
+                      }}
+                      className="w-4 h-4 rounded text-leaf"
+                    />
+                    <span>Увімкнено для клієнтів</span>
+                  </label>
+                </div>
+
+                <div className="space-y-4">
+                  <Field
+                    label="Країни доставки"
+                    value={settings?.delivery?.international?.countries ?? "Польща, Німеччина, Чехія, Італія, Іспанія, Молдова та інші країни ЄС"}
+                    onChange={setPath("delivery.international.countries")}
+                    placeholder="Польща, Німеччина, Чехія тощо"
+                  />
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Field
+                      label="Спосіб доставки"
+                      value={settings?.delivery?.international?.deliveryMethod ?? "Міжнародні перевізники (Nova Post Global, Meest Post)"}
+                      onChange={setPath("delivery.international.deliveryMethod")}
+                      placeholder="Nova Post Global, Meest Post"
+                    />
+                    <Field
+                      label="Терміни доставки"
+                      value={settings?.delivery?.international?.terms ?? "3–7 робочих днів"}
+                      onChange={setPath("delivery.international.terms")}
+                      placeholder="3–7 робочих днів"
+                    />
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Field
+                      label="Вартість доставки (інформаційний опис)"
+                      value={settings?.delivery?.international?.cost ?? "За тарифами перевізника (розраховується менеджером при підтвердженні)"}
+                      onChange={setPath("delivery.international.cost")}
+                      placeholder="За тарифами перевізника"
+                    />
+                    <Field
+                      label="Мінімальна сума замовлення для міжнародної доставки, грн"
+                      type="number"
+                      value={settings?.delivery?.international?.minOrder ?? 1000}
+                      onChange={setPath("delivery.international.minOrder")}
+                      placeholder="1000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label text-xs sm:text-sm font-semibold">
+                      Інформаційний текст для клієнтів (показується на сторінці доставки та в чекауті)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={settings?.delivery?.international?.infoText ?? ""}
+                      onChange={setPath("delivery.international.infoText")}
+                      placeholder="Опишіть особливості термоупаковки, збереження холоду та процес оформлення за кордон..."
                       className="input text-base sm:text-sm min-h-[44px]"
                     />
                   </div>
@@ -1403,10 +1495,10 @@ export default function SettingsAdmin() {
                 </div>
 
                 <div>
-                  <label className="label text-xs sm:text-sm font-semibold">Опис пасіки / повна історія</label>
+                  <label className="label text-xs sm:text-sm font-semibold">Опис магазину / історія Галинки</label>
                   <textarea
                     rows={6}
-                    value={settings?.about?.fullDescription ?? settings?.about?.story ?? "Перший наш вулик з'явився 10 років назад, а сьогодні на нашій пасіці налічується понад 100 вуликів. З того часу любов до бджільництва виросла у власне сімейне виробництво натурального меду найвищої якості."}
+                    value={settings?.about?.fullDescription ?? settings?.about?.story ?? "Мене звати Галина, і я готую для вас справжні домашні ковбаси та копченості. Тільки свіже добірне м'ясо, натуральні спеції та традиційне копчення на дровах без хімії."}
                     onChange={(e) => {
                       const val = e.target.value;
                       setSettings((s) => {
@@ -1417,7 +1509,7 @@ export default function SettingsAdmin() {
                         return next;
                       });
                     }}
-                    placeholder="Детальний опис пасіки, традицій та цінностей..."
+                    placeholder="Детальний опис виробництва, традицій та цінностей..."
                     className="input text-base sm:text-sm min-h-[44px]"
                   />
                 </div>
@@ -1493,31 +1585,31 @@ export default function SettingsAdmin() {
                     label="Телефон"
                     value={settings?.contacts?.phone || ""}
                     onChange={setPath("contacts.phone")}
-                    placeholder="+380 67 835 23 11"
+                    placeholder="+380 68 025 78 77"
                   />
                   <Field
                     label="Email"
                     value={settings?.contacts?.email || ""}
                     onChange={setPath("contacts.email")}
-                    placeholder="hello@pasika-honey.ua"
+                    placeholder="galinka@meat-paradise.ua"
                   />
                   <Field
                     label="Telegram (@username або посилання)"
                     value={settings?.contacts?.telegram || ""}
                     onChange={setPath("contacts.telegram")}
-                    placeholder="@pasika_honey"
+                    placeholder="@galinka_meat"
                   />
                   <Field
                     label="Viber (номер або чат)"
                     value={settings?.contacts?.viber || ""}
                     onChange={setPath("contacts.viber")}
-                    placeholder="+380 67 835 23 11"
+                    placeholder="+380 68 025 78 77"
                   />
                   <Field
                     label="Instagram (@профіль або посилання)"
                     value={settings?.contacts?.instagram || ""}
                     onChange={setPath("contacts.instagram")}
-                    placeholder="@honey_pasika"
+                    placeholder="@galinka_kopchenosti"
                   />
                   <Field
                     label="Facebook (профіль або сторінка)"
@@ -1529,7 +1621,13 @@ export default function SettingsAdmin() {
                     label="TikTok (@профіль або посилання)"
                     value={settings?.contacts?.tiktok || ""}
                     onChange={setPath("contacts.tiktok")}
-                    placeholder="@honey.dsv"
+                    placeholder="@kopchonosti777"
+                  />
+                  <Field
+                    label="YouTube (канал або посилання)"
+                    value={settings?.contacts?.youtube || ""}
+                    onChange={setPath("contacts.youtube")}
+                    placeholder="https://youtube.com/@..."
                   />
                 </div>
               </div>
@@ -1724,7 +1822,7 @@ export default function SettingsAdmin() {
                   type="text"
                   value={recipientForm.username}
                   onChange={(e) => setRecipientForm((f) => ({ ...f, username: e.target.value }))}
-                  placeholder="@pasika_honey"
+                  placeholder="@galinka_manager"
                   className="input font-mono text-base sm:text-xs min-h-[44px]"
                 />
               </div>
@@ -2024,7 +2122,7 @@ function BackupSection() {
           <span className="text-3xl">💾</span>
           <div>
             <h2 className="font-serif text-lg font-bold text-ink">
-              Резервні копії бази даних SQLite (pasika.db)
+              Резервні копії бази даних SQLite (galinka.db)
             </h2>
             <p className="text-xs text-ink/50">
               Постійне збереження всіх замовлень, клієнтів, товарів, статусів та налаштувань

@@ -1,4 +1,4 @@
-// Server-backed data layer for Honey Pasika.
+// Server-backed data layer for Galinka (М'ясний рай у Галинки).
 // Connects to the Express & SQLite backend (/api/*), removing any dependency
 // on localStorage for critical data.
 import { PRODUCTS as SEED_PRODUCTS, CATEGORIES as SEED_CATEGORIES, DEFAULT_SETTINGS as SEED_SETTINGS } from "./seed";
@@ -51,15 +51,12 @@ export function getApiBase() {
       return "";
     }
   }
-  return (
-    import.meta.env?.VITE_API_URL ||
-    (import.meta.env?.PROD ? "https://pasika-production.up.railway.app" : "")
-  ).replace(/\/$/, "");
+  return (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
 }
 
 export const API_BASE = getApiBase();
 
-const TOKEN_STORAGE_KEY = "pasika_admin_token";
+const TOKEN_STORAGE_KEY = "galinka_admin_token";
 
 export function getAdminToken() {
   try {
@@ -371,7 +368,7 @@ export const Orders = {
     const mem = state.orders.find((o) => o.id === id || o.orderCode === id);
     if (mem) return mem;
     try {
-      const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+      const stored = JSON.parse(localStorage.getItem("galinka_recent_orders") || "[]");
       const found = stored.find((o) => o.id === id || o.orderCode === id);
       if (found) return found;
     } catch {}
@@ -413,9 +410,9 @@ export const Orders = {
       };
       state.orders.unshift(orderWithToken);
       try {
-        const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+        const stored = JSON.parse(localStorage.getItem("galinka_recent_orders") || "[]");
         stored.unshift(orderWithToken);
-        localStorage.setItem("pasika_recent_orders", JSON.stringify(stored.slice(0, 30)));
+        localStorage.setItem("galinka_recent_orders", JSON.stringify(stored.slice(0, 30)));
       } catch {}
       notify();
       return orderWithToken;
@@ -478,14 +475,14 @@ export const Orders = {
     } catch (err) {
       // Local fallback for client resilience
       try {
-        const stored = JSON.parse(localStorage.getItem("pasika_recent_orders") || "[]");
+        const stored = JSON.parse(localStorage.getItem("galinka_recent_orders") || "[]");
         const clean = code.trim().toLowerCase();
         const found = stored.find(
           (o) =>
             o.orderCode?.toLowerCase() === clean ||
             o.order_code?.toLowerCase() === clean ||
             o.id?.toLowerCase() === clean ||
-            String(o.number) === clean.replace(/^pas-/i, "") ||
+            String(o.number) === clean.replace(/^(gal|pas)-/i, "") ||
             o.delivery?.trackingNumber === code.trim()
         );
         if (found) {
@@ -493,8 +490,8 @@ export const Orders = {
             found: true,
             id: found.id,
             number: found.number,
-            orderCode: found.orderCode || `PAS-${found.number}`,
-            order_code: found.orderCode || `PAS-${found.number}`,
+            orderCode: found.orderCode || `GAL-${found.number}`,
+            order_code: found.orderCode || `GAL-${found.number}`,
             status: found.status,
             createdAt: found.createdAt,
             total: found.total,
